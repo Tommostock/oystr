@@ -254,3 +254,48 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #555555;
 }
+
+/* ========================================
+ * HIDE SCROLLBAR UTILITY
+ * Hides the scrollbar but keeps scroll functionality.
+ * Used for the line toggle horizontal scroll.
+ * ======================================== */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ========================================
+ * LEAFLET OVERRIDES
+ * Custom styles for Leaflet map components
+ * to match the dot-matrix aesthetic.
+ * ======================================== */
+
+/* Station tooltip on hover */
+.station-tooltip {
+  background-color: #111111 !important;
+  border: 1px solid #ff9500 !important;
+  color: #ff9500 !important;
+  padding: 4px 8px !important;
+  border-radius: 0 !important;
+  box-shadow: 0 0 8px rgba(255, 149, 0, 0.2) !important;
+  font-family: var(--font-share-tech-mono), "Courier New", monospace;
+}
+
+.station-tooltip::before {
+  border-top-color: #ff9500 !important;
+}
+
+/* Remove default Leaflet attribution background */
+.leaflet-control-attribution {
+  background: rgba(10, 10, 10, 0.7) !important;
+  color: #664400 !important;
+  font-size: 9px !important;
+}
+
+.leaflet-control-attribution a {
+  color: #cc7700 !important;
+}
