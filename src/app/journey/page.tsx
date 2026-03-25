@@ -29,10 +29,12 @@ import { cn } from "@/lib/utils";
  * TYPES
  * ======================================== */
 
-/** Minimal station info needed for journey planning */
+/** Station info needed for journey planning */
 interface StationInfo {
   naptanId: string;
   name: string;
+  lat: number;
+  lon: number;
 }
 
 export default function JourneyPage() {
@@ -57,10 +59,15 @@ export default function JourneyPage() {
     setHasSearched(true);
 
     try {
-      /* Build the API URL */
+      /*
+       * Build the API URL.
+       * Use lat,lon coordinates instead of IDs because TfL's Journey API
+       * doesn't reliably accept hub IDs (returns 300 disambiguation).
+       * Coordinates always work.
+       */
       const params = new URLSearchParams({
-        from: fromStation.naptanId,
-        to: toStation.naptanId,
+        from: `${fromStation.lat},${fromStation.lon}`,
+        to: `${toStation.lat},${toStation.lon}`,
         timeIs: timeIs,
       });
 
@@ -130,6 +137,8 @@ export default function JourneyPage() {
                 setFromStation({
                   naptanId: station.naptanId,
                   name: station.name,
+                  lat: station.lat,
+                  lon: station.lon,
                 })
               }
               placeholder="Departure station..."
@@ -163,6 +172,8 @@ export default function JourneyPage() {
                 setToStation({
                   naptanId: station.naptanId,
                   name: station.name,
+                  lat: station.lat,
+                  lon: station.lon,
                 })
               }
               placeholder="Destination station..."
