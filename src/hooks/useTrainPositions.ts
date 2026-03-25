@@ -282,7 +282,8 @@ export function useTrainPositions(
      * Intervals are managed incrementally above (started/stopped per line).
      * Only clean up everything on full unmount via a separate effect below.
      */
-  }, [activeLinesKey, fetchTrains, stationLookup.size]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeLinesKey, stationLookup.size]);
 
   /* Clean up all intervals on unmount only */
   useEffect(() => {

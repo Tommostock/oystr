@@ -16,6 +16,7 @@ import { Share_Tech_Mono, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import BottomNav from "@/components/shared/BottomNav";
 import OfflineBanner from "@/components/shared/OfflineBanner";
+import InstallPrompt from "@/components/shared/InstallPrompt";
 
 /* ========================================
  * FONT LOADING
@@ -94,6 +95,9 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-board-bg text-amber antialiased">
         {/* Offline banner — only shows when there's no internet */}
         <OfflineBanner />
+
+        {/* Install prompt — shows for first-time visitors when app is installable */}
+        <InstallPrompt />
 
         {/*
          * Main content area.
