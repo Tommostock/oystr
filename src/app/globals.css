@@ -1,130 +1,256 @@
+/*
+ * globals.css — Oystr Design System
+ *
+ * This file defines the entire visual theme for Oystr.
+ * The app is styled to look like TfL's amber dot-matrix departure boards.
+ *
+ * Colour palette:
+ *   - Background:  #0a0a0a (near-black, like the board housing)
+ *   - Surface:     #111111 (card/panel backgrounds)
+ *   - Border:      #1a1a1a (subtle panel edges)
+ *   - Amber:       #ff9500 (primary LED text colour)
+ *   - Amber dim:   #cc7700 (secondary/dimmer text)
+ *   - Amber faint: #664400 (placeholder/inactive text)
+ *   - Error/red:   #ff3b30 (disruptions and severe delays)
+ *   - Good/green:  #34c759 (good service status)
+ */
+
+/* Import Tailwind CSS v4 and shadcn animation utilities */
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Dark mode variant for shadcn/ui compatibility */
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Tailwind v4 theme configuration
+ * This replaces the old tailwind.config.js — all config is done in CSS now.
+ * We define custom colours, fonts, and border-radius values here.
+ */
 @theme inline {
+  /* ========================================
+   * FONTS
+   * Share Tech Mono  = primary (dot-matrix look)
+   * IBM Plex Mono    = secondary (more readable)
+   * ======================================== */
+  --font-mono: var(--font-share-tech-mono), "Courier New", monospace;
+  --font-sans: var(--font-ibm-plex-mono), "Courier New", monospace;
+  --font-heading: var(--font-share-tech-mono), "Courier New", monospace;
+
+  /* ========================================
+   * CUSTOM COLOURS — Dot-Matrix Palette
+   * Use these with Tailwind classes like:
+   *   text-amber, bg-surface, border-board-border
+   * ======================================== */
+  --color-amber: #ff9500;
+  --color-amber-dim: #cc7700;
+  --color-amber-faint: #664400;
+  --color-board-bg: #0a0a0a;
+  --color-surface: #111111;
+  --color-board-border: #1a1a1a;
+  --color-good: #34c759;
+  --color-error: #ff3b30;
+
+  /* ========================================
+   * SHADCN/UI COLOUR OVERRIDES
+   * These map shadcn's design tokens to our dot-matrix theme
+   * so that any shadcn component we use looks correct.
+   * ======================================== */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* No rounded corners — sharp edges like real boards */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+  --radius-4xl: 0px;
 }
 
+/*
+ * CSS Custom Properties — Dark dot-matrix theme
+ * We only use dark mode, so :root IS the dark theme.
+ * All shadcn/ui variables are set to our amber palette.
+ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: #0a0a0a;
+  --foreground: #ff9500;
+  --card: #111111;
+  --card-foreground: #ff9500;
+  --popover: #111111;
+  --popover-foreground: #ff9500;
+  --primary: #ff9500;
+  --primary-foreground: #0a0a0a;
+  --secondary: #1a1a1a;
+  --secondary-foreground: #cc7700;
+  --muted: #1a1a1a;
+  --muted-foreground: #664400;
+  --accent: #ff9500;
+  --accent-foreground: #0a0a0a;
+  --destructive: #ff3b30;
+  --border: #1a1a1a;
+  --input: #1a1a1a;
+  --ring: #ff9500;
+  --radius: 0px;
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-}
-
+/* ========================================
+ * BASE STYLES
+ * Applied to all elements globally.
+ * ======================================== */
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
+
   html {
-    @apply font-sans;
+    /* Use the dot-matrix mono font everywhere */
+    @apply font-mono;
   }
+
+  body {
+    /* Near-black background, amber text, no overflow-x on mobile */
+    @apply bg-board-bg text-amber overflow-x-hidden;
+  }
+}
+
+/* ========================================
+ * AMBER GLOW EFFECT
+ * Adds a soft LED glow behind amber text.
+ * Use: className="amber-glow"
+ * ======================================== */
+.amber-glow {
+  text-shadow: 0 0 8px rgba(255, 149, 0, 0.4);
+}
+
+/* Stronger glow for headings and important text */
+.amber-glow-strong {
+  text-shadow:
+    0 0 8px rgba(255, 149, 0, 0.5),
+    0 0 20px rgba(255, 149, 0, 0.2);
+}
+
+/* ========================================
+ * SCANLINE OVERLAY
+ * Creates subtle horizontal lines over panels,
+ * simulating the look of an LED dot-matrix display.
+ * Use: className="scanline" on a positioned container.
+ * ======================================== */
+.scanline {
+  position: relative;
+}
+
+.scanline::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* Repeating thin lines every 3px, very low opacity */
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 3px
+  );
+  opacity: 0.03;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* ========================================
+ * BOARD PANEL
+ * The recessed panel style used for departure boards.
+ * Use: className="board-panel"
+ * ======================================== */
+.board-panel {
+  background-color: #111111;
+  border: 1px solid #1a1a1a;
+  /* Inset shadow makes it look recessed into the housing */
+  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+/* ========================================
+ * BLINKING CURSOR ANIMATION
+ * Used for loading states — "LOADING..." blinks
+ * like a real board booting up.
+ * ======================================== */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* ========================================
+ * PULSING DOT ANIMATION
+ * Used for live train position indicators on the map.
+ * ======================================== */
+@keyframes pulse-dot {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.4);
+    opacity: 0.7;
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* ========================================
+ * DOT-MATRIX TEXT STYLE
+ * Wide letter-spacing and uppercase, like LED characters.
+ * Use: className="dot-matrix"
+ * ======================================== */
+.dot-matrix {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-family: var(--font-share-tech-mono), "Courier New", monospace;
+}
+
+/* ========================================
+ * SCROLLBAR STYLING
+ * Dark scrollbar to match the theme.
+ * ======================================== */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333333;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555555;
 }
