@@ -9,6 +9,7 @@
  *   - Dark CartoDB tiles for the retro aesthetic
  *   - Circle markers for each station
  *   - Polylines connecting stations on each line
+ *   - Live train dots: pulsing circles showing real-time train positions
  *   - Tap a station to see live departures in a bottom sheet
  *   - Line toggle buttons to show/hide lines
  *
@@ -17,7 +18,7 @@
 
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -27,8 +28,12 @@ import {
   useMap,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { LINE_COLOURS, LINE_NAMES } from "@/lib/constants";
+import { LINE_COLOURS } from "@/lib/constants";
 import type { RouteSequenceResponse } from "@/lib/tfl-types";
+import {
+  useTrainPositions,
+  type StationLookup,
+} from "@/hooks/useTrainPositions";
 import AmberText from "@/components/shared/AmberText";
 
 /* ========================================
@@ -90,7 +95,6 @@ const MAP_LINE_IDS = [
 
 /* ========================================
  * HELPER: Invalidate map size on mount
- * Leaflet needs a kick when rendered in a flexbox container.
  * ======================================== */
 function MapResizer() {
   const map = useMap();
@@ -117,12 +121,32 @@ export default function TubeMap({
   const fetchedLines = useRef<Set<string>>(new Set());
 
   /**
+   * Build a station lookup map for the train tracking hook.
+   * Maps station names to their coordinates for position resolution.
+   */
+  const stationLookup: StationLookup = useMemo(() => {
+    const lookup: StationLookup = new Map();
+    for (const [, station] of stations) {
+      lookup.set(station.name, {
+        lat: station.lat,
+        lon: station.lon,
+        naptanId: station.naptanId,
+      });
+    }
+    return lookup;
+  }, [stations]);
+
+  /*
+   * Live train positions — polls every 15 seconds for active lines.
+   * Only starts fetching once we have station data for coordinate lookups.
+   */
+  const { trains } = useTrainPositions(activeLines, stationLookup);
+
+  /**
    * Fetch route data for a single line.
-   * Extracts station coordinates and polyline paths.
    */
   const fetchLineRoute = useCallback(
     async (lineId: string) => {
-      /* Skip if already fetched */
       if (fetchedLines.current.has(lineId)) return;
       fetchedLines.current.add(lineId);
 
@@ -132,7 +156,6 @@ export default function TubeMap({
 
         const data: RouteSequenceResponse = await response.json();
 
-        /* Extract stations from all branch sequences */
         const newStations = new Map<string, MapStation>();
         const branches: [number, number][][] = [];
 
@@ -140,7 +163,6 @@ export default function TubeMap({
           const branchCoords: [number, number][] = [];
 
           for (const stop of seq.stopPoint || []) {
-            /* Add station to our collection */
             const existing = stations.get(stop.naptanId) ||
               newStations.get(stop.naptanId) || {
                 naptanId: stop.naptanId,
@@ -152,8 +174,6 @@ export default function TubeMap({
 
             existing.lines.add(lineId);
             newStations.set(stop.naptanId, existing);
-
-            /* Add to this branch's polyline */
             branchCoords.push([stop.lat, stop.lon]);
           }
 
@@ -162,7 +182,6 @@ export default function TubeMap({
           }
         }
 
-        /* Update state with new stations and route */
         setStations((prev) => {
           const merged = new Map(prev);
           newStations.forEach((station, id) => {
@@ -230,6 +249,15 @@ export default function TubeMap({
         </div>
       )}
 
+      {/* Train count indicator */}
+      {trains.length > 0 && (
+        <div className="absolute top-2 right-2 z-[1000] bg-board-bg/90 px-2 py-1 border border-board-border">
+          <AmberText variant="dim" size="xs">
+            {trains.length} TRAINS LIVE
+          </AmberText>
+        </div>
+      )}
+
       <MapContainer
         center={LONDON_CENTER}
         zoom={DEFAULT_ZOOM}
@@ -287,6 +315,34 @@ export default function TubeMap({
                 {station.name
                   .replace(/\s*Underground Station$/i, "")
                   .replace(/\s*DLR Station$/i, "")
+                  .replace(/\s*Station$/i, "")}
+              </span>
+            </Tooltip>
+          </CircleMarker>
+        ))}
+
+        {/* ---- Live train dots (larger and brighter than station markers) ---- */}
+        {trains.map((train) => (
+          <CircleMarker
+            key={`train-${train.vehicleId}`}
+            center={train.position}
+            radius={6}
+            pathOptions={{
+              color: "#ffffff",
+              fillColor: LINE_COLOURS[train.lineId] || "#FF9500",
+              fillOpacity: 1,
+              weight: 2,
+              opacity: 0.8,
+            }}
+          >
+            <Tooltip
+              direction="top"
+              offset={[0, -8]}
+              className="station-tooltip"
+            >
+              <span className="font-mono text-[10px] tracking-wider uppercase">
+                {train.destination
+                  .replace(/\s*Underground Station$/i, "")
                   .replace(/\s*Station$/i, "")}
               </span>
             </Tooltip>
