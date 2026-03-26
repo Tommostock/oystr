@@ -117,7 +117,6 @@ export const TRAIN_TRACKING_POLL_INTERVAL = 15_000; // 15 seconds
  * ======================================== */
 export const NAV_TABS = [
   { href: "/", label: "Departures", icon: "train" },
-  { href: "/map", label: "Map", icon: "map" },
   { href: "/journey", label: "Journey", icon: "route" },
   { href: "/status", label: "Status", icon: "activity" },
   { href: "/saved", label: "Saved", icon: "star" },
