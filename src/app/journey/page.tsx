@@ -65,27 +65,27 @@ export default function JourneyPage() {
 
     try {
       /*
-       * Build the API URL.
+       * Resolve station IDs for the Journey API.
        *
-       * Use the station's naptanId when available — this tells TfL the
-       * journey starts/ends AT the station, so it won't add unnecessary
-       * walking legs from a nearby street address.
-       *
-       * Only fall back to lat,lon coordinates if there's no naptanId
-       * (which shouldn't happen, but just in case).
+       * Hub IDs (HUBLST, HUBBAN, etc.) cause the Journey API to
+       * route to street locations with walking legs. We resolve
+       * them to tube/rail station naptan IDs via our resolve API.
+       * Regular naptan IDs (940GZZLU...) work directly.
        */
-      /*
-       * For hub IDs (HUBLST, HUBBAN, etc.), use lat,lon coordinates
-       * instead of the ID. The Journey API returns 300 disambiguation
-       * errors for hub IDs but handles coordinates correctly.
-       * Regular naptan IDs (940GZZLU...) work fine directly.
-       */
-      const fromValue = fromStation.naptanId.startsWith("HUB")
-        ? `${fromStation.lat},${fromStation.lon}`
-        : fromStation.naptanId;
-      const toValue = toStation.naptanId.startsWith("HUB")
-        ? `${toStation.lat},${toStation.lon}`
-        : toStation.naptanId;
+      const resolveId = async (id: string): Promise<string> => {
+        if (!id.startsWith("HUB")) return id;
+        try {
+          const resp = await fetch(`/api/tfl/resolve-hub?hubId=${id}`);
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.naptanId) return data.naptanId;
+          }
+        } catch { /* fall through */ }
+        return id;
+      };
+
+      const fromValue = await resolveId(fromStation.naptanId);
+      const toValue = await resolveId(toStation.naptanId);
 
       const params = new URLSearchParams({
         from: fromValue,
@@ -206,10 +206,17 @@ export default function JourneyPage() {
       setIsLoading(true);
       setHasSearched(true);
 
-      const fromValue = from.naptanId.startsWith("HUB")
-        ? `${from.lat},${from.lon}` : from.naptanId;
-      const toValue = to.naptanId.startsWith("HUB")
-        ? `${to.lat},${to.lon}` : to.naptanId;
+      /* Resolve hub IDs to tube station IDs */
+      const resolveHub = async (id: string): Promise<string> => {
+        if (!id.startsWith("HUB")) return id;
+        try {
+          const r = await fetch(`/api/tfl/resolve-hub?hubId=${id}`);
+          if (r.ok) { const d = await r.json(); if (d.naptanId) return d.naptanId; }
+        } catch { /* fall through */ }
+        return id;
+      };
+      const fromValue = await resolveHub(from.naptanId);
+      const toValue = await resolveHub(to.naptanId);
 
       const params = new URLSearchParams({
         from: fromValue,
