@@ -15,6 +15,7 @@
 
 "use client";
 
+import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useCountdown } from "@/hooks/useCountdown";
 
@@ -64,6 +65,23 @@ export default function ArrivalRow({
   /* Check if this is a bus arrival */
   const isBus = modeName === "bus";
 
+  /*
+   * Scroll animation — trigger when destination text changes.
+   * Tracks the previous destination and adds a CSS animation class
+   * when it changes, creating a dot-matrix scroll-in effect.
+   */
+  const [animating, setAnimating] = useState(false);
+  const prevDestination = useRef(destination);
+
+  useEffect(() => {
+    if (destination !== prevDestination.current) {
+      prevDestination.current = destination;
+      setAnimating(true);
+      const timer = setTimeout(() => setAnimating(false), 350);
+      return () => clearTimeout(timer);
+    }
+  }, [destination]);
+
   return (
     <div
       className={cn(
@@ -104,35 +122,40 @@ export default function ArrivalRow({
         </div>
       )}
 
-      {/* ---- Destination name ---- */}
-      <span
-        className={cn(
-          /* Take up remaining space, truncate if too long */
-          "flex-1 truncate",
-          /* Uppercase VT323 text — the classic departure board look */
-          "text-amber font-board text-xl tracking-wider uppercase",
-          /* Amber glow on the text */
-          "amber-glow"
-        )}
-      >
-        {destination}
-      </span>
+      {/* ---- Destination name (scrolls in like a real board) ---- */}
+      <div className="flex-1 board-scroll-clip">
+        <span
+          className={cn(
+            /* Take up remaining space, truncate if too long */
+            "block truncate",
+            /* Uppercase VT323 text — the classic departure board look */
+            "text-amber font-board text-xl tracking-wider uppercase",
+            /* Amber glow on the text */
+            "amber-glow",
+            /* Scroll animation when destination changes */
+            animating && "board-scroll-in"
+          )}
+        >
+          {destination}
+        </span>
+      </div>
 
-      {/* ---- Time until arrival ---- */}
-      <span
-        className={cn(
-          /* Fixed width on the right side */
-          "shrink-0 text-right min-w-[5rem]",
-          /* VT323 departure board font */
-          "font-board text-xl tracking-wider",
-          /* DUE vehicles get bright glow, others are standard amber */
-          isDue
-            ? "text-amber amber-glow-strong animate-blink"
-            : "text-amber amber-glow"
-        )}
-      >
-        {timeText}
-      </span>
+      {/* ---- Time until arrival (scrolls in when value changes) ---- */}
+      <div className="shrink-0 text-right min-w-[5rem] board-scroll-clip">
+        <span
+          className={cn(
+            "block",
+            /* VT323 departure board font */
+            "font-board text-xl tracking-wider",
+            /* DUE vehicles get bright glow, others are standard amber */
+            isDue
+              ? "text-amber amber-glow-strong animate-blink"
+              : "text-amber amber-glow"
+          )}
+        >
+          {timeText}
+        </span>
+      </div>
     </div>
   );
 }

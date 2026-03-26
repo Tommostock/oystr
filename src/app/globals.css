@@ -304,3 +304,31 @@
 .page-transition {
   animation: page-fade-in 0.2s ease-out;
 }
+
+/* ========================================
+ * DOT-MATRIX SCROLL ANIMATION
+ * Slides text up from below like a real departure board updating.
+ * The container clips overflow so the text appears to scroll in.
+ * ======================================== */
+@keyframes board-scroll-in {
+  0% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.board-scroll-in {
+  animation: board-scroll-in 0.35s ease-out;
+}
+
+/* Container that clips the scrolling text */
+.board-scroll-clip {
+  overflow: hidden;
+}
