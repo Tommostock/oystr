@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <!-- Amber LED glow filter -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="16" result="blur2"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="32" result="blur3"/>
+      <feMerge>
+        <feMergeNode in="blur3"/>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="blur1"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Dark background -->
+  <rect width="512" height="512" fill="#0a0a0a"/>
+
+  <!-- Amber "O" with glow effect, centred -->
+  <text
+    x="256"
+    y="290"
+    text-anchor="middle"
+    dominant-baseline="central"
+    font-family="'Share Tech Mono', 'Courier New', monospace"
+    font-size="320"
+    font-weight="400"
+    fill="#ff9500"
+    filter="url(#glow)"
+    letter-spacing="0.02em"
+  >O</text>
+</svg>
