@@ -17,6 +17,7 @@ import "./globals.css";
 import BottomNav from "@/components/shared/BottomNav";
 import OfflineBanner from "@/components/shared/OfflineBanner";
 import InstallPrompt from "@/components/shared/InstallPrompt";
+import ServiceWorkerRegistration from "@/components/shared/ServiceWorkerRegistration";
 
 /* ========================================
  * FONT LOADING
@@ -101,6 +102,9 @@ export default function RootLayout({
       className={`${shareTechMono.variable} ${ibmPlexMono.variable} ${vt323.variable} h-full`}
     >
       <body className="min-h-full flex flex-col bg-board-bg text-amber antialiased">
+        {/* Register service worker for offline caching */}
+        <ServiceWorkerRegistration />
+
         {/* Offline banner — only shows when there's no internet */}
         <OfflineBanner />
 
@@ -113,7 +117,7 @@ export default function RootLayout({
          * pb-16 adds padding at the bottom so content isn't hidden
          * behind the fixed BottomNav.
          */}
-        <main className="flex-1 pb-16">{children}</main>
+        <main className="flex-1 pb-16 page-transition">{children}</main>
 
         {/* Bottom tab navigation — always visible */}
         <BottomNav />

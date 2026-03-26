@@ -18,7 +18,8 @@ import { LINE_COLOURS } from "@/lib/constants";
 import type { ArrivalPrediction } from "@/lib/tfl-types";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
-import LoadingBoard from "@/components/shared/LoadingBoard";
+import PullToRefresh from "@/components/shared/PullToRefresh";
+import BoardSkeleton from "./BoardSkeleton";
 import ArrivalRow from "./ArrivalRow";
 
 interface DepartureBoardProps {
@@ -107,14 +108,15 @@ export default function DepartureBoard({
   stationName,
 }: DepartureBoardProps) {
   /* Fetch live arrivals with automatic polling every 30 seconds */
-  const { arrivals, isLoading, error } = useArrivals(stopId);
+  const { arrivals, isLoading, error, refresh } = useArrivals(stopId);
 
-  /* ---- Loading state ---- */
+  /* ---- Loading state: show skeleton rows instead of blinking text ---- */
   if (isLoading && arrivals.length === 0) {
     return (
-      <BoardPanel title={stationName}>
-        <LoadingBoard message="FETCHING ARRIVALS..." />
-      </BoardPanel>
+      <div className="space-y-3">
+        <BoardSkeleton title={stationName} rows={4} />
+        <BoardSkeleton title="Loading..." rows={3} />
+      </div>
     );
   }
 
@@ -150,44 +152,40 @@ export default function DepartureBoard({
   const sortedGroupNames = Object.keys(groups).sort();
 
   return (
-    <div className="space-y-3">
-      {sortedGroupNames.map((platformName) => {
-        /*
-         * Check if this group contains bus arrivals.
-         * If so, use "BUS STOP X" as the header instead of the raw letter.
-         * Detect from the first arrival's modeName.
-         */
-        const firstArrival = groups[platformName][0];
-        const isBusGroup = firstArrival?.modeName === "bus";
-        const groupTitle = isBusGroup
-          ? `BUS STOP ${platformName}`
-          : platformName;
+    <PullToRefresh onRefresh={() => refresh()}>
+      <div className="space-y-3">
+        {sortedGroupNames.map((platformName) => {
+          const firstArrival = groups[platformName][0];
+          const isBusGroup = firstArrival?.modeName === "bus";
+          const groupTitle = isBusGroup
+            ? `BUS STOP ${platformName}`
+            : platformName;
 
-        return (
-          <BoardPanel key={platformName} title={groupTitle}>
-            <div role="table" aria-label={`Departures from ${groupTitle}`}>
-              {groups[platformName].map((arrival, index) => (
-                <ArrivalRow
-                  key={`${arrival.vehicleId}-${arrival.expectedArrival}-${index}`}
-                  platform={extractPlatformNumber(platformName)}
-                  destination={cleanDestination(arrival.destinationName)}
-                  timeToStation={arrival.timeToStation}
-                  lineColour={LINE_COLOURS[arrival.lineId]}
-                  routeNumber={arrival.lineName}
-                  modeName={arrival.modeName}
-                />
-              ))}
-            </div>
-          </BoardPanel>
-        );
-      })}
+          return (
+            <BoardPanel key={platformName} title={groupTitle}>
+              <div role="table" aria-label={`Departures from ${groupTitle}`}>
+                {groups[platformName].map((arrival, index) => (
+                  <ArrivalRow
+                    key={`${arrival.vehicleId}-${arrival.expectedArrival}-${index}`}
+                    platform={extractPlatformNumber(platformName)}
+                    destination={cleanDestination(arrival.destinationName)}
+                    timeToStation={arrival.timeToStation}
+                    lineColour={LINE_COLOURS[arrival.lineId]}
+                    routeNumber={arrival.lineName}
+                    modeName={arrival.modeName}
+                  />
+                ))}
+              </div>
+            </BoardPanel>
+          );
+        })}
 
-      {/* ---- Last updated indicator ---- */}
-      <div className="text-center py-1">
-        <AmberText variant="dim" size="xs">
-          AUTO-UPDATING EVERY 30S
-        </AmberText>
+        <div className="text-center py-1">
+          <AmberText variant="dim" size="xs">
+            AUTO-UPDATING EVERY 30S -- PULL DOWN TO REFRESH
+          </AmberText>
+        </div>
       </div>
-    </div>
+    </PullToRefresh>
   );
 }

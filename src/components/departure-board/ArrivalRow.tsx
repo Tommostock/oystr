@@ -13,7 +13,10 @@
  * It must look exactly like the amber LED text on a real board.
  */
 
+"use client";
+
 import { cn } from "@/lib/utils";
+import { useCountdown } from "@/hooks/useCountdown";
 
 interface ArrivalRowProps {
   /** Platform number or name (e.g. "1" or "Eastbound") */
@@ -53,9 +56,11 @@ export default function ArrivalRow({
   modeName,
   className,
 }: ArrivalRowProps) {
-  const timeText = formatTime(timeToStation);
+  /* Live countdown — decrements every second between API polls */
+  const liveSeconds = useCountdown(timeToStation);
+  const timeText = formatTime(liveSeconds);
   /* "DUE" vehicles get a stronger glow to draw attention */
-  const isDue = timeToStation <= 30;
+  const isDue = liveSeconds <= 30;
   /* Check if this is a bus arrival */
   const isBus = modeName === "bus";
 

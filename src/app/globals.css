@@ -272,15 +272,21 @@
 }
 
 /* ========================================
- * SCHEMATIC MAP STYLES
- * Styles for the SVG schematic tube map.
+ * PAGE TRANSITION
+ * Fade-in animation when navigating between tabs.
+ * Applied to the main content area in layout.tsx.
  * ======================================== */
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
-/* Station name labels on the schematic */
-.schematic-label {
-  font-family: var(--font-share-tech-mono), "Courier New", monospace;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  pointer-events: none;
-  user-select: none;
+.page-transition {
+  animation: page-fade-in 0.2s ease-out;
 }

@@ -23,6 +23,7 @@ import { useSearchParams } from "next/navigation";
 import StationSearch from "@/components/shared/StationSearch";
 import NearMeButton from "@/components/shared/NearMeButton";
 import DepartureBoard from "@/components/departure-board/DepartureBoard";
+import QuickViewWidget from "@/components/departure-board/QuickViewWidget";
 import SaveStationButton from "@/components/departure-board/SaveStationButton";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
@@ -123,14 +124,30 @@ function HomeContent() {
           />
         </div>
       ) : (
-        /* Show a placeholder when no station is selected */
-        <BoardPanel>
-          <div className="py-8 text-center">
-            <AmberText variant="dim" size="sm" className="dot-matrix">
-              SELECT A STATION TO VIEW LIVE DEPARTURES
-            </AmberText>
-          </div>
-        </BoardPanel>
+        <div className="space-y-4">
+          {/* Quick-view widget for saved stations */}
+          <QuickViewWidget
+            onStationSelect={(station) =>
+              setSelectedStation({
+                naptanId: station.naptanId,
+                name: station.name,
+                lat: 0,
+                lon: 0,
+                modes: [],
+                lines: [],
+              })
+            }
+          />
+
+          {/* Placeholder when no station is selected */}
+          <BoardPanel>
+            <div className="py-8 text-center">
+              <AmberText variant="dim" size="sm" className="dot-matrix">
+                SELECT A STATION TO VIEW LIVE DEPARTURES
+              </AmberText>
+            </div>
+          </BoardPanel>
+        </div>
       )}
     </div>
   );
