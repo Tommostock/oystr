@@ -92,6 +92,20 @@
  * We only use dark mode, so :root IS the dark theme.
  * All shadcn/ui variables are set to our amber palette.
  */
+/*
+ * PWA SAFE AREA
+ * When installed as a PWA (standalone mode), the app extends
+ * behind the status bar and home indicator. These styles ensure
+ * content doesn't get hidden under system UI elements.
+ */
+@media all and (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top) !important;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
 :root {
   --background: #0a0a0a;
   --foreground: #ff9500;

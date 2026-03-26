@@ -101,7 +101,7 @@ export default function RootLayout({
       lang="en"
       className={`${shareTechMono.variable} ${ibmPlexMono.variable} ${vt323.variable} h-full`}
     >
-      <body className="min-h-full flex flex-col bg-board-bg text-amber antialiased">
+      <body className="min-h-full flex flex-col bg-board-bg text-amber antialiased pt-[env(safe-area-inset-top)]">
         {/* Register service worker for offline caching */}
         <ServiceWorkerRegistration />
 
@@ -117,7 +117,7 @@ export default function RootLayout({
          * pb-16 adds padding at the bottom so content isn't hidden
          * behind the fixed BottomNav.
          */}
-        <main className="flex-1 pb-16 page-transition">{children}</main>
+        <main className="flex-1 pb-20 page-transition">{children}</main>
 
         {/* Bottom tab navigation — always visible */}
         <BottomNav />
