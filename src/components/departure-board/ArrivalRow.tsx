@@ -92,9 +92,8 @@ export default function ArrivalRow({
           </span>
         </div>
       ) : (
-        /* Tube/DLR: show line colour dot + platform number */
-        <div className="flex items-center gap-2 shrink-0 w-10">
-          {/* Optional line colour dot */}
+        /* Tube/DLR: show line colour dot only */
+        <div className="flex items-center shrink-0 w-5">
           {lineColour && (
             <span
               className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -102,9 +101,6 @@ export default function ArrivalRow({
               aria-hidden="true"
             />
           )}
-          <span className="text-amber-faint font-board text-xl tracking-wider">
-            {platform}
-          </span>
         </div>
       )}
 
