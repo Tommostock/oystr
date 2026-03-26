@@ -78,6 +78,50 @@ function HomeContent() {
     }
   }, [searchParams]);
 
+  /*
+   * When a station is selected without full details (e.g. from Saved page
+   * or Near Me), fetch the zone and coordinates from TfL so the weather
+   * icon and zone badge can display.
+   */
+  useEffect(() => {
+    if (!selectedStation) return;
+    if (selectedStation.lat !== 0 && selectedStation.zone) return;
+
+    async function enrichStation() {
+      try {
+        const resp = await fetch(
+          `/api/tfl/search?query=${encodeURIComponent(selectedStation!.name)}`
+        );
+        if (!resp.ok) return;
+        const results = await resp.json();
+        /* Find the matching station by naptanId or name */
+        const match = results.find(
+          (r: { naptanId: string; name: string }) =>
+            r.naptanId === selectedStation!.naptanId ||
+            r.name.toLowerCase().includes(selectedStation!.name.toLowerCase())
+        );
+        if (match) {
+          setSelectedStation((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  lat: match.lat || prev.lat,
+                  lon: match.lon || prev.lon,
+                  zone: match.zone || prev.zone,
+                  modes: match.modes?.length ? match.modes : prev.modes,
+                  lines: match.lines?.length ? match.lines : prev.lines,
+                }
+              : prev
+          );
+        }
+      } catch {
+        /* Silently fail — zone/weather are not critical */
+      }
+    }
+
+    enrichStation();
+  }, [selectedStation?.naptanId]);
+
   return (
     <div className="p-4 space-y-4">
       {/* ---- App Header with home reset button ---- */}
