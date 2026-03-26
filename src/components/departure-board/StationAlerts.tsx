@@ -15,8 +15,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { AlertTriangle, Accessibility, ChevronDown, ChevronUp } from "lucide-react";
+import { AlertTriangle, Accessibility, ChevronDown, ChevronUp, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LINE_NAMES } from "@/lib/constants";
 
 interface Disruption {
   description: string;
@@ -33,6 +34,13 @@ interface Facilities {
   gates: number;
 }
 
+interface TrainTime {
+  lineId: string;
+  lineName: string;
+  direction: string;
+  time: string;
+}
+
 interface StationAlertsProps {
   stopId: string;
 }
@@ -40,17 +48,30 @@ interface StationAlertsProps {
 export default function StationAlerts({ stopId }: StationAlertsProps) {
   const [disruptions, setDisruptions] = useState<Disruption[]>([]);
   const [facilities, setFacilities] = useState<Facilities | null>(null);
+  const [firstTrains, setFirstTrains] = useState<TrainTime[]>([]);
+  const [lastTrains, setLastTrains] = useState<TrainTime[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     async function fetchAlerts() {
       try {
-        const resp = await fetch(`/api/tfl/disruptions?stopId=${stopId}`);
-        if (resp.ok) {
-          const data = await resp.json();
+        /* Fetch disruptions and first/last trains in parallel */
+        const [alertsResp, timetableResp] = await Promise.all([
+          fetch(`/api/tfl/disruptions?stopId=${stopId}`),
+          fetch(`/api/tfl/first-last?stopId=${stopId}`),
+        ]);
+
+        if (alertsResp.ok) {
+          const data = await alertsResp.json();
           setDisruptions(data.disruptions || []);
           setFacilities(data.facilities || null);
+        }
+
+        if (timetableResp.ok) {
+          const data = await timetableResp.json();
+          setFirstTrains(data.firstTrains || []);
+          setLastTrains(data.lastTrains || []);
         }
       } catch {
         /* Silently fail — alerts are not critical */
@@ -62,15 +83,18 @@ export default function StationAlerts({ stopId }: StationAlertsProps) {
     setIsLoading(true);
     setDisruptions([]);
     setFacilities(null);
+    setFirstTrains([]);
+    setLastTrains([]);
     setIsExpanded(false);
     fetchAlerts();
   }, [stopId]);
 
-  /* Don't render while loading or if no data */
+  /* Don't render while loading or if no data at all */
   if (isLoading) return null;
-  if (disruptions.length === 0 && !facilities) return null;
+  if (disruptions.length === 0 && !facilities && firstTrains.length === 0) return null;
 
   const hasDisruptions = disruptions.length > 0;
+  const hasTrainTimes = firstTrains.length > 0 || lastTrains.length > 0;
 
   return (
     <div className="border border-board-border bg-surface">
@@ -111,6 +135,12 @@ export default function StationAlerts({ stopId }: StationAlertsProps) {
                 {facilities.stepFree ? "STEP-FREE" : "NO STEP-FREE"}
                 {facilities.lifts > 0 && ` / ${facilities.lifts} LIFT${facilities.lifts > 1 ? "S" : ""}`}
                 {facilities.escalators > 0 && ` / ${facilities.escalators} ESC`}
+              </>
+            )}
+            {hasTrainTimes && (
+              <>
+                {(hasDisruptions || facilities) ? " / " : ""}
+                FIRST/LAST TRAINS
               </>
             )}
           </span>
@@ -175,6 +205,52 @@ export default function StationAlerts({ stopId }: StationAlertsProps) {
               {facilities.address && (
                 <div className="font-mono text-xs tracking-wider text-amber-faint pl-5">
                   {facilities.address}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* First and last trains */}
+          {hasTrainTimes && (
+            <div className="pt-2 border-t border-board-border/30 space-y-2">
+              {firstTrains.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock size={10} strokeWidth={1.5} className="text-good shrink-0" />
+                    <span className="font-mono text-[10px] tracking-wider text-good uppercase">
+                      FIRST TRAINS
+                    </span>
+                  </div>
+                  {firstTrains.map((t, i) => (
+                    <div key={`first-${i}`} className="flex items-center justify-between pl-4">
+                      <span className="font-mono text-xs tracking-wider text-amber-faint uppercase">
+                        {LINE_NAMES[t.lineId] || t.lineId}
+                      </span>
+                      <span className="font-mono text-xs tracking-wider text-amber amber-glow">
+                        {t.time}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {lastTrains.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock size={10} strokeWidth={1.5} className="text-amber shrink-0" />
+                    <span className="font-mono text-[10px] tracking-wider text-amber uppercase">
+                      LAST TRAINS
+                    </span>
+                  </div>
+                  {lastTrains.map((t, i) => (
+                    <div key={`last-${i}`} className="flex items-center justify-between pl-4">
+                      <span className="font-mono text-xs tracking-wider text-amber-faint uppercase">
+                        {LINE_NAMES[t.lineId] || t.lineId}
+                      </span>
+                      <span className="font-mono text-xs tracking-wider text-amber amber-glow">
+                        {t.time}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
