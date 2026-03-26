@@ -1,39 +1,23 @@
 /**
- * map/page.tsx — Interactive Tube Map page
+ * map/page.tsx -- Schematic Tube Map page
  *
- * Full-screen Leaflet map showing tube stations and lines.
+ * Full-screen SVG schematic tube map in the Harry Beck style.
  * Features:
- *   - Dark CartoDB tiles
- *   - Station markers at real coordinates
- *   - Coloured polylines between stations
- *   - Tap a station for live departures (bottom sheet)
+ *   - All 13 tube/DLR/Elizabeth lines with official colours
+ *   - Clickable station markers with departures bottom sheet
  *   - Line toggle buttons to show/hide lines
+ *   - Zoom and pan support
+ *   - Live train position dots
  *
- * Leaflet is dynamically imported (no SSR) because it requires `window`.
+ * No external map library needed -- pure SVG rendering.
  */
 
 "use client";
 
 import { useState, useCallback } from "react";
-import dynamic from "next/dynamic";
+import SchematicMap from "@/components/map/SchematicMap";
 import LineToggle from "@/components/map/LineToggle";
 import StationBottomSheet from "@/components/map/StationBottomSheet";
-
-/*
- * Dynamically import TubeMap with SSR disabled.
- * Leaflet uses `window` and `document` which don't exist on the server.
- * This ensures the map component only loads in the browser.
- */
-const TubeMap = dynamic(() => import("@/components/map/TubeMap"), {
-  ssr: false,
-  loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-board-bg">
-      <span className="font-mono text-sm tracking-wider text-amber-faint animate-blink">
-        LOADING MAP...
-      </span>
-    </div>
-  ),
-});
 
 /** Shape of a selected station for the bottom sheet */
 interface SelectedStation {
@@ -44,16 +28,23 @@ interface SelectedStation {
 export default function MapPage() {
   /*
    * Track which lines are visible on the map.
-   * Start with a few popular lines to avoid overwhelming the API on load.
+   * Start with all lines visible.
    */
   const [activeLines, setActiveLines] = useState<Set<string>>(
     new Set([
+      "bakerloo",
       "central",
-      "victoria",
+      "circle",
+      "district",
+      "hammersmith-city",
       "jubilee",
+      "metropolitan",
       "northern",
       "piccadilly",
+      "victoria",
+      "waterloo-city",
       "elizabeth",
+      "dlr",
     ])
   );
 
@@ -91,8 +82,8 @@ export default function MapPage() {
       </div>
 
       {/* ---- Map container (fills remaining space) ---- */}
-      <div className="flex-1 relative">
-        <TubeMap
+      <div className="flex-1 relative overflow-hidden">
+        <SchematicMap
           activeLines={activeLines}
           onStationSelect={handleStationSelect}
         />
