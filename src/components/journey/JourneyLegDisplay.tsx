@@ -16,6 +16,10 @@
  *   <JourneyLegDisplay leg={journeyLeg} isLast={false} />
  */
 
+"use client";
+
+import { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { LINE_COLOURS } from "@/lib/constants";
 import type { JourneyLeg } from "@/lib/tfl-types";
 import { cn } from "@/lib/utils";
@@ -84,6 +88,11 @@ export default function JourneyLegDisplay({
   const lineName =
     leg.routeOptions?.[0]?.lineIdentifier?.name || leg.mode?.name || "";
 
+  /* Intermediate stops (stations passed through) */
+  const stops = leg.path?.stopPoints || [];
+  const hasStops = stops.length > 0 && !isWalking;
+  const [showStops, setShowStops] = useState(false);
+
   return (
     <div className="flex gap-3">
       {/* ---- Vertical line with station dots ---- */}
@@ -148,7 +157,43 @@ export default function JourneyLegDisplay({
           <span className="font-mono text-sm tracking-wider text-amber amber-glow shrink-0">
             {leg.duration} MIN
           </span>
+
+          {/* Expand stops button */}
+          {hasStops && (
+            <button
+              onClick={() => setShowStops(!showStops)}
+              className="flex items-center gap-1 text-amber-faint hover:text-amber transition-colors shrink-0 ml-1"
+              aria-label={showStops ? "Hide stops" : `Show ${stops.length} stops`}
+            >
+              <span className="font-mono text-[10px] tracking-wider">
+                {stops.length} STOPS
+              </span>
+              {showStops ? (
+                <ChevronUp size={10} strokeWidth={1.5} />
+              ) : (
+                <ChevronDown size={10} strokeWidth={1.5} />
+              )}
+            </button>
+          )}
         </div>
+
+        {/* Intermediate stops (expandable) */}
+        {showStops && hasStops && (
+          <div className="ml-8 mb-2 space-y-0.5">
+            {stops.map((stop, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <div
+                  className="w-1 h-1 rounded-full shrink-0"
+                  style={{ backgroundColor: colour }}
+                  aria-hidden="true"
+                />
+                <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
+                  {cleanStationName(stop.name)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Arrival station (shown on last leg) */}
         {isLast && (

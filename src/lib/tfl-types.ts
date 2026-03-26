@@ -133,5 +133,13 @@ export interface JourneyLeg {
   departureTime: string;
   /** Arrival time ISO string */
   arrivalTime: string;
+  /** Path with intermediate stop points (stations passed through) */
+  path?: {
+    stopPoints: {
+      name: string;
+      lat: number;
+      lon: number;
+    }[];
+  };
 }
 
