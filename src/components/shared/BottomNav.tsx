@@ -2,7 +2,7 @@
  * BottomNav.tsx — Bottom tab navigation bar
  *
  * The main navigation for the app. Fixed to the bottom of the screen.
- * 4 tabs: Departures, Journey, Status, Saved.
+ * 5 tabs: Departures, Stations, Journey, Status, Saved.
  *
  * Active tab shows in bright amber with glow.
  * Inactive tabs are dim amber.
@@ -13,7 +13,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Train, Route, Activity, Star } from "lucide-react";
+import { Train, List, Route, Activity, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_TABS } from "@/lib/constants";
 
@@ -24,6 +24,7 @@ import { NAV_TABS } from "@/lib/constants";
  * ======================================== */
 const iconMap = {
   train: Train,
+  list: List,
   route: Route,
   activity: Activity,
   star: Star,

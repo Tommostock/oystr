@@ -12,7 +12,7 @@
  *   - Images/SVGs: Cache-first with network fallback
  */
 
-const CACHE_NAME = "oystr-v1";
+const CACHE_NAME = "oystr-v2";
 
 /**
  * Files to pre-cache on install.

@@ -29,6 +29,8 @@ interface Facilities {
   lifts: number;
   escalators: number;
   stepFree: boolean;
+  address: string;
+  gates: number;
 }
 
 interface StationAlertsProps {
@@ -147,24 +149,34 @@ export default function StationAlerts({ stopId }: StationAlertsProps) {
 
           {/* Facilities */}
           {facilities && (
-            <div className="flex items-center gap-3 pt-1">
-              <Accessibility
-                size={12}
-                strokeWidth={1.5}
-                className={cn(
-                  "shrink-0",
-                  facilities.stepFree ? "text-good" : "text-amber-faint"
-                )}
-              />
-              <span className="font-mono text-xs tracking-wider text-amber-faint">
-                {facilities.stepFree
-                  ? "STEP-FREE ACCESS AVAILABLE"
-                  : "NO STEP-FREE ACCESS"}
-                {facilities.lifts > 0 &&
-                  ` -- ${facilities.lifts} LIFT${facilities.lifts > 1 ? "S" : ""}`}
-                {facilities.escalators > 0 &&
-                  ` -- ${facilities.escalators} ESCALATOR${facilities.escalators > 1 ? "S" : ""}`}
-              </span>
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center gap-3">
+                <Accessibility
+                  size={12}
+                  strokeWidth={1.5}
+                  className={cn(
+                    "shrink-0",
+                    facilities.stepFree ? "text-good" : "text-amber-faint"
+                  )}
+                />
+                <span className="font-mono text-xs tracking-wider text-amber-faint">
+                  {facilities.stepFree
+                    ? "STEP-FREE ACCESS AVAILABLE"
+                    : "NO STEP-FREE ACCESS"}
+                  {facilities.lifts > 0 &&
+                    ` -- ${facilities.lifts} LIFT${facilities.lifts > 1 ? "S" : ""}`}
+                  {facilities.escalators > 0 &&
+                    ` -- ${facilities.escalators} ESCALATOR${facilities.escalators > 1 ? "S" : ""}`}
+                  {facilities.gates > 0 &&
+                    ` -- ${facilities.gates} GATE${facilities.gates > 1 ? "S" : ""}`}
+                </span>
+              </div>
+              {/* Station address */}
+              {facilities.address && (
+                <div className="font-mono text-xs tracking-wider text-amber-faint pl-5">
+                  {facilities.address}
+                </div>
+              )}
             </div>
           )}
         </div>

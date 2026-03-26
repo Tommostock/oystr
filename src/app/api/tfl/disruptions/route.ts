@@ -71,11 +71,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    /* Parse facilities (lifts, escalators, step-free) */
+    /* Parse facilities (lifts, escalators, step-free, address, gates) */
     let facilities = {
       lifts: 0,
       escalators: 0,
       stepFree: false,
+      address: "",
+      gates: 0,
     };
 
     if (stationResp.ok) {
@@ -83,17 +85,13 @@ export async function GET(request: NextRequest) {
       const props: { key: string; value: string }[] =
         stationData.additionalProperties || [];
 
-      const liftProp = props.find(
-        (p) => p.key.toLowerCase() === "lifts"
-      );
-      const escalatorProp = props.find(
-        (p) => p.key.toLowerCase() === "escalators"
-      );
+      const getProp = (key: string) =>
+        props.find((p) => p.key.toLowerCase() === key.toLowerCase())?.value;
 
-      facilities.lifts = liftProp ? parseInt(liftProp.value) || 0 : 0;
-      facilities.escalators = escalatorProp
-        ? parseInt(escalatorProp.value) || 0
-        : 0;
+      facilities.lifts = parseInt(getProp("Lifts") || "0") || 0;
+      facilities.escalators = parseInt(getProp("Escalators") || "0") || 0;
+      facilities.gates = parseInt(getProp("Gates") || "0") || 0;
+      facilities.address = getProp("Address") || "";
       /* A station is considered step-free if it has lifts */
       facilities.stepFree = facilities.lifts > 0;
     }

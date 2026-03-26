@@ -27,6 +27,10 @@ import DepartureBoard from "@/components/departure-board/DepartureBoard";
 import QuickViewWidget from "@/components/departure-board/QuickViewWidget";
 import SaveStationButton from "@/components/departure-board/SaveStationButton";
 import StationAlerts from "@/components/departure-board/StationAlerts";
+import PeakIndicator from "@/components/shared/PeakIndicator";
+import CrowdingIndicator from "@/components/shared/CrowdingIndicator";
+import NightTubeIndicator from "@/components/shared/NightTubeIndicator";
+import SavedStationDisruptions from "@/components/shared/SavedStationDisruptions";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
 
@@ -146,9 +150,16 @@ function HomeContent() {
                   </span>
                 )}
               </div>
-              <SaveStationButton station={selectedStation} />
+              <div className="flex items-center gap-2 shrink-0">
+                <CrowdingIndicator />
+                <PeakIndicator />
+                <SaveStationButton station={selectedStation} />
+              </div>
             </div>
           </div>
+
+          {/* Night Tube indicator (only shows Fri/Sat nights) */}
+          <NightTubeIndicator />
 
           {/* Accessibility and disruption alerts */}
           <StationAlerts stopId={selectedStation.naptanId} />
@@ -161,6 +172,9 @@ function HomeContent() {
         </div>
       ) : (
         <div className="space-y-4">
+          {/* Disruption banner for saved station lines */}
+          <SavedStationDisruptions />
+
           {/* Quick-view widget for saved stations */}
           <QuickViewWidget
             onStationSelect={(station) =>

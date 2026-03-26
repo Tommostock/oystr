@@ -14,7 +14,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Clock } from "lucide-react";
+import { ChevronDown, ChevronUp, Clock, Share2 } from "lucide-react";
 import type { Journey } from "@/lib/tfl-types";
 import JourneyLegDisplay from "./JourneyLegDisplay";
 import { LINE_COLOURS } from "@/lib/constants";
@@ -160,6 +160,37 @@ export default function JourneyCard({ journey, index }: JourneyCardProps) {
               )}
             </div>
           )}
+
+          {/* Share button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const steps = journey.legs
+                .map((leg) => {
+                  const line = leg.routeOptions?.[0]?.lineIdentifier?.name;
+                  const mode = leg.mode?.name;
+                  const from = leg.departurePoint?.commonName?.replace(/ Underground Station$/i, "").replace(/ Station$/i, "") || "";
+                  const to = leg.arrivalPoint?.commonName?.replace(/ Underground Station$/i, "").replace(/ Station$/i, "") || "";
+                  if (mode === "walking") return `Walk from ${from} to ${to} (${leg.duration} min)`;
+                  return `${line || mode} from ${from} to ${to} (${leg.duration} min)`;
+                })
+                .join("\n");
+              const fare = journey.fare ? ` -- \u00A3${(journey.fare.totalCost / 100).toFixed(2)}` : "";
+              const text = `Journey: ${journey.duration} min${fare}\n\n${steps}\n\nPlanned with Oystr`;
+
+              if (navigator.share) {
+                navigator.share({ text }).catch(() => {});
+              } else {
+                navigator.clipboard.writeText(text).then(() => {
+                  alert("Journey copied to clipboard");
+                });
+              }
+            }}
+            className="mt-3 pt-2 border-t border-board-border/50 w-full flex items-center justify-center gap-2 py-2 font-mono text-xs tracking-wider text-amber-faint hover:text-amber transition-colors"
+          >
+            <Share2 size={12} strokeWidth={1.5} />
+            <span>SHARE JOURNEY</span>
+          </button>
         </div>
       )}
     </div>
