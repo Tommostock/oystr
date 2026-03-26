@@ -92,11 +92,14 @@ export async function GET(request: NextRequest) {
       lineIds.slice(0, 4).map(async (lineId) => {
         try {
           /*
-           * Fetch both directions (inbound + outbound).
-           * Without a direction param, TfL returns disambiguation
-           * instead of actual timetable data.
+           * First fetch the disambiguation to get direction descriptions
+           * (e.g. "Upminster - Ealing Broadway"), then fetch both directions.
            */
-          const [inboundResp, outboundResp] = await Promise.all([
+          const [disambResp, inboundResp, outboundResp] = await Promise.all([
+            fetch(
+              `${TFL_API_BASE}/Line/${lineId}/Timetable/${stopId}?${params}`,
+              { next: { revalidate: 86400 } }
+            ),
             fetch(
               `${TFL_API_BASE}/Line/${lineId}/Timetable/${stopId}?direction=inbound&${params}`,
               { next: { revalidate: 3600 } }
@@ -106,6 +109,33 @@ export async function GET(request: NextRequest) {
               { next: { revalidate: 3600 } }
             ),
           ]);
+
+          /*
+           * Extract terminus names from disambiguation options.
+           * Options look like: "Upminster - Ealing Broadway" with direction=inbound
+           * We extract the destination (second station) for each direction.
+           */
+          const directionNames: Record<string, string> = {};
+          if (disambResp.ok) {
+            const disambData = await disambResp.json();
+            const options = disambData.disambiguation?.disambiguationOptions || [];
+            for (const opt of options) {
+              const desc: string = opt.description || "";
+              const uri: string = opt.uri || "";
+              /* Extract direction from URI */
+              const isInbound = uri.includes("direction=inbound");
+              /* Extract destination from description: "From - To" */
+              const parts = desc.split(" - ");
+              if (parts.length === 2) {
+                const dest = parts[1]
+                  .replace(/ Underground Station$/i, "")
+                  .replace(/ Station$/i, "")
+                  .trim();
+                const key = isInbound ? "inbound" : "outbound";
+                if (!directionNames[key]) directionNames[key] = dest;
+              }
+            }
+          }
 
           /* eslint-disable @typescript-eslint/no-explicit-any */
           const allRoutes: { route: any; direction: string }[] = [];
@@ -143,20 +173,9 @@ export async function GET(request: NextRequest) {
             const journeys = schedule?.knownJourneys || [];
             if (journeys.length === 0) continue;
 
-            /*
-             * Get the terminus station name from the route's station intervals.
-             * This tells us which direction the train is heading
-             * (e.g. "towards Upminster" or "towards Ealing Broadway").
-             */
-            const intervals = route.stationIntervals || [];
-            const lastInterval = intervals[intervals.length - 1];
-            const destStops = lastInterval?.intervals || [];
-            const lastStopId = destStops[destStops.length - 1]?.stopId || "";
-            /* Clean the naptan ID into a readable name */
-            const terminusName = lastStopId
-              .replace(/^940GZZLU/i, "")
-              .replace(/^910G/i, "");
-            const dirLabel = dir === "inbound" ? `towards ${terminusName || "central"}` : `towards ${terminusName || "outer"}`;
+            /* Use the clean terminus name from disambiguation */
+            const terminus = directionNames[dir] || dir;
+            const dirLabel = `towards ${terminus}`;
 
             const first = journeys[0];
             const last = journeys[journeys.length - 1];

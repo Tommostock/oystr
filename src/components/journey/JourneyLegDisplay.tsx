@@ -88,8 +88,13 @@ export default function JourneyLegDisplay({
   const lineName =
     leg.routeOptions?.[0]?.lineIdentifier?.name || leg.mode?.name || "";
 
-  /* Intermediate stops (stations passed through) */
-  const stops = leg.path?.stopPoints || [];
+  /*
+   * Intermediate stops (stations passed through).
+   * Exclude the last stop — that's the arrival station which is
+   * already shown as the next leg's departure or as the final destination.
+   */
+  const allStops = leg.path?.stopPoints || [];
+  const stops = allStops.length > 1 ? allStops.slice(0, -1) : allStops;
   const hasStops = stops.length > 0 && !isWalking;
   const [showStops, setShowStops] = useState(false);
 

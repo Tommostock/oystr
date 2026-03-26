@@ -189,7 +189,7 @@ export default function StationAlerts({ stopId }: StationAlertsProps) {
                     facilities.stepFree ? "text-good" : "text-amber-faint"
                   )}
                 />
-                <span className="font-mono text-xs tracking-wider text-amber-faint">
+                <span className="font-mono text-xs tracking-wider text-amber amber-glow">
                   {facilities.stepFree
                     ? "STEP-FREE ACCESS AVAILABLE"
                     : "NO STEP-FREE ACCESS"}
@@ -203,7 +203,7 @@ export default function StationAlerts({ stopId }: StationAlertsProps) {
               </div>
               {/* Station address */}
               {facilities.address && (
-                <div className="font-mono text-xs tracking-wider text-amber-faint pl-5">
+                <div className="font-mono text-xs tracking-wider text-amber amber-glow pl-5">
                   {facilities.address}
                 </div>
               )}
@@ -223,10 +223,10 @@ export default function StationAlerts({ stopId }: StationAlertsProps) {
                   </div>
                   {firstTrains.map((t, i) => (
                     <div key={`first-${i}`} className="flex items-center justify-between pl-4 gap-2">
-                      <span className="font-mono text-xs tracking-wider text-amber-faint uppercase truncate">
+                      <span className="font-mono text-xs tracking-wider text-amber amber-glow uppercase truncate">
                         {LINE_NAMES[t.lineId] || t.lineId}
                         {t.direction && (
-                          <span className="text-[10px] text-amber-faint/60 ml-1">
+                          <span className="text-[10px] text-amber/70 ml-1">
                             {t.direction}
                           </span>
                         )}
@@ -241,17 +241,17 @@ export default function StationAlerts({ stopId }: StationAlertsProps) {
               {lastTrains.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <Clock size={10} strokeWidth={1.5} className="text-amber shrink-0" />
-                    <span className="font-mono text-[10px] tracking-wider text-amber uppercase">
+                    <Clock size={10} strokeWidth={1.5} className="text-error shrink-0" />
+                    <span className="font-mono text-[10px] tracking-wider text-error uppercase">
                       LAST TRAINS
                     </span>
                   </div>
                   {lastTrains.map((t, i) => (
                     <div key={`last-${i}`} className="flex items-center justify-between pl-4 gap-2">
-                      <span className="font-mono text-xs tracking-wider text-amber-faint uppercase truncate">
+                      <span className="font-mono text-xs tracking-wider text-amber amber-glow uppercase truncate">
                         {LINE_NAMES[t.lineId] || t.lineId}
                         {t.direction && (
-                          <span className="text-[10px] text-amber-faint/60 ml-1">
+                          <span className="text-[10px] text-amber/70 ml-1">
                             {t.direction}
                           </span>
                         )}

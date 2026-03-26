@@ -208,7 +208,7 @@ function HomeContent() {
             </div>
             {/* Station name origin fact (only if available) */}
             {getStationFact(selectedStation.name) && (
-              <p className="font-mono text-[10px] tracking-wider text-amber-faint/70 leading-relaxed">
+              <p className="font-mono text-[10px] tracking-wider text-amber amber-glow leading-relaxed">
                 {getStationFact(selectedStation.name)}
               </p>
             )}
