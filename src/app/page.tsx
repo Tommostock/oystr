@@ -35,7 +35,6 @@ import NightTubeIndicator from "@/components/shared/NightTubeIndicator";
 import SavedStationDisruptions from "@/components/shared/SavedStationDisruptions";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
-import NewsTicker from "@/components/shared/NewsTicker";
 
 /** Shape of a selected station (from the search results) */
 interface SelectedStation {
@@ -305,9 +304,6 @@ function HomeContent() {
               })
             }
           />
-
-          {/* London news ticker — scrolling BBC headlines */}
-          <NewsTicker />
 
           {/* Placeholder when no station is selected */}
           <BoardPanel>

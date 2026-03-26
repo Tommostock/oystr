@@ -241,30 +241,6 @@
   transition: cx 2s ease-in-out, cy 2s ease-in-out;
 }
 
-/* ========================================
- * NEWS TICKER ANIMATION
- * Continuously scrolls headlines from right to left,
- * like the dot-matrix message boards above platforms.
- * The animation duration is set inline based on content
- * width so the scroll speed stays consistent.
- * ======================================== */
-@keyframes ticker-scroll {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(-50%);
-  }
-}
-
-.ticker-scroll {
-  animation: ticker-scroll var(--ticker-duration, 30s) linear infinite;
-}
-
-/* Pause the ticker on hover so users can read a headline */
-.ticker-scroll:hover {
-  animation-play-state: paused;
-}
 
 /* ========================================
  * DOT-MATRIX TEXT STYLE
