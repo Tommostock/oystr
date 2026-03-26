@@ -30,13 +30,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    /* Build the TfL API URL for nearby stops */
+    /* Build the TfL API URL for nearby stops — includes bus stops */
     const params = new URLSearchParams({
       lat,
       lon,
       radius,
-      stopTypes: "NaptanMetroStation,NaptanRailStation",
-      modes: "tube,dlr,overground,elizabeth-line",
+      stopTypes: "NaptanMetroStation,NaptanRailStation,NaptanPublicBusCoachTram",
+      modes: "tube,dlr,overground,elizabeth-line,bus",
     });
 
     if (process.env.TFL_APP_KEY) {
@@ -71,6 +71,8 @@ export async function GET(request: NextRequest) {
           distance: number;
           modes: string[];
           lines: { id: string; name: string }[];
+          stopLetter?: string;
+          indicator?: string;
         }) => ({
           naptanId: stop.naptanId,
           name: stop.commonName
@@ -84,13 +86,16 @@ export async function GET(request: NextRequest) {
           distance: Math.round(stop.distance),
           modes: stop.modes || [],
           lines: stop.lines || [],
+          /* Include bus stop letter if available (e.g. "H") */
+          stopLetter: stop.stopLetter || undefined,
+          indicator: stop.indicator || undefined,
         })
       )
       .sort(
         (a: { distance: number }, b: { distance: number }) =>
           a.distance - b.distance
       )
-      .slice(0, 5); /* Return top 5 nearest */
+      .slice(0, 15); /* Return top 15 nearest (more results now with bus stops) */
 
     return NextResponse.json(stations);
   } catch (error) {

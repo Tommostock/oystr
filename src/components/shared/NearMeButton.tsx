@@ -30,6 +30,8 @@ interface NearbyStation {
   distance: number;
   modes: string[];
   lines: { id: string; name: string }[];
+  stopLetter?: string;
+  indicator?: string;
 }
 
 interface NearMeButtonProps {
@@ -220,19 +222,25 @@ export default function NearMeButton({
               )}
             >
               <div className="flex items-center gap-2">
-                {/* Line colour dots */}
-                <div className="flex gap-0.5 shrink-0">
-                  {station.lines.slice(0, 3).map((line) => (
-                    <span
-                      key={line.id}
-                      className="w-2 h-2 rounded-full"
-                      style={{
-                        backgroundColor:
-                          LINE_COLOURS[line.id] || "#FF9500",
-                      }}
-                    />
-                  ))}
-                </div>
+                {/* Bus stop letter badge OR line colour dots */}
+                {station.stopLetter ? (
+                  <span className="shrink-0 w-5 h-5 flex items-center justify-center border border-amber text-amber text-xs font-mono">
+                    {station.stopLetter}
+                  </span>
+                ) : (
+                  <div className="flex gap-0.5 shrink-0">
+                    {station.lines.slice(0, 3).map((line) => (
+                      <span
+                        key={line.id}
+                        className="w-2 h-2 rounded-full"
+                        style={{
+                          backgroundColor:
+                            LINE_COLOURS[line.id] || "#FF9500",
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
                 {/* Station name */}
                 <span className="font-mono text-sm tracking-wider text-amber uppercase truncate flex-1">
                   {cleanName(station.name)}
@@ -242,9 +250,11 @@ export default function NearMeButton({
                   {formatDistance(station.distance)}
                 </span>
               </div>
-              {/* Modes */}
-              <div className="font-mono text-xs tracking-wider text-amber-faint mt-0.5 uppercase pl-6">
-                {station.modes.join(" / ")}
+              {/* Modes + indicator */}
+              <div className="font-mono text-xs tracking-wider text-amber-faint mt-0.5 uppercase pl-7">
+                {station.indicator
+                  ? `${station.modes.join(" / ")} -- ${station.indicator}`
+                  : station.modes.join(" / ")}
               </div>
             </button>
           ))}
