@@ -30,6 +30,7 @@ import StationAlerts from "@/components/departure-board/StationAlerts";
 import PeakIndicator from "@/components/shared/PeakIndicator";
 import CrowdingIndicator from "@/components/shared/CrowdingIndicator";
 import WeatherIcon from "@/components/shared/WeatherIcon";
+import { getStationFact } from "@/lib/station-facts";
 import NightTubeIndicator from "@/components/shared/NightTubeIndicator";
 import SavedStationDisruptions from "@/components/shared/SavedStationDisruptions";
 import BoardPanel from "@/components/shared/BoardPanel";
@@ -205,6 +206,12 @@ function HomeContent() {
               </div>
               <SaveStationButton station={selectedStation} />
             </div>
+            {/* Station name origin fact (only if available) */}
+            {getStationFact(selectedStation.name) && (
+              <p className="font-mono text-[10px] tracking-wider text-amber-faint/70 leading-relaxed">
+                {getStationFact(selectedStation.name)}
+              </p>
+            )}
             {/* Row 2: indicators (compact) */}
             <div className="flex items-center gap-2">
               <CrowdingIndicator />
