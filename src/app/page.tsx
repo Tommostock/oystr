@@ -21,6 +21,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import StationSearch from "@/components/shared/StationSearch";
+import NearMeButton from "@/components/shared/NearMeButton";
 import DepartureBoard from "@/components/departure-board/DepartureBoard";
 import SaveStationButton from "@/components/departure-board/SaveStationButton";
 import BoardPanel from "@/components/shared/BoardPanel";
@@ -82,11 +83,30 @@ function HomeContent() {
         </AmberText>
       </div>
 
-      {/* ---- Station Search ---- */}
-      <StationSearch
-        onSelect={(station) => setSelectedStation(station)}
-        placeholder="Search for a station..."
-      />
+      {/* ---- Station Search + Near Me ---- */}
+      <div className="space-y-3">
+        <StationSearch
+          onSelect={(station) => setSelectedStation(station)}
+          placeholder="Search for a station..."
+        />
+        {/* Near Me button — auto-detects nearest station via GPS */}
+        {!selectedStation && (
+          <div className="flex justify-center">
+            <NearMeButton
+              onStationFound={(station) =>
+                setSelectedStation({
+                  naptanId: station.naptanId,
+                  name: station.name,
+                  lat: station.lat,
+                  lon: station.lon,
+                  modes: station.modes,
+                  lines: station.lines,
+                })
+              }
+            />
+          </div>
+        )}
+      </div>
 
       {/* ---- Departure Board or Empty State ---- */}
       {selectedStation ? (

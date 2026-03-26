@@ -1,0 +1,103 @@
+/**
+ * API Route: /api/tfl/nearby
+ *
+ * Returns the nearest stations to a given latitude/longitude.
+ * Uses the TfL StopPoint API to find stops within a radius.
+ *
+ * Query params:
+ *   ?lat=51.5074&lon=-0.1278   — the user's coordinates
+ *   ?radius=500                — optional search radius in metres (default 500)
+ *
+ * Returns:
+ *   Array of nearby stations sorted by distance, with their
+ *   IDs, names, modes, and distance in metres.
+ */
+
+import { NextRequest, NextResponse } from "next/server";
+import { TFL_API_BASE } from "@/lib/constants";
+
+export async function GET(request: NextRequest) {
+  const lat = request.nextUrl.searchParams.get("lat");
+  const lon = request.nextUrl.searchParams.get("lon");
+  const radius = request.nextUrl.searchParams.get("radius") || "500";
+
+  /* Validate coordinates */
+  if (!lat || !lon) {
+    return NextResponse.json(
+      { error: "lat and lon query parameters are required" },
+      { status: 400 }
+    );
+  }
+
+  try {
+    /* Build the TfL API URL for nearby stops */
+    const params = new URLSearchParams({
+      lat,
+      lon,
+      radius,
+      stopTypes: "NaptanMetroStation,NaptanRailStation",
+      modes: "tube,dlr,overground,elizabeth-line",
+    });
+
+    if (process.env.TFL_APP_KEY) {
+      params.set("app_key", process.env.TFL_APP_KEY);
+    }
+
+    const response = await fetch(
+      `${TFL_API_BASE}/StopPoint?${params}`,
+      { next: { revalidate: 300 } } /* Cache for 5 minutes */
+    );
+
+    if (!response.ok) {
+      return NextResponse.json(
+        { error: "TfL API error", status: response.status },
+        { status: 502 }
+      );
+    }
+
+    const data = await response.json();
+
+    /*
+     * Transform and sort by distance.
+     * TfL returns stopPoints with a distance field (in metres).
+     */
+    const stations = (data.stopPoints || [])
+      .map(
+        (stop: {
+          naptanId: string;
+          commonName: string;
+          lat: number;
+          lon: number;
+          distance: number;
+          modes: string[];
+          lines: { id: string; name: string }[];
+        }) => ({
+          naptanId: stop.naptanId,
+          name: stop.commonName
+            .replace(/ Underground Station$/i, "")
+            .replace(/ DLR Station$/i, "")
+            .replace(/ Rail Station$/i, "")
+            .replace(/ Station$/i, "")
+            .trim(),
+          lat: stop.lat,
+          lon: stop.lon,
+          distance: Math.round(stop.distance),
+          modes: stop.modes || [],
+          lines: stop.lines || [],
+        })
+      )
+      .sort(
+        (a: { distance: number }, b: { distance: number }) =>
+          a.distance - b.distance
+      )
+      .slice(0, 5); /* Return top 5 nearest */
+
+    return NextResponse.json(stations);
+  } catch (error) {
+    console.error("TfL nearby error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch nearby stations" },
+      { status: 500 }
+    );
+  }
+}
