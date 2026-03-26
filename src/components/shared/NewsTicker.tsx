@@ -73,9 +73,9 @@ export default function NewsTicker() {
   /*
    * Calculate animation duration based on number of headlines.
    * More headlines = longer string = needs more time to scroll.
-   * ~3 seconds per headline gives a comfortable reading speed.
+   * ~2 seconds per headline for a brisk, readable speed.
    */
-  const duration = headlines.length * 4;
+  const duration = headlines.length * 2;
 
   return (
     <div className="border border-board-border bg-surface overflow-hidden">
