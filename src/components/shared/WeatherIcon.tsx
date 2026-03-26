@@ -44,39 +44,41 @@ interface WeatherIconProps {
 /**
  * Map WMO weather code to a Lucide icon component and colour.
  */
+/** Amber colour matching the app's glow theme */
+const AMBER = "#ff9500";
+
 function getWeatherDisplay(code: number): {
   Icon: typeof Sun;
-  colour: string;
   label: string;
 } {
   /* Clear */
-  if (code === 0) return { Icon: Sun, colour: "#FBBF24", label: "Clear" };
+  if (code === 0) return { Icon: Sun, label: "Clear" };
 
   /* Partly cloudy */
-  if (code <= 2) return { Icon: CloudSun, colour: "#9CA3AF", label: "Partly cloudy" };
+  if (code <= 2) return { Icon: CloudSun, label: "Partly cloudy" };
 
   /* Overcast */
-  if (code === 3) return { Icon: Cloud, colour: "#6B7280", label: "Overcast" };
+  if (code === 3) return { Icon: Cloud, label: "Overcast" };
 
   /* Fog */
-  if (code === 45 || code === 48) return { Icon: CloudFog, colour: "#9CA3AF", label: "Fog" };
+  if (code === 45 || code === 48) return { Icon: CloudFog, label: "Fog" };
 
   /* Drizzle */
-  if (code >= 51 && code <= 57) return { Icon: CloudDrizzle, colour: "#60A5FA", label: "Drizzle" };
+  if (code >= 51 && code <= 57) return { Icon: CloudDrizzle, label: "Drizzle" };
 
   /* Rain */
   if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82))
-    return { Icon: CloudRain, colour: "#3B82F6", label: "Rain" };
+    return { Icon: CloudRain, label: "Rain" };
 
   /* Snow */
   if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86))
-    return { Icon: CloudSnow, colour: "#E5E7EB", label: "Snow" };
+    return { Icon: CloudSnow, label: "Snow" };
 
   /* Thunderstorm */
-  if (code >= 95) return { Icon: CloudLightning, colour: "#F59E0B", label: "Thunderstorm" };
+  if (code >= 95) return { Icon: CloudLightning, label: "Thunderstorm" };
 
   /* Fallback */
-  return { Icon: Cloud, colour: "#6B7280", label: "Cloudy" };
+  return { Icon: Cloud, label: "Cloudy" };
 }
 
 export default function WeatherIcon({ lat, lon }: WeatherIconProps) {
@@ -117,15 +119,15 @@ export default function WeatherIcon({ lat, lon }: WeatherIconProps) {
   /* Don't render until we have data */
   if (weatherCode === null) return null;
 
-  const { Icon, colour, label } = getWeatherDisplay(weatherCode);
+  const { Icon, label } = getWeatherDisplay(weatherCode);
 
   return (
     <span
-      className="inline-flex items-center shrink-0 ml-1 -mt-2"
+      className="inline-flex items-center shrink-0 ml-1 -mt-2 amber-glow"
       title={label}
       aria-label={`Weather: ${label}`}
     >
-      <Icon size={12} strokeWidth={1.5} style={{ color: colour }} />
+      <Icon size={12} strokeWidth={1.5} style={{ color: AMBER }} />
     </span>
   );
 }

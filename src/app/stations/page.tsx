@@ -167,7 +167,7 @@ export default function StationsPage() {
 
                   {/* Zone badge */}
                   {station.zone && (
-                    <span className="shrink-0 font-mono text-xs tracking-wider text-amber-faint">
+                    <span className="shrink-0 font-mono text-xs tracking-wider text-amber amber-glow">
                       Z{station.zone}
                     </span>
                   )}

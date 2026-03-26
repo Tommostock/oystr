@@ -194,7 +194,7 @@ function HomeContent() {
                   <WeatherIcon lat={selectedStation.lat} lon={selectedStation.lon} />
                 </div>
                 {selectedStation.zone && (
-                  <span className="shrink-0 font-mono text-xs tracking-wider text-amber-faint">
+                  <span className="shrink-0 font-mono text-xs tracking-wider text-amber amber-glow">
                     Zone {selectedStation.zone}
                   </span>
                 )}

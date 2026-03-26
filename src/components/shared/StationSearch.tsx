@@ -289,7 +289,7 @@ export default function StationSearch({
                   <span className="truncate flex-1">{station.name}</span>
                   {/* Zone badge — e.g. "Z1" or "Z2/3" */}
                   {station.zone && (
-                    <span className="shrink-0 text-amber-faint text-xs font-mono">
+                    <span className="shrink-0 text-amber amber-glow text-xs font-mono">
                       Z{station.zone}
                     </span>
                   )}
