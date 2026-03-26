@@ -15,7 +15,7 @@
 "use client";
 
 import { useLineStatus } from "@/hooks/useLineStatus";
-import { LINE_COLOURS, LINE_NAMES, ALL_LINE_IDS } from "@/lib/constants";
+import { LINE_COLOURS, LINE_NAMES } from "@/lib/constants";
 import type { LineStatus } from "@/lib/tfl-types";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
@@ -23,19 +23,78 @@ import LoadingBoard from "@/components/shared/LoadingBoard";
 import LineStatusCard from "@/components/line-status/LineStatusCard";
 
 /**
- * Sort lines into our preferred display order.
- * We use ALL_LINE_IDS from constants.ts to define the order,
- * so lines always appear in a consistent sequence.
+ * Sort lines by severity, then alphabetically within each group.
+ *
+ * TfL severity values (lower = worse):
+ *   0  = "Special Service"
+ *   1  = "Closed"
+ *   2  = "Suspended"
+ *   3  = "Part Suspended"
+ *   4  = "Planned Closure"
+ *   5  = "Part Closure"
+ *   6  = "Severe Delays"
+ *   7  = "Reduced Service"
+ *   8  = "Bus Service"
+ *   9  = "Minor Delays"
+ *   10 = "Good Service"
+ *   11 = "Part Closed"
+ *   12 = "Exit Only"
+ *   13 = "No Step Free Access"
+ *   14 = "Change of Frequency"
+ *   15 = "Diverted"
+ *   16 = "Not Running"
+ *   17 = "Issues Reported"
+ *   18 = "No Issues"
+ *   19 = "Information"
+ *   20 = "Service Closed"
+ *
+ * Display order (worst disruptions first):
+ *   1. Closed / Suspended / Not Running     (severity 1, 2, 16, 20)
+ *   2. Part Suspended / Part Closed         (severity 3, 5, 11)
+ *   3. Severe Delays / Reduced Service      (severity 6, 7)
+ *   4. Minor Delays                         (severity 9)
+ *   5. Other non-good statuses              (everything else != 10)
+ *   6. Good Service                         (severity 10)
+ *
+ * Within each group, lines are sorted alphabetically by name.
  */
-function sortLines(lines: LineStatus[]): LineStatus[] {
-  /* Create a map of lineId -> index for quick lookup */
-  const orderMap = new Map<string, number>();
-  ALL_LINE_IDS.forEach((id, index) => orderMap.set(id, index));
+function getSortPriority(severity: number): number {
+  switch (severity) {
+    case 1:   // Closed
+    case 2:   // Suspended
+    case 16:  // Not Running
+    case 20:  // Service Closed
+      return 0;
+    case 3:   // Part Suspended
+    case 5:   // Part Closure
+    case 11:  // Part Closed
+      return 1;
+    case 6:   // Severe Delays
+    case 7:   // Reduced Service
+      return 2;
+    case 9:   // Minor Delays
+      return 3;
+    case 10:  // Good Service
+      return 5;
+    default:  // Everything else (special service, planned closure, etc.)
+      return 4;
+  }
+}
 
+function sortLines(lines: LineStatus[]): LineStatus[] {
   return [...lines].sort((a, b) => {
-    const aOrder = orderMap.get(a.id) ?? 999;
-    const bOrder = orderMap.get(b.id) ?? 999;
-    return aOrder - bOrder;
+    const aSeverity = a.lineStatuses?.[0]?.statusSeverity ?? 10;
+    const bSeverity = b.lineStatuses?.[0]?.statusSeverity ?? 10;
+    const aPriority = getSortPriority(aSeverity);
+    const bPriority = getSortPriority(bSeverity);
+
+    /* Sort by severity group first (worst at top) */
+    if (aPriority !== bPriority) return aPriority - bPriority;
+
+    /* Within the same group, sort alphabetically by line name */
+    const aName = LINE_NAMES[a.id] || a.name;
+    const bName = LINE_NAMES[b.id] || b.name;
+    return aName.localeCompare(bName);
   });
 }
 
