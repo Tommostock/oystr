@@ -48,8 +48,39 @@ const CANVAS_H = 900;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 4;
 
-/** Line stroke width — used for rendering and spacing calculations */
+/** Line stroke width */
 const LINE_WIDTH = 3;
+
+/**
+ * Gap between parallel lines at shared stations.
+ * When multiple lines pass through an interchange, each line
+ * gets its own "lane" offset by this many SVG units.
+ * This makes lines run side-by-side (like real tube maps)
+ * instead of stacking invisibly on top of each other.
+ */
+const LANE_GAP = 4;
+
+/**
+ * Consistent ordering for assigning lanes at interchange stations.
+ * Lines earlier in this list get lower lane indices (drawn first).
+ * This ensures the same line always gets the same relative position
+ * at every interchange it passes through.
+ */
+const LINE_ORDER: string[] = [
+  "metropolitan",
+  "hammersmith-city",
+  "circle",
+  "district",
+  "piccadilly",
+  "central",
+  "bakerloo",
+  "jubilee",
+  "victoria",
+  "northern",
+  "waterloo-city",
+  "elizabeth",
+  "dlr",
+];
 
 /* ========================================
  * COMPONENT
@@ -74,6 +105,44 @@ export default function SchematicMap({
 
   /* ---- Station lookup ---- */
   const stationMap = useMemo(() => buildStationMap(), []);
+
+  /**
+   * For each station served by multiple lines, compute the lane
+   * offset for each line. This makes lines run parallel at
+   * interchanges instead of stacking on top of each other.
+   *
+   * Returns a Map: "stationId:lineId" -> offset in SVG units
+   *
+   * Example: If Baker Street is served by [metropolitan, circle,
+   * hammersmith-city, jubilee, bakerloo], each gets an offset:
+   *   metropolitan: -8, hammersmith-city: -4, circle: 0,
+   *   jubilee: +4, bakerloo: +8
+   */
+  const laneOffsets = useMemo(() => {
+    const offsets = new Map<string, number>();
+
+    for (const station of STATIONS) {
+      /* Only compute lanes for interchange stations (2+ lines) */
+      if (station.lines.length < 2) continue;
+
+      /* Sort this station's lines by the global LINE_ORDER */
+      const sortedLines = [...station.lines].sort(
+        (a, b) => LINE_ORDER.indexOf(a) - LINE_ORDER.indexOf(b)
+      );
+
+      /* Centre the lanes around 0 */
+      const count = sortedLines.length;
+      const totalWidth = (count - 1) * LANE_GAP;
+      const startOffset = -totalWidth / 2;
+
+      for (let i = 0; i < count; i++) {
+        const key = `${station.naptanId}:${sortedLines[i]}`;
+        offsets.set(key, startOffset + i * LANE_GAP);
+      }
+    }
+
+    return offsets;
+  }, []);
 
   /* ---- Filter stations and routes by active lines ---- */
   const visibleStations = useMemo(() => {
@@ -220,43 +289,104 @@ export default function SchematicMap({
   }, []);
 
   /* ========================================
-   * BUILD LINE POLYLINE POINTS (right-angle routing)
+   * BUILD LINE POLYLINE POINTS (right-angle routing with lane offsets)
    *
    * For each pair of consecutive stations, if they don't share
    * the same X or Y coordinate, we insert a corner waypoint
-   * to create a clean 90-degree turn. All lines are perfectly
-   * straight — horizontal or vertical only.
+   * to create a clean 90-degree turn.
+   *
+   * At interchange stations (where multiple lines share a stop),
+   * each line is offset perpendicular to its travel direction so
+   * lines run side-by-side instead of stacking on top of each other.
+   * This is how real tube maps show shared segments — like at
+   * Earl's Court where District and Piccadilly run parallel.
+   *
+   * The offset direction depends on the segment:
+   *   - Horizontal segments → offset vertically (shift Y)
+   *   - Vertical segments → offset horizontally (shift X)
    * ======================================== */
   const buildPolylinePoints = useCallback(
-    (stationIds: string[]): string => {
-      const points: string[] = [];
+    (stationIds: string[], lineId: string): string => {
+      /*
+       * Step 1: Build raw station coordinates with lane offsets.
+       * For each station, determine if this line needs an offset
+       * and which direction to apply it based on neighbours.
+       */
+      const coords: { x: number; y: number }[] = [];
 
       for (let i = 0; i < stationIds.length; i++) {
-        const s = stationMap.get(stationIds[i]);
+        const sid = stationIds[i];
+        const s = stationMap.get(sid);
         if (!s) continue;
 
+        /* Get lane offset for this line at this station (0 if not an interchange) */
+        const offset = laneOffsets.get(`${sid}:${lineId}`) || 0;
+
+        if (offset === 0) {
+          coords.push({ x: s.x, y: s.y });
+          continue;
+        }
+
+        /*
+         * Determine segment direction to know which axis to offset.
+         * Look at the previous and next stations to figure out if
+         * this line is running horizontally or vertically here.
+         */
+        const prevStation = i > 0 ? stationMap.get(stationIds[i - 1]) : null;
+        const nextStation =
+          i < stationIds.length - 1
+            ? stationMap.get(stationIds[i + 1])
+            : null;
+
+        /* Default: check if the line is more horizontal or vertical at this point */
+        let isHorizontal = true;
+        if (prevStation && nextStation) {
+          const dx = Math.abs(nextStation.x - prevStation.x);
+          const dy = Math.abs(nextStation.y - prevStation.y);
+          isHorizontal = dx >= dy;
+        } else if (prevStation) {
+          isHorizontal = Math.abs(s.x - prevStation.x) >= Math.abs(s.y - prevStation.y);
+        } else if (nextStation) {
+          isHorizontal = Math.abs(nextStation.x - s.x) >= Math.abs(nextStation.y - s.y);
+        }
+
+        if (isHorizontal) {
+          /* Horizontal segment — offset vertically */
+          coords.push({ x: s.x, y: s.y + offset });
+        } else {
+          /* Vertical segment — offset horizontally */
+          coords.push({ x: s.x + offset, y: s.y });
+        }
+      }
+
+      /*
+       * Step 2: Insert corner waypoints for right-angle routing.
+       * Between any two points that don't share X or Y, add a
+       * corner to create an L-shaped 90-degree path.
+       */
+      const points: string[] = [];
+
+      for (let i = 0; i < coords.length; i++) {
+        const c = coords[i];
+
         if (i === 0) {
-          points.push(`${s.x},${s.y}`);
+          points.push(`${c.x},${c.y}`);
           continue;
         }
 
-        const prev = stationMap.get(stationIds[i - 1]);
-        if (!prev) {
-          points.push(`${s.x},${s.y}`);
-          continue;
+        const prev = coords[i - 1];
+
+        if (prev.x !== c.x && prev.y !== c.y) {
+          /* Insert corner: horizontal first, then vertical */
+          points.push(`${c.x},${prev.y}`);
         }
 
-        /* If stations don't share X or Y, add a corner waypoint */
-        if (prev.x !== s.x && prev.y !== s.y) {
-          points.push(`${s.x},${prev.y}`);
-        }
-
-        points.push(`${s.x},${s.y}`);
+        points.push(`${c.x},${c.y}`);
       }
 
       return points.join(" ");
     },
-    [stationMap]
+    [stationMap, laneOffsets]
   );
 
   /* ========================================
@@ -302,7 +432,8 @@ export default function SchematicMap({
         {visibleRoutes.map((route) =>
           route.branches.map((branch, branchIdx) => {
             const points = buildPolylinePoints(
-              branch.filter((id): id is string => id !== null)
+              branch.filter((id): id is string => id !== null),
+              route.lineId
             );
             if (!points) return null;
             return (
