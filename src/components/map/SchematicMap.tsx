@@ -40,38 +40,16 @@ interface SchematicMapProps {
  * CONSTANTS
  * ======================================== */
 
-/** Full canvas dimensions */
-const CANVAS_W = 1200;
-const CANVAS_H = 800;
+/** Full canvas dimensions — larger to spread stations apart */
+const CANVAS_W = 1400;
+const CANVAS_H = 900;
 
 /** Zoom limits */
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 4;
 
-/**
- * Line draw order — determines which line renders on top and
- * the perpendicular offset so parallel lines don't overlap.
- * Lines sharing a segment (e.g. Circle + H&C + District between
- * Paddington and Aldgate East) get different offsets so they
- * render as visible parallel stripes.
- *
- * Offset is in SVG units perpendicular to the line direction.
- */
-const LINE_OFFSETS: Record<string, number> = {
-  "hammersmith-city": -6,
-  circle: -3,
-  metropolitan: -2,
-  district: 0,
-  piccadilly: 2,
-  central: 0,
-  victoria: 0,
-  jubilee: 0,
-  northern: 0,
-  bakerloo: 3,
-  "waterloo-city": 0,
-  elizabeth: 3,
-  dlr: 0,
-};
+/** Line stroke width — used for rendering and spacing calculations */
+const LINE_WIDTH = 3;
 
 /* ========================================
  * COMPONENT
@@ -242,75 +220,41 @@ export default function SchematicMap({
   }, []);
 
   /* ========================================
-   * BUILD LINE POLYLINE POINTS (right-angle routing with offset)
+   * BUILD LINE POLYLINE POINTS (right-angle routing)
    *
    * For each pair of consecutive stations, if they don't share
    * the same X or Y coordinate, we insert a corner waypoint
-   * to create a clean 90-degree turn.
-   *
-   * The offset parameter shifts the line perpendicular to its
-   * direction so that parallel lines (e.g. District + Circle)
-   * render as separate visible stripes instead of stacking.
-   *
-   * For horizontal segments: offset shifts vertically (Y)
-   * For vertical segments: offset shifts horizontally (X)
+   * to create a clean 90-degree turn. All lines are perfectly
+   * straight — horizontal or vertical only.
    * ======================================== */
   const buildPolylinePoints = useCallback(
-    (stationIds: string[], offset: number = 0): string => {
-      const rawPoints: { x: number; y: number }[] = [];
+    (stationIds: string[]): string => {
+      const points: string[] = [];
 
       for (let i = 0; i < stationIds.length; i++) {
         const s = stationMap.get(stationIds[i]);
         if (!s) continue;
 
         if (i === 0) {
-          rawPoints.push({ x: s.x, y: s.y });
+          points.push(`${s.x},${s.y}`);
           continue;
         }
 
-        const prev = rawPoints[rawPoints.length - 1];
+        const prev = stationMap.get(stationIds[i - 1]);
+        if (!prev) {
+          points.push(`${s.x},${s.y}`);
+          continue;
+        }
 
         /* If stations don't share X or Y, add a corner waypoint */
         if (prev.x !== s.x && prev.y !== s.y) {
-          rawPoints.push({ x: s.x, y: prev.y });
+          points.push(`${s.x},${prev.y}`);
         }
 
-        rawPoints.push({ x: s.x, y: s.y });
+        points.push(`${s.x},${s.y}`);
       }
 
-      /* Apply perpendicular offset to each segment */
-      if (offset === 0 || rawPoints.length < 2) {
-        return rawPoints.map((p) => `${p.x},${p.y}`).join(" ");
-      }
-
-      const offsetPoints: string[] = [];
-      for (let i = 0; i < rawPoints.length; i++) {
-        const p = rawPoints[i];
-        let ox = 0;
-        let oy = 0;
-
-        if (i < rawPoints.length - 1) {
-          const next = rawPoints[i + 1];
-          if (next.y === p.y) {
-            /* Horizontal segment — offset vertically */
-            oy = offset;
-          } else {
-            /* Vertical segment — offset horizontally */
-            ox = offset;
-          }
-        } else if (i > 0) {
-          const prev = rawPoints[i - 1];
-          if (prev.y === p.y) {
-            oy = offset;
-          } else {
-            ox = offset;
-          }
-        }
-
-        offsetPoints.push(`${p.x + ox},${p.y + oy}`);
-      }
-
-      return offsetPoints.join(" ");
+      return points.join(" ");
     },
     [stationMap]
   );
@@ -326,9 +270,9 @@ export default function SchematicMap({
    * At 50% zoom (viewBox.w = 600), there's enough space.
    */
   const showLabels = viewBox.w < CANVAS_W * 0.55;
-  /* Station dot size scales with zoom */
-  const dotRadius = Math.max(2, Math.min(4, viewBox.w / 300));
-  const interchangeRadius = dotRadius * 1.6;
+  /* Station dot size — fixed for clarity */
+  const dotRadius = 3;
+  const interchangeRadius = 5;
 
   return (
     <div
@@ -357,10 +301,8 @@ export default function SchematicMap({
         {/* ---- Line paths ---- */}
         {visibleRoutes.map((route) =>
           route.branches.map((branch, branchIdx) => {
-            const offset = LINE_OFFSETS[route.lineId] || 0;
             const points = buildPolylinePoints(
-              branch.filter((id): id is string => id !== null),
-              offset
+              branch.filter((id): id is string => id !== null)
             );
             if (!points) return null;
             return (
@@ -369,7 +311,7 @@ export default function SchematicMap({
                 points={points}
                 fill="none"
                 stroke={LINE_COLOURS[route.lineId] || "#FF9500"}
-                strokeWidth={Math.max(2.5, 4 * (CANVAS_W / viewBox.w) * 0.3)}
+                strokeWidth={LINE_WIDTH}
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 opacity={0.9}
@@ -402,7 +344,7 @@ export default function SchematicMap({
                   r={interchangeRadius}
                   fill="#0a0a0a"
                   stroke="#ffffff"
-                  strokeWidth={Math.max(0.8, 1.2 * (CANVAS_W / viewBox.w) * 0.3)}
+                  strokeWidth={1.2}
                 />
               ) : (
                 /* Regular: small filled circle */
@@ -465,9 +407,9 @@ export default function SchematicMap({
                 className="schematic-label"
                 fill="#ff9500"
                 stroke="#0a0a0a"
-                strokeWidth={Math.max(1, 2 * (CANVAS_W / viewBox.w) * 0.3)}
+                strokeWidth={2}
                 paintOrder="stroke fill"
-                fontSize={Math.max(3, 4.5 * (CANVAS_W / viewBox.w) * 0.3)}
+                fontSize={5}
                 opacity={0.85}
                 pointerEvents="none"
               >
