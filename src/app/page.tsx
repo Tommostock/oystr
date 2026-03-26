@@ -26,6 +26,7 @@ import NearMeButton from "@/components/shared/NearMeButton";
 import DepartureBoard from "@/components/departure-board/DepartureBoard";
 import QuickViewWidget from "@/components/departure-board/QuickViewWidget";
 import SaveStationButton from "@/components/departure-board/SaveStationButton";
+import StationAlerts from "@/components/departure-board/StationAlerts";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
 
@@ -148,6 +149,9 @@ function HomeContent() {
               <SaveStationButton station={selectedStation} />
             </div>
           </div>
+
+          {/* Accessibility and disruption alerts */}
+          <StationAlerts stopId={selectedStation.naptanId} />
 
           {/* Live departure board for the selected station */}
           <DepartureBoard
