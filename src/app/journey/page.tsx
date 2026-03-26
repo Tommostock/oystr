@@ -148,6 +148,7 @@ export default function JourneyPage() {
                   lon: station.lon,
                 })
               }
+              value={fromStation?.name || ""}
               placeholder="Departure station..."
             />
           </div>
@@ -183,6 +184,7 @@ export default function JourneyPage() {
                   lon: station.lon,
                 })
               }
+              value={toStation?.name || ""}
               placeholder="Destination station..."
             />
           </div>

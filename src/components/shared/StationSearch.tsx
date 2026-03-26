@@ -47,6 +47,8 @@ interface StationSearchProps {
   onSelect: (station: SearchResult) => void;
   /** Placeholder text for the input */
   placeholder?: string;
+  /** Controlled value — sets the input text from the parent (e.g. after swap) */
+  value?: string;
   /** Additional CSS classes */
   className?: string;
 }
@@ -57,16 +59,27 @@ interface StationSearchProps {
 export default function StationSearch({
   onSelect,
   placeholder = "Search for a station...",
+  value,
   className,
 }: StationSearchProps) {
   /* The current text in the search input */
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(value || "");
   /* The list of matching stations from the API */
   const [results, setResults] = useState<SearchResult[]>([]);
   /* Whether the dropdown is visible */
   const [isOpen, setIsOpen] = useState(false);
   /* Whether we're waiting for API results */
   const [isSearching, setIsSearching] = useState(false);
+
+  /*
+   * Sync the input text when the parent changes the value prop.
+   * This happens when the journey planner swaps From/To stations.
+   */
+  useEffect(() => {
+    if (value !== undefined) {
+      setQuery(value);
+    }
+  }, [value]);
 
   /* Ref to the container div — used to detect clicks outside */
   const containerRef = useRef<HTMLDivElement>(null);
