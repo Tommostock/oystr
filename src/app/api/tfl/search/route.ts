@@ -117,6 +117,34 @@ async function expandBusParent(parent: SearchStation): Promise<SearchStation[]> 
   }
 }
 
+/**
+ * Enrich an individual bus stop with its stop letter.
+ *
+ * Some bus stops come back from search with IDs like "490000074A"
+ * (not a parent group) and don't have a stop letter in the search
+ * results. We fetch the stop details to get the letter.
+ */
+async function enrichBusStop(station: SearchStation): Promise<SearchStation[]> {
+  try {
+    const params = buildParams();
+    const response = await fetch(
+      `${TFL_API_BASE}/StopPoint/${station.naptanId}?${params}`,
+      { next: { revalidate: 3600 } }
+    );
+
+    if (!response.ok) return [station];
+
+    const data = await response.json();
+    return [{
+      ...station,
+      stopLetter: data.stopLetter || undefined,
+      indicator: data.indicator || undefined,
+    }];
+  } catch {
+    return [station];
+  }
+}
+
 export async function GET(request: NextRequest) {
   /* Extract the search query from the URL */
   const query = request.nextUrl.searchParams.get("query");
@@ -189,18 +217,19 @@ export async function GET(request: NextRequest) {
     );
 
     /*
-     * Expand bus parent groups into individual stops with letters.
+     * Expand bus parent groups AND enrich individual bus stops.
      *
-     * Bus stop group IDs start with "490G" (e.g. "490G00008174").
-     * These parents don't have stop letters — their children do.
-     * We expand each parent into its children so the search dropdown
-     * shows individual stops like "Oxford Street (Stop H)".
-     *
-     * Non-bus results (tube, DLR, etc.) pass through unchanged.
+     * Bus stop group IDs start with "490G" — expand into children.
+     * Individual bus stop IDs start with "490" (not "490G") — fetch
+     * their stop letter from the StopPoint API.
+     * Non-bus results pass through unchanged.
      */
     const expandPromises = rawStations.map((station) => {
       if (station.naptanId.startsWith("490G")) {
         return expandBusParent(station);
+      }
+      if (station.naptanId.startsWith("490") && !station.stopLetter) {
+        return enrichBusStop(station);
       }
       return Promise.resolve([station]);
     });
