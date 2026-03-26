@@ -36,6 +36,10 @@ interface SearchResult {
   lon: number;
   modes: string[];
   lines: { id: string; name: string }[];
+  /** Bus stop letter (e.g. "H") — only for bus stops */
+  stopLetter?: string;
+  /** Bus stop indicator text (e.g. "Stop H") — only for bus stops */
+  indicator?: string;
 }
 
 interface StationSearchProps {
@@ -259,11 +263,21 @@ export default function StationSearch({
                 )}
                 role="option"
               >
-                {/* Station name in uppercase */}
-                <div className="uppercase">{station.name}</div>
-                {/* Transport modes as small labels underneath */}
+                {/* Station name with optional stop letter badge */}
+                <div className="flex items-center gap-2 uppercase">
+                  {/* Bus stop letter badge — e.g. [H] */}
+                  {station.stopLetter && (
+                    <span className="shrink-0 w-6 h-6 flex items-center justify-center border border-amber text-amber text-xs font-mono">
+                      {station.stopLetter}
+                    </span>
+                  )}
+                  <span className="truncate">{station.name}</span>
+                </div>
+                {/* Transport modes and indicator as small labels underneath */}
                 <div className="text-amber-faint text-xs mt-1 uppercase">
-                  {station.modes.join(" / ")}
+                  {station.indicator
+                    ? `${station.modes.join(" / ")} -- ${station.indicator}`
+                    : station.modes.join(" / ")}
                 </div>
               </button>
             </li>

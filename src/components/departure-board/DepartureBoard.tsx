@@ -151,21 +151,36 @@ export default function DepartureBoard({
 
   return (
     <div className="space-y-3">
-      {sortedGroupNames.map((platformName) => (
-        <BoardPanel key={platformName} title={platformName}>
-          <div role="table" aria-label={`Departures from ${platformName}`}>
-            {groups[platformName].map((arrival, index) => (
-              <ArrivalRow
-                key={`${arrival.vehicleId}-${arrival.expectedArrival}-${index}`}
-                platform={extractPlatformNumber(platformName)}
-                destination={cleanDestination(arrival.destinationName)}
-                timeToStation={arrival.timeToStation}
-                lineColour={LINE_COLOURS[arrival.lineId]}
-              />
-            ))}
-          </div>
-        </BoardPanel>
-      ))}
+      {sortedGroupNames.map((platformName) => {
+        /*
+         * Check if this group contains bus arrivals.
+         * If so, use "BUS STOP X" as the header instead of the raw letter.
+         * Detect from the first arrival's modeName.
+         */
+        const firstArrival = groups[platformName][0];
+        const isBusGroup = firstArrival?.modeName === "bus";
+        const groupTitle = isBusGroup
+          ? `BUS STOP ${platformName}`
+          : platformName;
+
+        return (
+          <BoardPanel key={platformName} title={groupTitle}>
+            <div role="table" aria-label={`Departures from ${groupTitle}`}>
+              {groups[platformName].map((arrival, index) => (
+                <ArrivalRow
+                  key={`${arrival.vehicleId}-${arrival.expectedArrival}-${index}`}
+                  platform={extractPlatformNumber(platformName)}
+                  destination={cleanDestination(arrival.destinationName)}
+                  timeToStation={arrival.timeToStation}
+                  lineColour={LINE_COLOURS[arrival.lineId]}
+                  routeNumber={arrival.lineName}
+                  modeName={arrival.modeName}
+                />
+              ))}
+            </div>
+          </BoardPanel>
+        );
+      })}
 
       {/* ---- Last updated indicator ---- */}
       <div className="text-center py-1">
