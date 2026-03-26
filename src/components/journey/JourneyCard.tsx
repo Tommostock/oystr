@@ -200,7 +200,7 @@ export default function JourneyCard({ journey, index }: JourneyCardProps) {
                 });
               }
             }}
-            className="mt-3 pt-2 border-t border-board-border/50 w-full flex items-center justify-center gap-2 py-2 font-mono text-xs tracking-wider text-amber amber-glow hover:amber-glow-strong transition-colors"
+            className="mt-4 border-t border-board-border/50 w-full flex items-center justify-center gap-2 py-4 font-mono text-xs tracking-wider text-amber amber-glow hover:amber-glow-strong transition-colors"
           >
             <Share2 size={12} strokeWidth={1.5} />
             <span>SHARE JOURNEY</span>
