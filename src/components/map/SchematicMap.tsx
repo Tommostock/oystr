@@ -280,7 +280,7 @@ export default function SchematicMap({
                 points={points}
                 fill="none"
                 stroke={LINE_COLOURS[route.lineId] || "#FF9500"}
-                strokeWidth={Math.max(2, 3 * (CANVAS_W / viewBox.w) * 0.3)}
+                strokeWidth={Math.max(3, 5 * (CANVAS_W / viewBox.w) * 0.3)}
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 opacity={0.85}
