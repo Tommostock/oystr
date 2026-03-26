@@ -11,9 +11,11 @@
 
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Star, Trash2 } from "lucide-react";
 import { useFavourites } from "@/hooks/useFavourites";
+import { db } from "@/lib/db";
 import { LINE_COLOURS, LINE_NAMES } from "@/lib/constants";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
@@ -22,6 +24,50 @@ import { cn } from "@/lib/utils";
 export default function SavedPage() {
   const { favourites, removeFavourite } = useFavourites();
   const router = useRouter();
+
+  /*
+   * Enrich saved stations that have empty lines.
+   * Fetches line data from TfL search API and updates the DB.
+   * This fixes stations saved before the lines feature was added.
+   */
+  useEffect(() => {
+    async function enrichStations() {
+      for (const station of favourites) {
+        if (station.lines.length > 0) continue;
+
+        try {
+          const resp = await fetch(
+            `/api/tfl/search?query=${encodeURIComponent(station.name)}`
+          );
+          if (!resp.ok) continue;
+
+          const results = await resp.json();
+          const match = results.find(
+            (r: { naptanId: string }) => r.naptanId === station.naptanId
+          ) || results[0];
+
+          if (match?.lines?.length > 0) {
+            const lineIds = match.lines.map(
+              (l: { id: string } | string) =>
+                typeof l === "string" ? l : l.id
+            );
+            await db.favourites.update(station.naptanId, {
+              lines: lineIds,
+            });
+          }
+        } catch {
+          /* Silently fail */
+        }
+      }
+    }
+
+    const stationsWithoutLines = favourites.filter(
+      (s) => s.lines.length === 0
+    );
+    if (stationsWithoutLines.length > 0) {
+      enrichStations();
+    }
+  }, [favourites]);
 
   /**
    * Navigate to the home page with the selected station.
