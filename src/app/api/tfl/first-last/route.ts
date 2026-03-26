@@ -143,13 +143,28 @@ export async function GET(request: NextRequest) {
             const journeys = schedule?.knownJourneys || [];
             if (journeys.length === 0) continue;
 
+            /*
+             * Get the terminus station name from the route's station intervals.
+             * This tells us which direction the train is heading
+             * (e.g. "towards Upminster" or "towards Ealing Broadway").
+             */
+            const intervals = route.stationIntervals || [];
+            const lastInterval = intervals[intervals.length - 1];
+            const destStops = lastInterval?.intervals || [];
+            const lastStopId = destStops[destStops.length - 1]?.stopId || "";
+            /* Clean the naptan ID into a readable name */
+            const terminusName = lastStopId
+              .replace(/^940GZZLU/i, "")
+              .replace(/^910G/i, "");
+            const dirLabel = dir === "inbound" ? `towards ${terminusName || "central"}` : `towards ${terminusName || "outer"}`;
+
             const first = journeys[0];
             const last = journeys[journeys.length - 1];
 
             allFirstTrains.push({
               lineId,
               lineName: lineId,
-              direction: dir,
+              direction: dirLabel,
               time: formatTime(first.hour, first.minute),
               rawMinutes: toMinutes(first.hour, first.minute),
             });
@@ -157,7 +172,7 @@ export async function GET(request: NextRequest) {
             allLastTrains.push({
               lineId,
               lineName: lineId,
-              direction: dir,
+              direction: dirLabel,
               time: formatTime(last.hour, last.minute),
               rawMinutes: toMinutes(last.hour, last.minute),
             });

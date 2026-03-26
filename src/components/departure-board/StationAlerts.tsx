@@ -222,11 +222,16 @@ export default function StationAlerts({ stopId }: StationAlertsProps) {
                     </span>
                   </div>
                   {firstTrains.map((t, i) => (
-                    <div key={`first-${i}`} className="flex items-center justify-between pl-4">
-                      <span className="font-mono text-xs tracking-wider text-amber-faint uppercase">
+                    <div key={`first-${i}`} className="flex items-center justify-between pl-4 gap-2">
+                      <span className="font-mono text-xs tracking-wider text-amber-faint uppercase truncate">
                         {LINE_NAMES[t.lineId] || t.lineId}
+                        {t.direction && (
+                          <span className="text-[10px] text-amber-faint/60 ml-1">
+                            {t.direction}
+                          </span>
+                        )}
                       </span>
-                      <span className="font-mono text-xs tracking-wider text-amber amber-glow">
+                      <span className="font-mono text-xs tracking-wider text-amber amber-glow shrink-0">
                         {t.time}
                       </span>
                     </div>
@@ -242,11 +247,16 @@ export default function StationAlerts({ stopId }: StationAlertsProps) {
                     </span>
                   </div>
                   {lastTrains.map((t, i) => (
-                    <div key={`last-${i}`} className="flex items-center justify-between pl-4">
-                      <span className="font-mono text-xs tracking-wider text-amber-faint uppercase">
+                    <div key={`last-${i}`} className="flex items-center justify-between pl-4 gap-2">
+                      <span className="font-mono text-xs tracking-wider text-amber-faint uppercase truncate">
                         {LINE_NAMES[t.lineId] || t.lineId}
+                        {t.direction && (
+                          <span className="text-[10px] text-amber-faint/60 ml-1">
+                            {t.direction}
+                          </span>
+                        )}
                       </span>
-                      <span className="font-mono text-xs tracking-wider text-amber amber-glow">
+                      <span className="font-mono text-xs tracking-wider text-amber amber-glow shrink-0">
                         {t.time}
                       </span>
                     </div>
