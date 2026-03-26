@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
-    <!-- Amber LED glow filter -->
+    <!-- Amber LED glow filter (matches OYSTR title glow) -->
     <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur1"/>
-      <feGaussianBlur in="SourceGraphic" stdDeviation="24" result="blur2"/>
-      <feGaussianBlur in="SourceGraphic" stdDeviation="48" result="blur3"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="18" result="blur2"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="40" result="blur3"/>
       <feMerge>
         <feMergeNode in="blur3"/>
         <feMergeNode in="blur2"/>
@@ -18,20 +18,23 @@
   <rect width="1024" height="1024" fill="#0a0a0a"/>
 
   <!--
-    Amber "O" with VT323 font, dead centre of the 1024x1024 tile.
-    x=512 = horizontal centre (text-anchor: middle)
-    y=536 = vertical centre with slight offset for VT323 cap height
-    dominant-baseline: central aligns the text middle to y
+    Lucide "Train" icon scaled to ~420px and centred.
+    Original viewBox is 0 0 24 24.
+    Scale factor: 420/24 = 17.5
+    Centre offset: (1024 - 420) / 2 = 302
+    Nudge down by 20px to visually centre (train body is top-heavy,
+    the legs extend below the visual mass).
   -->
-  <text
-    x="512"
-    y="512"
-    text-anchor="middle"
-    dominant-baseline="central"
-    font-family="'VT323', 'Courier New', monospace"
-    font-size="600"
-    font-weight="400"
-    fill="#ff9500"
-    filter="url(#glow)"
-  >O</text>
+  <g transform="translate(302, 282) scale(17.5)"
+     fill="none" stroke="#ff9500" stroke-width="2"
+     stroke-linecap="round" stroke-linejoin="round"
+     filter="url(#glow)">
+    <rect width="16" height="16" x="4" y="3" rx="2"/>
+    <path d="M4 11h16"/>
+    <path d="M12 3v8"/>
+    <path d="m8 19-2 3"/>
+    <path d="m18 22-2-3"/>
+    <path d="M8 15h.01"/>
+    <path d="M16 15h.01"/>
+  </g>
 </svg>
