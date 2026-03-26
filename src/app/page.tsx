@@ -20,6 +20,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { RotateCcw } from "lucide-react";
 import StationSearch from "@/components/shared/StationSearch";
 import NearMeButton from "@/components/shared/NearMeButton";
 import DepartureBoard from "@/components/departure-board/DepartureBoard";
@@ -72,8 +73,20 @@ function HomeContent() {
 
   return (
     <div className="p-4 space-y-4">
-      {/* ---- App Header ---- */}
-      <div className="text-center pt-4 pb-2">
+      {/* ---- App Header with home reset button ---- */}
+      <div className="relative flex items-center justify-center pt-4 pb-2">
+        {/* Home/reset button — always visible, clears selection and returns to start */}
+        {selectedStation && (
+          <button
+            onClick={() => setSelectedStation(null)}
+            className="absolute left-0 flex items-center gap-1.5 text-amber-faint hover:text-amber transition-colors font-mono text-xs tracking-wider"
+            aria-label="Back to home"
+          >
+            <RotateCcw size={14} strokeWidth={1.5} />
+            <span>RESET</span>
+          </button>
+        )}
+
         <AmberText
           as="h1"
           size="2xl"
@@ -124,15 +137,7 @@ function HomeContent() {
                   .replace(/\s*\(London\)/i, "")}
               </AmberText>
             </div>
-            <div className="flex items-center gap-2">
-              <SaveStationButton station={selectedStation} />
-              <button
-                onClick={() => setSelectedStation(null)}
-                className="font-mono text-xs tracking-wider text-amber-faint hover:text-amber border border-board-border px-2 py-1 transition-colors"
-              >
-                CLEAR
-              </button>
-            </div>
+            <SaveStationButton station={selectedStation} />
           </div>
 
           {/* Live departure board for the selected station */}
