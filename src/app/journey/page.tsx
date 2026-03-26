@@ -61,13 +61,20 @@ export default function JourneyPage() {
     try {
       /*
        * Build the API URL.
-       * Use lat,lon coordinates instead of IDs because TfL's Journey API
-       * doesn't reliably accept hub IDs (returns 300 disambiguation).
-       * Coordinates always work.
+       *
+       * Use the station's naptanId when available — this tells TfL the
+       * journey starts/ends AT the station, so it won't add unnecessary
+       * walking legs from a nearby street address.
+       *
+       * Only fall back to lat,lon coordinates if there's no naptanId
+       * (which shouldn't happen, but just in case).
        */
+      const fromValue = fromStation.naptanId || `${fromStation.lat},${fromStation.lon}`;
+      const toValue = toStation.naptanId || `${toStation.lat},${toStation.lon}`;
+
       const params = new URLSearchParams({
-        from: `${fromStation.lat},${fromStation.lon}`,
-        to: `${toStation.lat},${toStation.lon}`,
+        from: fromValue,
+        to: toValue,
         timeIs: timeIs,
       });
 
