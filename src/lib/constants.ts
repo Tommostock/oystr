@@ -67,33 +67,6 @@ export const LINE_NAMES: Record<string, string> = {
   windrush: "Windrush",
 };
 
-/** All line IDs in display order */
-export const ALL_LINE_IDS = [
-  "bakerloo",
-  "central",
-  "circle",
-  "district",
-  "hammersmith-city",
-  "jubilee",
-  "metropolitan",
-  "northern",
-  "piccadilly",
-  "victoria",
-  "waterloo-city",
-  "elizabeth",
-  "dlr",
-  /* London Overground sub-lines (in alphabetical order) */
-  "liberty",
-  "lioness",
-  "mildmay",
-  "suffragette",
-  "weaver",
-  "windrush",
-  "tram",
-] as const;
-
-/** Type for a valid line ID */
-export type LineId = (typeof ALL_LINE_IDS)[number];
 
 /* ========================================
  * TFL API CONFIGURATION
@@ -109,7 +82,6 @@ export const TFL_API_BASE = "https://api.tfl.gov.uk";
  * ======================================== */
 export const ARRIVALS_POLL_INTERVAL = 30_000; // 30 seconds
 export const LINE_STATUS_POLL_INTERVAL = 60_000; // 60 seconds
-export const TRAIN_TRACKING_POLL_INTERVAL = 15_000; // 15 seconds
 
 /* ========================================
  * NAVIGATION TABS

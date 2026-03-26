@@ -18,7 +18,6 @@ import { ChevronDown, ChevronUp, Clock, Share2 } from "lucide-react";
 import type { Journey } from "@/lib/tfl-types";
 import JourneyLegDisplay from "./JourneyLegDisplay";
 import { LINE_COLOURS } from "@/lib/constants";
-import { cn } from "@/lib/utils";
 
 interface JourneyCardProps {
   /** The journey data from TfL */

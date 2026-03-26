@@ -105,6 +105,7 @@ export default function StationsPage() {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder="FILTER STATIONS..."
+          aria-label="Filter stations by name"
           className={cn(
             "w-full py-2.5 px-3",
             "bg-surface text-amber",

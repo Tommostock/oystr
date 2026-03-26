@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
     }
 
     /* Parse facilities (lifts, escalators, step-free, address, gates) */
-    let facilities = {
+    const facilities = {
       lifts: 0,
       escalators: 0,
       stepFree: false,

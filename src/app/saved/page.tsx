@@ -82,11 +82,18 @@ export default function SavedPage() {
             onClick={() =>
               handleStationClick(station.naptanId, station.name)
             }
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleStationClick(station.naptanId, station.name);
+              }
+            }}
+            tabIndex={0}
             className={cn(
               /* Card styling */
               "border border-board-border bg-surface",
               /* Interactive */
-              "cursor-pointer hover:border-amber-faint",
+              "cursor-pointer hover:border-amber-faint focus:border-amber-faint focus:outline-none",
               "transition-colors duration-200",
               /* Flex layout */
               "flex items-center gap-3 p-3"

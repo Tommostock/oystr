@@ -83,7 +83,7 @@ export const viewport: Viewport = {
   /* Standard mobile viewport settings */
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  maximumScale: 5, /* Allow pinch-to-zoom for accessibility */
   /* Ensure content respects the safe area on notched phones */
   viewportFit: "cover",
 };

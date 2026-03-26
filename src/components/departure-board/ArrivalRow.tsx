@@ -20,8 +20,6 @@ import { cn } from "@/lib/utils";
 import { useCountdown } from "@/hooks/useCountdown";
 
 interface ArrivalRowProps {
-  /** Platform number or name (e.g. "1" or "Eastbound") */
-  platform: string;
   /** Destination station name */
   destination: string;
   /** Seconds until arrival — we convert to minutes for display */
@@ -49,7 +47,6 @@ function formatTime(seconds: number): string {
 }
 
 export default function ArrivalRow({
-  platform,
   destination,
   timeToStation,
   lineColour,

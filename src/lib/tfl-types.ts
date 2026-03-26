@@ -67,38 +67,9 @@ export interface LineStatusDetail {
 }
 
 /* ========================================
- * STOP POINT (STATION)
- * Returned by /StopPoint/Search/{query}
- * and /StopPoint/{id}
- * ======================================== */
-export interface StopPoint {
-  /** Naptan ID — the unique identifier for this station/stop */
-  naptanId: string;
-  /** Station name, e.g. "Mile End Underground Station" */
-  commonName: string;
-  /** Latitude coordinate */
-  lat: number;
-  /** Longitude coordinate */
-  lon: number;
-  /** Transport modes available, e.g. ["tube", "dlr"] */
-  modes: string[];
-  /** Lines serving this station */
-  lines: { id: string; name: string }[];
-}
-
-/** Response from /StopPoint/Search/{query} */
-export interface StopPointSearchResponse {
-  matches: StopPoint[];
-  total: number;
-}
-
-/* ========================================
  * JOURNEY PLANNER
  * Returned by /Journey/JourneyResults/{from}/to/{to}
  * ======================================== */
-export interface JourneyResponse {
-  journeys: Journey[];
-}
 
 export interface Journey {
   /** Total duration in minutes */
@@ -164,38 +135,3 @@ export interface JourneyLeg {
   arrivalTime: string;
 }
 
-/* ========================================
- * ROUTE SEQUENCE
- * Returned by /Line/{lineId}/Route/Sequence/{direction}
- * Used to draw lines on the map in station order.
- * ======================================== */
-export interface RouteSequenceResponse {
-  lineId: string;
-  lineName: string;
-  direction: string;
-  orderedLineRoutes: {
-    name: string;
-    naptanIds: string[];
-    serviceType: string;
-  }[];
-  stations: {
-    naptanId: string;
-    name: string;
-    lat: number;
-    lon: number;
-  }[];
-  stopPointSequences: {
-    lineId: string;
-    lineName: string;
-    direction: string;
-    branchId: number;
-    nextBranchIds: number[];
-    prevBranchIds: number[];
-    stopPoint: {
-      naptanId: string;
-      name: string;
-      lat: number;
-      lon: number;
-    }[];
-  }[];
-}

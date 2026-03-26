@@ -83,22 +83,26 @@ function HomeContent() {
    * or Near Me), fetch the zone and coordinates from TfL so the weather
    * icon and zone badge can display.
    */
+  const selectedNaptanId = selectedStation?.naptanId;
+  const selectedName = selectedStation?.name;
+  const selectedLat = selectedStation?.lat;
+  const selectedZone = selectedStation?.zone;
+
   useEffect(() => {
-    if (!selectedStation) return;
-    if (selectedStation.lat !== 0 && selectedStation.zone) return;
+    if (!selectedNaptanId || !selectedName) return;
+    if (selectedLat !== 0 && selectedZone) return;
 
     async function enrichStation() {
       try {
         const resp = await fetch(
-          `/api/tfl/search?query=${encodeURIComponent(selectedStation!.name)}`
+          `/api/tfl/search?query=${encodeURIComponent(selectedName!)}`
         );
         if (!resp.ok) return;
         const results = await resp.json();
-        /* Find the matching station by naptanId or name */
         const match = results.find(
           (r: { naptanId: string; name: string }) =>
-            r.naptanId === selectedStation!.naptanId ||
-            r.name.toLowerCase().includes(selectedStation!.name.toLowerCase())
+            r.naptanId === selectedNaptanId ||
+            r.name.toLowerCase().includes(selectedName!.toLowerCase())
         );
         if (match) {
           setSelectedStation((prev) =>
@@ -120,7 +124,7 @@ function HomeContent() {
     }
 
     enrichStation();
-  }, [selectedStation?.naptanId]);
+  }, [selectedNaptanId, selectedName, selectedLat, selectedZone]);
 
   return (
     <div className="p-4 space-y-4">

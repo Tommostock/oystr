@@ -72,16 +72,6 @@ function groupByPlatform(
   return groups;
 }
 
-/**
- * Extract a short platform label from the full platform name.
- * "Eastbound - Platform 1" => "1"
- * "Platform 3" => "3"
- * "Northbound" => ""
- */
-function extractPlatformNumber(platformName: string): string {
-  const match = platformName.match(/Platform\s+(\d+)/i);
-  return match ? match[1] : "";
-}
 
 /**
  * Clean up destination names from TfL.
@@ -167,7 +157,6 @@ export default function DepartureBoard({
                 {groups[platformName].map((arrival, index) => (
                   <ArrivalRow
                     key={`${arrival.vehicleId}-${arrival.expectedArrival}-${index}`}
-                    platform={extractPlatformNumber(platformName)}
                     destination={cleanDestination(arrival.destinationName)}
                     timeToStation={arrival.timeToStation}
                     lineColour={LINE_COLOURS[arrival.lineId]}

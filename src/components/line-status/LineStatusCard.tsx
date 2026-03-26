@@ -60,7 +60,6 @@ function getStatusColour(severity: number): string {
 }
 
 export default function LineStatusCard({
-  lineId,
   lineName,
   colour,
   status,
@@ -72,9 +71,6 @@ export default function LineStatusCard({
 
   /* Only show the expand button if there's a disruption reason to show */
   const hasDetail = reason && reason.length > 0;
-
-  /* Is this line running normally? */
-  const isGoodService = severity === 10;
 
   return (
     <div
