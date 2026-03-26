@@ -12,7 +12,7 @@
  */
 
 import type { Metadata, Viewport } from "next";
-import { Share_Tech_Mono, IBM_Plex_Mono } from "next/font/google";
+import { Share_Tech_Mono, IBM_Plex_Mono, VT323 } from "next/font/google";
 import "./globals.css";
 import BottomNav from "@/components/shared/BottomNav";
 import OfflineBanner from "@/components/shared/OfflineBanner";
@@ -39,6 +39,14 @@ const ibmPlexMono = IBM_Plex_Mono({
   weight: ["400", "500", "600"],
   subsets: ["latin"],
   variable: "--font-ibm-plex-mono",
+  display: "swap",
+});
+
+/** VT323 — retro terminal font for departure boards */
+const vt323 = VT323({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-vt323",
   display: "swap",
 });
 
@@ -90,7 +98,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${shareTechMono.variable} ${ibmPlexMono.variable} h-full`}
+      className={`${shareTechMono.variable} ${ibmPlexMono.variable} ${vt323.variable} h-full`}
     >
       <body className="min-h-full flex flex-col bg-board-bg text-amber antialiased">
         {/* Offline banner — only shows when there's no internet */}

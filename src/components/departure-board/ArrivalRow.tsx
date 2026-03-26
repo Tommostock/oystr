@@ -80,7 +80,7 @@ export default function ArrivalRow({
               "inline-flex items-center justify-center",
               "min-w-[2rem] px-1 py-0.5",
               "border border-amber text-amber",
-              "font-mono text-xs tracking-wider font-bold"
+              "font-board text-sm tracking-wider"
             )}
           >
             {routeNumber}
@@ -97,7 +97,7 @@ export default function ArrivalRow({
               aria-hidden="true"
             />
           )}
-          <span className="text-amber-faint font-mono text-sm tracking-wider">
+          <span className="text-amber-faint font-board text-base tracking-wider">
             {platform}
           </span>
         </div>
@@ -108,8 +108,8 @@ export default function ArrivalRow({
         className={cn(
           /* Take up remaining space, truncate if too long */
           "flex-1 truncate",
-          /* Uppercase mono text — the classic board look */
-          "text-amber font-mono text-sm tracking-wider uppercase",
+          /* Uppercase VT323 text — the classic departure board look */
+          "text-amber font-board text-base tracking-wider uppercase",
           /* Amber glow on the text */
           "amber-glow"
         )}
@@ -122,8 +122,8 @@ export default function ArrivalRow({
         className={cn(
           /* Fixed width on the right side */
           "shrink-0 text-right min-w-[4.5rem]",
-          /* Mono font */
-          "font-mono text-sm tracking-wider",
+          /* VT323 departure board font */
+          "font-board text-base tracking-wider",
           /* DUE vehicles get bright glow, others are standard amber */
           isDue
             ? "text-amber amber-glow-strong animate-blink"

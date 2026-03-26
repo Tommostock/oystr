@@ -62,7 +62,7 @@ export default function BoardPanel({
             variant="secondary"
             size="sm"
             uppercase
-            className="dot-matrix"
+            className="font-board"
           >
             {title}
           </AmberText>

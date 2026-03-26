@@ -37,6 +37,7 @@
   --font-mono: var(--font-share-tech-mono), "Courier New", monospace;
   --font-sans: var(--font-ibm-plex-mono), "Courier New", monospace;
   --font-heading: var(--font-share-tech-mono), "Courier New", monospace;
+  --font-board: var(--font-vt323), "Courier New", monospace;
 
   /* ========================================
    * CUSTOM COLOURS — Dot-Matrix Palette
