@@ -1,23 +1,24 @@
 /**
- * map/page.tsx -- Schematic Tube Map page
+ * map/page.tsx -- Tube Map page
  *
- * Full-screen SVG schematic tube map in the Harry Beck style.
+ * Displays the official TfL tube map as a zoomable, pannable image.
+ * Uses the Wikimedia Commons CC-BY-SA-4.0 schematic SVG with
+ * CSS filters to invert it to dark mode.
+ *
  * Features:
- *   - All 13 tube/DLR/Elizabeth lines with official colours
- *   - Clickable station markers with departures bottom sheet
- *   - Line toggle buttons to show/hide lines
- *   - Zoom and pan support
- *   - Live train position dots
- *
- * No external map library needed -- pure SVG rendering.
+ *   - Pinch/scroll to zoom
+ *   - Drag to pan
+ *   - Double-tap to reset
+ *   - Search button to find and view station departures
  */
 
 "use client";
 
 import { useState, useCallback } from "react";
-import SchematicMap from "@/components/map/SchematicMap";
-import LineToggle from "@/components/map/LineToggle";
+import TubeMapImage from "@/components/map/TubeMapImage";
+import StationSearch from "@/components/shared/StationSearch";
 import StationBottomSheet from "@/components/map/StationBottomSheet";
+import { Search, X } from "lucide-react";
 
 /** Shape of a selected station for the bottom sheet */
 interface SelectedStation {
@@ -26,67 +27,61 @@ interface SelectedStation {
 }
 
 export default function MapPage() {
-  /*
-   * Track which lines are visible on the map.
-   * Start with all lines visible.
-   */
-  const [activeLines, setActiveLines] = useState<Set<string>>(
-    new Set([
-      "bakerloo",
-      "central",
-      "circle",
-      "district",
-      "hammersmith-city",
-      "jubilee",
-      "metropolitan",
-      "northern",
-      "piccadilly",
-      "victoria",
-      "waterloo-city",
-      "elizabeth",
-      "dlr",
-    ])
-  );
-
-  /* The station the user tapped (shown in bottom sheet) */
+  /* The station the user selected (shown in bottom sheet) */
   const [selectedStation, setSelectedStation] =
     useState<SelectedStation | null>(null);
 
-  /**
-   * Toggle a line on/off.
-   */
-  const handleToggle = useCallback((lineId: string) => {
-    setActiveLines((prev) => {
-      const next = new Set(prev);
-      if (next.has(lineId)) {
-        next.delete(lineId);
-      } else {
-        next.add(lineId);
-      }
-      return next;
-    });
-  }, []);
+  /* Whether the search overlay is visible */
+  const [showSearch, setShowSearch] = useState(false);
 
   /**
-   * Handle station marker tap.
+   * Handle station selection from search.
    */
-  const handleStationSelect = useCallback((station: SelectedStation) => {
-    setSelectedStation(station);
-  }, []);
+  const handleStationSelect = useCallback(
+    (station: { naptanId: string; name: string }) => {
+      setSelectedStation(station);
+      setShowSearch(false);
+    },
+    []
+  );
 
   return (
-    <div className="fixed inset-0 flex flex-col" style={{ top: 0, bottom: "4rem" }}>
-      {/* ---- Line toggle buttons (scrollable) ---- */}
+    <div
+      className="fixed inset-0 flex flex-col"
+      style={{ top: 0, bottom: "4rem" }}
+    >
+      {/* ---- Search bar / toggle at top ---- */}
       <div className="shrink-0 bg-board-bg border-b border-board-border z-[500]">
-        <LineToggle activeLines={activeLines} onToggle={handleToggle} />
+        {showSearch ? (
+          <div className="flex items-center gap-2 p-2">
+            <div className="flex-1">
+              <StationSearch
+                onSelect={handleStationSelect}
+                placeholder="Search station for departures..."
+              />
+            </div>
+            <button
+              onClick={() => setShowSearch(false)}
+              className="text-amber-faint hover:text-amber p-2 transition-colors"
+              aria-label="Close search"
+            >
+              <X size={20} strokeWidth={1.5} />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowSearch(true)}
+            className="w-full flex items-center gap-3 px-4 py-3 text-amber-faint hover:text-amber font-mono text-sm tracking-wider transition-colors"
+          >
+            <Search size={16} strokeWidth={1.5} />
+            <span>SEARCH STATION FOR DEPARTURES</span>
+          </button>
+        )}
       </div>
 
       {/* ---- Map container (fills remaining space) ---- */}
       <div className="flex-1 relative overflow-hidden">
-        <SchematicMap
-          activeLines={activeLines}
-          onStationSelect={handleStationSelect}
-        />
+        <TubeMapImage />
 
         {/* ---- Station bottom sheet ---- */}
         {selectedStation && (
