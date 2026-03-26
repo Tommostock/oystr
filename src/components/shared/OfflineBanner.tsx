@@ -39,7 +39,7 @@ export default function OfflineBanner() {
       aria-live="polite"
     >
       <span className="text-amber amber-glow dot-matrix text-xs tracking-widest">
-        OFFLINE -- SHOWING SCHEDULED TIMES
+        NO CONNECTION -- LIVE DATA UNAVAILABLE
       </span>
     </div>
   );
