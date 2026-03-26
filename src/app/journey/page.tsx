@@ -15,13 +15,14 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { ArrowDownUp } from "lucide-react";
+import { ArrowDownUp, Home, X } from "lucide-react";
 import StationSearch from "@/components/shared/StationSearch";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
 import LoadingBoard from "@/components/shared/LoadingBoard";
 import JourneyCard from "@/components/journey/JourneyCard";
 import TimeSelector from "@/components/journey/TimeSelector";
+import { useHomeStation } from "@/hooks/useHomeStation";
 import type { Journey } from "@/lib/tfl-types";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +48,10 @@ export default function JourneyPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+
+  /* Home station from localStorage */
+  const { homeStation, setHomeStation, clearHomeStation } = useHomeStation();
 
   /**
    * Plan a journey between the two selected stations.
@@ -132,6 +137,101 @@ export default function JourneyPage() {
     setDateTime(newDateTime);
   };
 
+  /**
+   * "Directions Home" — get current location and plan a journey home.
+   * Uses GPS to find the nearest station, sets it as "from",
+   * sets home station as "to", and auto-plans the journey.
+   */
+  const handleDirectionsHome = useCallback(async () => {
+    if (!homeStation) return;
+    if (!navigator.geolocation) {
+      setError("GEOLOCATION NOT SUPPORTED");
+      return;
+    }
+
+    setIsLocating(true);
+    setError(null);
+
+    try {
+      /* Get current position */
+      const position = await new Promise<GeolocationPosition>(
+        (resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: false,
+            timeout: 10000,
+            maximumAge: 60000,
+          });
+        }
+      );
+
+      const { latitude, longitude } = position.coords;
+
+      /* Find the nearest station */
+      const nearbyResp = await fetch(
+        `/api/tfl/nearby?lat=${latitude}&lon=${longitude}&radius=1600`
+      );
+
+      if (!nearbyResp.ok) throw new Error("Failed to find nearby stations");
+
+      const nearbyStations = await nearbyResp.json();
+
+      /* Pick the first non-bus station, or the first one */
+      const nearest = nearbyStations.find(
+        (s: { modes: string[] }) => !s.modes.every((m: string) => m === "bus")
+      ) || nearbyStations[0];
+
+      if (!nearest) {
+        setError("NO STATIONS NEARBY");
+        return;
+      }
+
+      /* Set from = nearest station, to = home */
+      const from: StationInfo = {
+        naptanId: nearest.naptanId,
+        name: nearest.name,
+        lat: nearest.lat,
+        lon: nearest.lon,
+      };
+      const to: StationInfo = {
+        naptanId: homeStation.naptanId,
+        name: homeStation.name,
+        lat: homeStation.lat,
+        lon: homeStation.lon,
+      };
+
+      setFromStation(from);
+      setToStation(to);
+
+      /* Auto-plan the journey */
+      setIsLoading(true);
+      setHasSearched(true);
+
+      const fromValue = from.naptanId.startsWith("HUB")
+        ? `${from.lat},${from.lon}` : from.naptanId;
+      const toValue = to.naptanId.startsWith("HUB")
+        ? `${to.lat},${to.lon}` : to.naptanId;
+
+      const params = new URLSearchParams({
+        from: fromValue,
+        to: toValue,
+        timeIs: "Departing",
+      });
+
+      const response = await fetch(`/api/tfl/journey?${params}`);
+      if (!response.ok) throw new Error("Failed to plan journey");
+
+      const data = await response.json();
+      setJourneys(data.journeys || []);
+    } catch (err) {
+      console.error("Directions home error:", err);
+      setError("COULD NOT GET DIRECTIONS HOME -- TRY AGAIN");
+      setJourneys([]);
+    } finally {
+      setIsLocating(false);
+      setIsLoading(false);
+    }
+  }, [homeStation]);
+
   return (
     <div className="p-4 space-y-4">
       {/* ---- Page Header ---- */}
@@ -140,6 +240,52 @@ export default function JourneyPage() {
           Journey Planner
         </AmberText>
       </div>
+
+      {/* ---- Directions Home ---- */}
+      {homeStation ? (
+        <div className="flex gap-2">
+          <button
+            onClick={handleDirectionsHome}
+            disabled={isLocating || isLoading}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 py-3",
+              "bg-surface border border-amber",
+              "font-mono text-sm tracking-wider text-amber uppercase",
+              "hover:bg-amber/10 transition-colors duration-200",
+              "disabled:opacity-40 disabled:border-board-border",
+              "amber-glow"
+            )}
+          >
+            <Home size={16} strokeWidth={1.5} />
+            <span>{isLocating ? "LOCATING..." : "DIRECTIONS HOME"}</span>
+          </button>
+          <button
+            onClick={clearHomeStation}
+            className="p-3 bg-surface border border-board-border text-amber-faint hover:text-error hover:border-error/50 transition-colors"
+            aria-label="Remove home station"
+            title={`Home: ${homeStation.name}`}
+          >
+            <X size={14} strokeWidth={1.5} />
+          </button>
+        </div>
+      ) : (
+        <div className="border border-board-border bg-surface p-3">
+          <div className="font-mono text-xs tracking-wider text-amber-faint mb-2 uppercase">
+            SET YOUR HOME STATION FOR ONE-TAP DIRECTIONS
+          </div>
+          <StationSearch
+            onSelect={(station) =>
+              setHomeStation({
+                naptanId: station.naptanId,
+                name: station.name,
+                lat: station.lat,
+                lon: station.lon,
+              })
+            }
+            placeholder="Search for your home station..."
+          />
+        </div>
+      )}
 
       {/* ---- From / To Search Inputs ---- */}
       <BoardPanel>
