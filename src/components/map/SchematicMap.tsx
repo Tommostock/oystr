@@ -391,18 +391,33 @@ export default function SchematicMap({
           })}
 
         {/* ---- Live train dots ---- */}
+        {/* Train dots are smaller than station dots and use a glow ring */}
+        {/* to distinguish them from stations, even when sitting on a station */}
         {trains.map((train) => (
-          <circle
-            key={`train-${train.lineId}-${train.vehicleId}`}
-            cx={train.position[0]}
-            cy={train.position[1]}
-            r={dotRadius * 1.2}
-            fill={LINE_COLOURS[train.lineId] || "#FF9500"}
-            stroke="#ffffff"
-            strokeWidth={Math.max(0.5, 0.8 * (CANVAS_W / viewBox.w) * 0.3)}
-            opacity={0.9}
-            className="animate-pulse-dot"
-          />
+          <g key={`train-${train.lineId}-${train.vehicleId}`}>
+            {/* Outer glow ring — makes the train visible on top of stations */}
+            <circle
+              cx={train.position[0]}
+              cy={train.position[1]}
+              r={dotRadius * 2}
+              fill="none"
+              stroke={LINE_COLOURS[train.lineId] || "#FF9500"}
+              strokeWidth={0.5}
+              opacity={0.4}
+              className="animate-pulse-dot"
+            />
+            {/* Inner filled dot — the actual train position */}
+            <circle
+              cx={train.position[0]}
+              cy={train.position[1]}
+              r={dotRadius * 0.8}
+              fill={LINE_COLOURS[train.lineId] || "#FF9500"}
+              stroke="#ffffff"
+              strokeWidth={Math.max(0.3, 0.5 * (CANVAS_W / viewBox.w) * 0.3)}
+              opacity={0.95}
+              className="animate-pulse-dot"
+            />
+          </g>
         ))}
       </svg>
     </div>
