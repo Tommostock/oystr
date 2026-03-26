@@ -17,17 +17,22 @@
   <!-- Dark background -->
   <rect width="512" height="512" fill="#0a0a0a"/>
 
-  <!-- Amber "O" with glow effect, centred -->
+  <!--
+    Amber "O" with VT323 font, dead centre.
+    x=256 = horizontal centre (text-anchor: middle)
+    y=256 = vertical centre (dominant-baseline: central)
+    VT323 has a tall cap height, so we nudge y slightly
+    to visually centre the glyph within the tile.
+  -->
   <text
     x="256"
-    y="290"
+    y="256"
     text-anchor="middle"
     dominant-baseline="central"
-    font-family="'Share Tech Mono', 'Courier New', monospace"
-    font-size="320"
+    font-family="'VT323', 'Courier New', monospace"
+    font-size="300"
     font-weight="400"
     fill="#ff9500"
     filter="url(#glow)"
-    letter-spacing="0.02em"
   >O</text>
 </svg>

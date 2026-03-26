@@ -1,6 +1,37 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="64" fill="#0a0a0a"/>
-  <text x="256" y="290" text-anchor="middle" dominant-baseline="middle"
-    font-family="'Courier New', monospace" font-weight="bold" font-size="280"
-    fill="#ff9500">O</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <!-- Amber LED glow filter -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="24" result="blur2"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="48" result="blur3"/>
+      <feMerge>
+        <feMergeNode in="blur3"/>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="blur1"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Dark background -->
+  <rect width="1024" height="1024" fill="#0a0a0a"/>
+
+  <!--
+    Amber "O" with VT323 font, dead centre of the 1024x1024 tile.
+    x=512 = horizontal centre (text-anchor: middle)
+    y=536 = vertical centre with slight offset for VT323 cap height
+    dominant-baseline: central aligns the text middle to y
+  -->
+  <text
+    x="512"
+    y="512"
+    text-anchor="middle"
+    dominant-baseline="central"
+    font-family="'VT323', 'Courier New', monospace"
+    font-size="600"
+    font-weight="400"
+    fill="#ff9500"
+    filter="url(#glow)"
+  >O</text>
 </svg>
