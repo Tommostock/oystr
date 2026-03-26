@@ -344,7 +344,7 @@ export default function SchematicMap({
             const lp = station.labelPosition || "right";
             let tx = station.x;
             let ty = station.y;
-            let anchor = "start";
+            let anchor: "start" | "middle" | "end" = "start";
 
             switch (lp) {
               case "left":
