@@ -46,6 +46,20 @@ interface SelectedStation {
   modes: string[];
   lines: { id: string; name: string }[];
   zone?: string;
+  address?: string;
+}
+
+/**
+ * Get a greeting based on the current time of day.
+ * Used in the app header for a personal touch.
+ */
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 5) return "Good Night";
+  if (hour < 12) return "Good Morning";
+  if (hour < 17) return "Good Afternoon";
+  if (hour < 21) return "Good Evening";
+  return "Good Night";
 }
 
 /**
@@ -128,6 +142,35 @@ function HomeContent() {
     enrichStation();
   }, [selectedNaptanId, selectedName, selectedLat, selectedZone]);
 
+  /*
+   * Fetch the station address from the disruptions endpoint.
+   * The address comes from TfL StopPoint data and is shown
+   * below the station name in the header.
+   */
+  const selectedAddress = selectedStation?.address;
+  useEffect(() => {
+    if (!selectedNaptanId || selectedAddress) return;
+
+    async function fetchAddress() {
+      try {
+        const resp = await fetch(
+          `/api/tfl/disruptions?stopId=${selectedNaptanId}`
+        );
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (data.facilities?.address) {
+          setSelectedStation((prev) =>
+            prev ? { ...prev, address: data.facilities.address } : prev
+          );
+        }
+      } catch {
+        /* Silently fail — address is not critical */
+      }
+    }
+
+    fetchAddress();
+  }, [selectedNaptanId, selectedAddress]);
+
   return (
     <div className="p-4 space-y-4">
       {/* ---- App Header with home reset button ---- */}
@@ -153,9 +196,9 @@ function HomeContent() {
           >
             Oystr
           </AmberText>
-          {/* Subtitle — tells new users what the app is */}
+          {/* Greeting or subtitle depending on state */}
           <span className="font-mono text-[9px] tracking-[0.25em] text-amber-faint uppercase mt-0.5">
-            Your London Transport Companion
+            {selectedStation ? "Your London Transport Companion" : getGreeting()}
           </span>
         </div>
       </div>
@@ -213,6 +256,12 @@ function HomeContent() {
               </div>
               <SaveStationButton station={selectedStation} />
             </div>
+            {/* Station address (compact, below the name) */}
+            {selectedStation.address && (
+              <p className="font-mono text-[10px] tracking-wider text-amber-faint leading-tight">
+                {selectedStation.address}
+              </p>
+            )}
             {/* Station name origin fact (only if available) */}
             {getStationFact(selectedStation.name) && (
               <p className="font-mono text-[10px] tracking-wider text-amber amber-glow leading-relaxed">
