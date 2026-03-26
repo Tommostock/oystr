@@ -140,12 +140,12 @@ export default function JourneyLegDisplay({
           />
 
           {/* Line name */}
-          <span className="font-mono text-xs tracking-wider text-amber-faint uppercase truncate">
+          <span className="font-mono text-sm tracking-wider text-amber amber-glow uppercase truncate">
             {isWalking ? "Walk" : lineName}
           </span>
 
           {/* Duration */}
-          <span className="font-mono text-xs tracking-wider text-amber-faint shrink-0">
+          <span className="font-mono text-sm tracking-wider text-amber amber-glow shrink-0">
             {leg.duration} MIN
           </span>
         </div>
@@ -160,7 +160,7 @@ export default function JourneyLegDisplay({
 
       {/* ---- Departure time ---- */}
       <div className="shrink-0">
-        <span className="font-mono text-xs tracking-wider text-amber-faint">
+        <span className="font-mono text-sm tracking-wider text-amber amber-glow">
           {formatTime(leg.departureTime)}
         </span>
       </div>
