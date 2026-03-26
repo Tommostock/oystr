@@ -117,7 +117,12 @@ export default function RootLayout({
          * pb-16 adds padding at the bottom so content isn't hidden
          * behind the fixed BottomNav.
          */}
-        <main className="flex-1 pb-20 page-transition">{children}</main>
+        <main
+          className="flex-1 page-transition"
+          style={{ paddingBottom: "calc(3.5rem + env(safe-area-inset-bottom, 0px) + 0.5rem)" }}
+        >
+          {children}
+        </main>
 
         {/* Bottom tab navigation — always visible */}
         <BottomNav />
