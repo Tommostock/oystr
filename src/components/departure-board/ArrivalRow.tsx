@@ -63,7 +63,7 @@ export default function ArrivalRow({
     <div
       className={cn(
         /* Horizontal layout: identifier | destination | time */
-        "flex items-center gap-3 py-1.5",
+        "flex items-center gap-3 py-2.5",
         /* Bottom border to separate rows */
         "border-b border-board-border/50 last:border-b-0",
         className
@@ -74,13 +74,13 @@ export default function ArrivalRow({
       {/* ---- Left column: route number (bus) or platform (tube) ---- */}
       {isBus && routeNumber ? (
         /* Bus: show route number in a bordered box */
-        <div className="shrink-0 w-10">
+        <div className="shrink-0 w-12">
           <span
             className={cn(
               "inline-flex items-center justify-center",
-              "min-w-[2rem] px-1 py-0.5",
+              "min-w-[2.5rem] px-1.5 py-0.5",
               "border border-amber text-amber",
-              "font-board text-sm tracking-wider"
+              "font-board text-lg tracking-wider"
             )}
           >
             {routeNumber}
@@ -88,16 +88,16 @@ export default function ArrivalRow({
         </div>
       ) : (
         /* Tube/DLR: show line colour dot + platform number */
-        <div className="flex items-center gap-2 shrink-0 w-8">
+        <div className="flex items-center gap-2 shrink-0 w-10">
           {/* Optional line colour dot */}
           {lineColour && (
             <span
-              className="w-2 h-2 rounded-full shrink-0"
+              className="w-2.5 h-2.5 rounded-full shrink-0"
               style={{ backgroundColor: lineColour }}
               aria-hidden="true"
             />
           )}
-          <span className="text-amber-faint font-board text-base tracking-wider">
+          <span className="text-amber-faint font-board text-xl tracking-wider">
             {platform}
           </span>
         </div>
@@ -109,7 +109,7 @@ export default function ArrivalRow({
           /* Take up remaining space, truncate if too long */
           "flex-1 truncate",
           /* Uppercase VT323 text — the classic departure board look */
-          "text-amber font-board text-base tracking-wider uppercase",
+          "text-amber font-board text-xl tracking-wider uppercase",
           /* Amber glow on the text */
           "amber-glow"
         )}
@@ -121,9 +121,9 @@ export default function ArrivalRow({
       <span
         className={cn(
           /* Fixed width on the right side */
-          "shrink-0 text-right min-w-[4.5rem]",
+          "shrink-0 text-right min-w-[5rem]",
           /* VT323 departure board font */
-          "font-board text-base tracking-wider",
+          "font-board text-xl tracking-wider",
           /* DUE vehicles get bright glow, others are standard amber */
           isDue
             ? "text-amber amber-glow-strong animate-blink"

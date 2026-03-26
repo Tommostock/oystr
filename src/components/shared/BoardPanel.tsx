@@ -60,7 +60,7 @@ export default function BoardPanel({
         <div className="mb-3 border-b border-board-border pb-2">
           <AmberText
             variant="secondary"
-            size="sm"
+            size="base"
             uppercase
             className="font-board"
           >
