@@ -36,6 +36,8 @@ interface SearchResult {
   lon: number;
   modes: string[];
   lines: { id: string; name: string }[];
+  /** TfL fare zone (e.g. "1", "2/3") */
+  zone?: string;
   /** Bus stop letter (e.g. "H") — only for bus stops */
   stopLetter?: string;
   /** Bus stop indicator text (e.g. "Stop H") — only for bus stops */
@@ -276,7 +278,7 @@ export default function StationSearch({
                 )}
                 role="option"
               >
-                {/* Station name with optional stop letter badge */}
+                {/* Station name with optional stop letter badge and zone */}
                 <div className="flex items-center gap-2 uppercase">
                   {/* Bus stop letter badge — e.g. [H] */}
                   {station.stopLetter && (
@@ -284,7 +286,13 @@ export default function StationSearch({
                       {station.stopLetter}
                     </span>
                   )}
-                  <span className="truncate">{station.name}</span>
+                  <span className="truncate flex-1">{station.name}</span>
+                  {/* Zone badge — e.g. "Z1" or "Z2/3" */}
+                  {station.zone && (
+                    <span className="shrink-0 text-amber-faint text-xs font-mono">
+                      Z{station.zone}
+                    </span>
+                  )}
                 </div>
                 {/* Transport modes and indicator as small labels underneath */}
                 <div className="text-amber-faint text-xs mt-1 uppercase">

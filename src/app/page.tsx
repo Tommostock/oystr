@@ -37,6 +37,7 @@ interface SelectedStation {
   lon: number;
   modes: string[];
   lines: { id: string; name: string }[];
+  zone?: string;
 }
 
 /**
@@ -128,14 +129,22 @@ function HomeContent() {
           {/* Selected station header — prominent name + save button */}
           <div className="border border-board-border bg-surface p-3">
             <div className="flex items-center justify-between">
-              <h2 className="font-board text-2xl tracking-wider text-amber uppercase amber-glow truncate">
-                {selectedStation.name
-                  .replace(/\s*Underground Station$/i, "")
-                  .replace(/\s*DLR Station$/i, "")
-                  .replace(/\s*Rail Station$/i, "")
-                  .replace(/\s*Station$/i, "")
-                  .replace(/\s*\(London\)/i, "")}
-              </h2>
+              <div className="flex items-center gap-3 min-w-0">
+                <h2 className="font-board text-2xl tracking-wider text-amber uppercase amber-glow truncate">
+                  {selectedStation.name
+                    .replace(/\s*Underground Station$/i, "")
+                    .replace(/\s*DLR Station$/i, "")
+                    .replace(/\s*Rail Station$/i, "")
+                    .replace(/\s*Station$/i, "")
+                    .replace(/\s*\(London\)/i, "")}
+                </h2>
+                {/* Zone badge */}
+                {selectedStation.zone && (
+                  <span className="shrink-0 font-mono text-xs tracking-wider text-amber-faint border border-board-border px-1.5 py-0.5">
+                    ZONE {selectedStation.zone}
+                  </span>
+                )}
+              </div>
               <SaveStationButton station={selectedStation} />
             </div>
           </div>

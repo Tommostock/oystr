@@ -27,6 +27,8 @@ interface SearchStation {
   lon: number;
   modes: string[];
   lines: { id: string; name: string }[];
+  /** TfL fare zone (e.g. "1", "2/3") — for tube/rail stations */
+  zone?: string;
   /** Bus stop letter (e.g. "H") — only for bus stops */
   stopLetter?: string;
   /** Bus stop indicator text (e.g. "Stop H") — only for bus stops */
@@ -173,6 +175,7 @@ export async function GET(request: NextRequest) {
         lat: number;
         lon: number;
         modes: string[];
+        zone?: string;
         lines: { id: string; name: string }[];
       }) => ({
         naptanId: match.id,
@@ -181,6 +184,7 @@ export async function GET(request: NextRequest) {
         lon: match.lon,
         modes: match.modes || [],
         lines: match.lines || [],
+        zone: match.zone || undefined,
       })
     );
 
