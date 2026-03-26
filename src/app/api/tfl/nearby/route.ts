@@ -92,10 +92,16 @@ export async function GET(request: NextRequest) {
         })
       )
       .sort(
-        (a: { distance: number }, b: { distance: number }) =>
-          a.distance - b.distance
+        (a: { distance: number; modes: string[] }, b: { distance: number; modes: string[] }) => {
+          /* Tube/rail stations first, bus stops after */
+          const aIsBus = a.modes.length === 1 && a.modes[0] === "bus";
+          const bIsBus = b.modes.length === 1 && b.modes[0] === "bus";
+          if (aIsBus !== bIsBus) return aIsBus ? 1 : -1;
+          /* Within each group, sort by distance */
+          return a.distance - b.distance;
+        }
       )
-      .slice(0, 15); /* Return top 15 nearest (more results now with bus stops) */
+      .slice(0, 15);
 
     return NextResponse.json(stations);
   } catch (error) {
