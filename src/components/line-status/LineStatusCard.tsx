@@ -129,7 +129,7 @@ export default function LineStatusCard({
       {/* ---- Expanded Detail: disruption reason ---- */}
       {isExpanded && hasDetail && (
         <div className="px-3 pb-3 pt-0 border-t border-board-border">
-          <p className="font-mono text-xs tracking-wider text-amber-faint leading-relaxed mt-2">
+          <p className="font-mono text-sm tracking-wider text-amber amber-glow leading-relaxed mt-2">
             {reason}
           </p>
         </div>
