@@ -29,6 +29,7 @@ import SaveStationButton from "@/components/departure-board/SaveStationButton";
 import StationAlerts from "@/components/departure-board/StationAlerts";
 import PeakIndicator from "@/components/shared/PeakIndicator";
 import CrowdingIndicator from "@/components/shared/CrowdingIndicator";
+import WeatherIcon from "@/components/shared/WeatherIcon";
 import NightTubeIndicator from "@/components/shared/NightTubeIndicator";
 import SavedStationDisruptions from "@/components/shared/SavedStationDisruptions";
 import BoardPanel from "@/components/shared/BoardPanel";
@@ -133,17 +134,21 @@ function HomeContent() {
         <div className="space-y-3">
           {/* Selected station header */}
           <div className="border border-board-border bg-surface p-3 space-y-2">
-            {/* Row 1: Station name + zone + save icon */}
+            {/* Row 1: Station name + weather + zone + save icon */}
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-baseline gap-2 min-w-0">
-                <h2 className="font-board text-2xl tracking-wider text-amber uppercase amber-glow truncate">
-                  {selectedStation.name
-                    .replace(/\s*Underground Station$/i, "")
-                    .replace(/\s*DLR Station$/i, "")
-                    .replace(/\s*Rail Station$/i, "")
-                    .replace(/\s*Station$/i, "")
-                    .replace(/\s*\(London\)/i, "")}
-                </h2>
+                <div className="flex items-start">
+                  <h2 className="font-board text-2xl tracking-wider text-amber uppercase amber-glow truncate">
+                    {selectedStation.name
+                      .replace(/\s*Underground Station$/i, "")
+                      .replace(/\s*DLR Station$/i, "")
+                      .replace(/\s*Rail Station$/i, "")
+                      .replace(/\s*Station$/i, "")
+                      .replace(/\s*\(London\)/i, "")}
+                  </h2>
+                  {/* Weather icon as superscript */}
+                  <WeatherIcon lat={selectedStation.lat} lon={selectedStation.lon} />
+                </div>
                 {selectedStation.zone && (
                   <span className="shrink-0 font-mono text-xs tracking-wider text-amber-faint">
                     Zone {selectedStation.zone}
