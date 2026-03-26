@@ -112,9 +112,27 @@ function HomeContent() {
       {/* ---- Departure Board or Empty State ---- */}
       {selectedStation ? (
         <div className="space-y-3">
-          {/* Save station button — sits between search and board */}
-          <div className="flex justify-end">
-            <SaveStationButton station={selectedStation} />
+          {/* Selected station header — always visible so user knows what they're viewing */}
+          <div className="flex items-center justify-between border-b border-board-border pb-2">
+            <div>
+              <AmberText size="lg" uppercase className="amber-glow font-board">
+                {selectedStation.name
+                  .replace(/\s*Underground Station$/i, "")
+                  .replace(/\s*DLR Station$/i, "")
+                  .replace(/\s*Rail Station$/i, "")
+                  .replace(/\s*Station$/i, "")
+                  .replace(/\s*\(London\)/i, "")}
+              </AmberText>
+            </div>
+            <div className="flex items-center gap-2">
+              <SaveStationButton station={selectedStation} />
+              <button
+                onClick={() => setSelectedStation(null)}
+                className="font-mono text-xs tracking-wider text-amber-faint hover:text-amber border border-board-border px-2 py-1 transition-colors"
+              >
+                CLEAR
+              </button>
+            </div>
           </div>
 
           {/* Live departure board for the selected station */}
