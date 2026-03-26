@@ -143,14 +143,20 @@ function HomeContent() {
           </button>
         )}
 
-        <AmberText
-          as="h1"
-          size="2xl"
-          uppercase
-          className="amber-glow-strong dot-matrix"
-        >
-          Oystr
-        </AmberText>
+        <div className="flex flex-col items-center">
+          <AmberText
+            as="h1"
+            size="2xl"
+            uppercase
+            className="amber-glow-strong dot-matrix"
+          >
+            Oystr
+          </AmberText>
+          {/* Subtitle — tells new users what the app is */}
+          <span className="font-mono text-[9px] tracking-[0.25em] text-amber-faint uppercase mt-0.5">
+            Your London Transport Companion
+          </span>
+        </div>
       </div>
 
       {/* ---- Station Search + Near Me ---- */}
