@@ -91,23 +91,42 @@ export async function GET(request: NextRequest) {
     await Promise.all(
       lineIds.slice(0, 4).map(async (lineId) => {
         try {
-          const resp = await fetch(
-            `${TFL_API_BASE}/Line/${lineId}/Timetable/${stopId}?${params}`,
-            { next: { revalidate: 3600 } }
-          );
+          /*
+           * Fetch both directions (inbound + outbound).
+           * Without a direction param, TfL returns disambiguation
+           * instead of actual timetable data.
+           */
+          const [inboundResp, outboundResp] = await Promise.all([
+            fetch(
+              `${TFL_API_BASE}/Line/${lineId}/Timetable/${stopId}?direction=inbound&${params}`,
+              { next: { revalidate: 3600 } }
+            ),
+            fetch(
+              `${TFL_API_BASE}/Line/${lineId}/Timetable/${stopId}?direction=outbound&${params}`,
+              { next: { revalidate: 3600 } }
+            ),
+          ]);
 
-          if (!resp.ok) return;
-          const data = await resp.json();
+          /* eslint-disable @typescript-eslint/no-explicit-any */
+          const allRoutes: { route: any; direction: string }[] = [];
 
-          const routes = data.timetable?.routes || [];
-          for (const route of routes) {
+          for (const [resp, dir] of [[inboundResp, "inbound"], [outboundResp, "outbound"]] as const) {
+            if (!resp.ok) continue;
+            const data = await resp.json();
+            const routes = data.timetable?.routes || [];
+            for (const route of routes) {
+              allRoutes.push({ route, direction: dir });
+            }
+          }
+
+          for (const { route, direction: dir } of allRoutes) {
             /* Pick the right schedule for today */
             const schedules = route.schedules || [];
-            let schedule = schedules[0]; /* Default to first */
+            let schedule = schedules[0];
 
             for (const s of schedules) {
               const name = (s.name || "").toLowerCase();
-              if (day >= 1 && day <= 5 && name.includes("friday")) {
+              if (day >= 1 && day <= 5 && (name.includes("monday") || name.includes("friday"))) {
                 schedule = s;
                 break;
               }
@@ -124,22 +143,13 @@ export async function GET(request: NextRequest) {
             const journeys = schedule?.knownJourneys || [];
             if (journeys.length === 0) continue;
 
-            /* Get destination name from route intervals */
-            const intervals = route.stationIntervals || [];
-            const lastInterval = intervals[intervals.length - 1];
-            const destStops = lastInterval?.intervals || [];
-            const destName = destStops[destStops.length - 1]?.stopId || lineId;
-            const direction = destName
-              .replace(/940GZZLU/i, "")
-              .replace(/910G/i, "");
-
             const first = journeys[0];
             const last = journeys[journeys.length - 1];
 
             allFirstTrains.push({
               lineId,
               lineName: lineId,
-              direction,
+              direction: dir,
               time: formatTime(first.hour, first.minute),
               rawMinutes: toMinutes(first.hour, first.minute),
             });
@@ -147,7 +157,7 @@ export async function GET(request: NextRequest) {
             allLastTrains.push({
               lineId,
               lineName: lineId,
-              direction,
+              direction: dir,
               time: formatTime(last.hour, last.minute),
               rawMinutes: toMinutes(last.hour, last.minute),
             });
