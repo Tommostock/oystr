@@ -100,12 +100,20 @@ export default function JourneyCard({ journey, index }: JourneyCardProps) {
           </div>
         </div>
 
-        {/* Total duration */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <Clock size={12} strokeWidth={1.5} className="text-amber-faint" />
-          <span className="font-mono text-sm tracking-wider text-amber amber-glow">
-            {journey.duration} MIN
-          </span>
+        {/* Duration and fare */}
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <div className="flex items-center gap-1.5">
+            <Clock size={12} strokeWidth={1.5} className="text-amber-faint" />
+            <span className="font-mono text-sm tracking-wider text-amber amber-glow">
+              {journey.duration} MIN
+            </span>
+          </div>
+          {/* Oyster fare — single adult pay-as-you-go */}
+          {journey.fare && (
+            <span className="font-mono text-xs tracking-wider text-good">
+              {"\u00A3"}{(journey.fare.totalCost / 100).toFixed(2)}
+            </span>
+          )}
         </div>
 
         {/* Expand/collapse chevron */}
@@ -128,6 +136,30 @@ export default function JourneyCard({ journey, index }: JourneyCardProps) {
               isLast={i === journey.legs.length - 1}
             />
           ))}
+
+          {/* Fare breakdown */}
+          {journey.fare && journey.fare.fares.length > 0 && (
+            <div className="mt-3 pt-2 border-t border-board-border/50">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs tracking-wider text-amber-faint uppercase">
+                  OYSTER / CONTACTLESS FARE
+                </span>
+                <span className="font-mono text-sm tracking-wider text-good amber-glow">
+                  {"\u00A3"}{(journey.fare.totalCost / 100).toFixed(2)}
+                </span>
+              </div>
+              {journey.fare.fares[0] && (
+                <div className="flex gap-4 mt-1">
+                  <span className="font-mono text-xs tracking-wider text-amber-faint">
+                    PEAK: {"\u00A3"}{(journey.fare.fares[0].peak / 100).toFixed(2)}
+                  </span>
+                  <span className="font-mono text-xs tracking-wider text-amber-faint">
+                    OFF-PEAK: {"\u00A3"}{(journey.fare.fares[0].offPeak / 100).toFixed(2)}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

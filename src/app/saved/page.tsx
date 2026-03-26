@@ -94,27 +94,28 @@ export default function SavedPage() {
             role="button"
             aria-label={`View departures for ${station.name}`}
           >
-            {/* Line colour dots */}
-            <div className="flex flex-col gap-1 shrink-0">
-              {station.lines.slice(0, 3).map((lineId) => (
-                <span
-                  key={lineId}
-                  className="w-2 h-2 rounded-full"
-                  style={{
-                    backgroundColor: LINE_COLOURS[lineId] || "#FF9500",
-                  }}
-                  title={LINE_NAMES[lineId] || lineId}
-                  aria-hidden="true"
-                />
-              ))}
-            </div>
-
             {/* Station name and line info */}
             <div className="flex-1 min-w-0">
-              <div className="font-mono text-sm tracking-wider text-amber uppercase truncate">
-                {station.name
-                  .replace(/\s*Underground Station$/i, "")
-                  .replace(/\s*Station$/i, "")}
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-sm tracking-wider text-amber uppercase truncate">
+                  {station.name
+                    .replace(/\s*Underground Station$/i, "")
+                    .replace(/\s*Station$/i, "")}
+                </span>
+                {/* All line colour dots in a horizontal row */}
+                <div className="flex gap-1 shrink-0">
+                  {station.lines.map((lineId) => (
+                    <span
+                      key={lineId}
+                      className="w-2.5 h-2.5 rounded-full"
+                      style={{
+                        backgroundColor: LINE_COLOURS[lineId] || "#FF9500",
+                      }}
+                      title={LINE_NAMES[lineId] || lineId}
+                      aria-hidden="true"
+                    />
+                  ))}
+                </div>
               </div>
               <div className="font-mono text-xs tracking-wider text-amber-faint mt-0.5">
                 {station.lines

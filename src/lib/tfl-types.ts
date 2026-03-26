@@ -109,6 +109,19 @@ export interface Journey {
   arrivalDateTime: string;
   /** Individual legs of the journey */
   legs: JourneyLeg[];
+  /** Fare information (Oyster/contactless pay-as-you-go) */
+  fare?: {
+    /** Total cost in pence (e.g. 300 = GBP 3.00) */
+    totalCost: number;
+    fares: {
+      /** Peak fare in pence */
+      peak: number;
+      /** Off-peak fare in pence */
+      offPeak: number;
+      /** Charge level: "Peak" or "Off Peak" */
+      chargeLevel: string;
+    }[];
+  };
 }
 
 export interface JourneyLeg {
