@@ -48,6 +48,31 @@ const CANVAS_H = 800;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 4;
 
+/**
+ * Line draw order — determines which line renders on top and
+ * the perpendicular offset so parallel lines don't overlap.
+ * Lines sharing a segment (e.g. Circle + H&C + District between
+ * Paddington and Aldgate East) get different offsets so they
+ * render as visible parallel stripes.
+ *
+ * Offset is in SVG units perpendicular to the line direction.
+ */
+const LINE_OFFSETS: Record<string, number> = {
+  "hammersmith-city": -6,
+  circle: -3,
+  metropolitan: -2,
+  district: 0,
+  piccadilly: 2,
+  central: 0,
+  victoria: 0,
+  jubilee: 0,
+  northern: 0,
+  bakerloo: 3,
+  "waterloo-city": 0,
+  elizabeth: 3,
+  dlr: 0,
+};
+
 /* ========================================
  * COMPONENT
  * ======================================== */
@@ -217,48 +242,75 @@ export default function SchematicMap({
   }, []);
 
   /* ========================================
-   * BUILD LINE POLYLINE POINTS (right-angle routing)
+   * BUILD LINE POLYLINE POINTS (right-angle routing with offset)
    *
    * For each pair of consecutive stations, if they don't share
    * the same X or Y coordinate, we insert a corner waypoint
-   * to create a clean 90-degree turn. This ensures all line
-   * segments are either perfectly horizontal or perfectly vertical.
+   * to create a clean 90-degree turn.
    *
-   * Given station A(x1,y1) and station B(x2,y2):
-   *   - If x1 === x2 or y1 === y2: direct line (already orthogonal)
-   *   - Else: insert corner at (x2, y1) — horizontal first, then vertical
+   * The offset parameter shifts the line perpendicular to its
+   * direction so that parallel lines (e.g. District + Circle)
+   * render as separate visible stripes instead of stacking.
+   *
+   * For horizontal segments: offset shifts vertically (Y)
+   * For vertical segments: offset shifts horizontally (X)
    * ======================================== */
   const buildPolylinePoints = useCallback(
-    (stationIds: string[]): string => {
-      const points: string[] = [];
+    (stationIds: string[], offset: number = 0): string => {
+      const rawPoints: { x: number; y: number }[] = [];
 
       for (let i = 0; i < stationIds.length; i++) {
         const s = stationMap.get(stationIds[i]);
         if (!s) continue;
 
-        /* Add this station's position */
         if (i === 0) {
-          points.push(`${s.x},${s.y}`);
+          rawPoints.push({ x: s.x, y: s.y });
           continue;
         }
 
-        /* Get previous station */
-        const prev = stationMap.get(stationIds[i - 1]);
-        if (!prev) {
-          points.push(`${s.x},${s.y}`);
-          continue;
-        }
+        const prev = rawPoints[rawPoints.length - 1];
 
         /* If stations don't share X or Y, add a corner waypoint */
         if (prev.x !== s.x && prev.y !== s.y) {
-          /* Route: horizontal first, then vertical */
-          points.push(`${s.x},${prev.y}`);
+          rawPoints.push({ x: s.x, y: prev.y });
         }
 
-        points.push(`${s.x},${s.y}`);
+        rawPoints.push({ x: s.x, y: s.y });
       }
 
-      return points.join(" ");
+      /* Apply perpendicular offset to each segment */
+      if (offset === 0 || rawPoints.length < 2) {
+        return rawPoints.map((p) => `${p.x},${p.y}`).join(" ");
+      }
+
+      const offsetPoints: string[] = [];
+      for (let i = 0; i < rawPoints.length; i++) {
+        const p = rawPoints[i];
+        let ox = 0;
+        let oy = 0;
+
+        if (i < rawPoints.length - 1) {
+          const next = rawPoints[i + 1];
+          if (next.y === p.y) {
+            /* Horizontal segment — offset vertically */
+            oy = offset;
+          } else {
+            /* Vertical segment — offset horizontally */
+            ox = offset;
+          }
+        } else if (i > 0) {
+          const prev = rawPoints[i - 1];
+          if (prev.y === p.y) {
+            oy = offset;
+          } else {
+            ox = offset;
+          }
+        }
+
+        offsetPoints.push(`${p.x + ox},${p.y + oy}`);
+      }
+
+      return offsetPoints.join(" ");
     },
     [stationMap]
   );
@@ -268,8 +320,12 @@ export default function SchematicMap({
    * ======================================== */
 
   const vb = `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`;
-  /* Show labels only when zoomed in enough */
-  const showLabels = viewBox.w < CANVAS_W * 0.8;
+  /*
+   * Only show labels when zoomed in enough to avoid overlap.
+   * At full zoom-out (viewBox.w = 1200), labels would overlap badly.
+   * At 50% zoom (viewBox.w = 600), there's enough space.
+   */
+  const showLabels = viewBox.w < CANVAS_W * 0.55;
   /* Station dot size scales with zoom */
   const dotRadius = Math.max(2, Math.min(4, viewBox.w / 300));
   const interchangeRadius = dotRadius * 1.6;
@@ -301,8 +357,10 @@ export default function SchematicMap({
         {/* ---- Line paths ---- */}
         {visibleRoutes.map((route) =>
           route.branches.map((branch, branchIdx) => {
+            const offset = LINE_OFFSETS[route.lineId] || 0;
             const points = buildPolylinePoints(
-              branch.filter((id): id is string => id !== null)
+              branch.filter((id): id is string => id !== null),
+              offset
             );
             if (!points) return null;
             return (
@@ -311,10 +369,10 @@ export default function SchematicMap({
                 points={points}
                 fill="none"
                 stroke={LINE_COLOURS[route.lineId] || "#FF9500"}
-                strokeWidth={Math.max(3, 5 * (CANVAS_W / viewBox.w) * 0.3)}
+                strokeWidth={Math.max(2.5, 4 * (CANVAS_W / viewBox.w) * 0.3)}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                opacity={0.85}
+                opacity={0.9}
               />
             );
           })
@@ -379,21 +437,21 @@ export default function SchematicMap({
 
             switch (lp) {
               case "left":
-                tx -= 5;
-                ty += 1;
+                tx -= 8;
+                ty -= 3;
                 anchor = "end";
                 break;
               case "right":
-                tx += 5;
-                ty += 1;
+                tx += 8;
+                ty -= 3;
                 anchor = "start";
                 break;
               case "above":
-                ty -= 5;
+                ty -= 8;
                 anchor = "middle";
                 break;
               case "below":
-                ty += 8;
+                ty += 10;
                 anchor = "middle";
                 break;
             }
@@ -406,8 +464,11 @@ export default function SchematicMap({
                 textAnchor={anchor}
                 className="schematic-label"
                 fill="#ff9500"
-                fontSize={Math.max(3, 5 * (CANVAS_W / viewBox.w) * 0.3)}
-                opacity={0.7}
+                stroke="#0a0a0a"
+                strokeWidth={Math.max(1, 2 * (CANVAS_W / viewBox.w) * 0.3)}
+                paintOrder="stroke fill"
+                fontSize={Math.max(3, 4.5 * (CANVAS_W / viewBox.w) * 0.3)}
+                opacity={0.85}
                 pointerEvents="none"
               >
                 {station.name}
