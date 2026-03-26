@@ -15,7 +15,7 @@
 import { NextResponse } from "next/server";
 
 /** BBC News London RSS feed URL */
-const BBC_LONDON_RSS = "https://feeds.bbcnews.com/news/england/london/rss.xml";
+const BBC_LONDON_RSS = "https://www.bbc.co.uk/news/england/london/rss.xml";
 
 /** Shape of a news headline we return to the client */
 interface NewsHeadline {
