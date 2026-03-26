@@ -80,6 +80,9 @@ export async function GET(request: NextRequest) {
       gates: 0,
     };
 
+    /* Lines serving this station (used by Saved page to enrich old stations) */
+    let lines: { id: string; name: string }[] = [];
+
     if (stationResp.ok) {
       const stationData = await stationResp.json();
       const props: { key: string; value: string }[] =
@@ -94,9 +97,17 @@ export async function GET(request: NextRequest) {
       facilities.address = getProp("Address") || "";
       /* A station is considered step-free if it has lifts */
       facilities.stepFree = facilities.lifts > 0;
+
+      /* Extract line IDs from the StopPoint data */
+      lines = (stationData.lines || []).map(
+        (l: { id: string; name: string }) => ({
+          id: l.id,
+          name: l.name,
+        })
+      );
     }
 
-    return NextResponse.json({ disruptions, facilities });
+    return NextResponse.json({ disruptions, facilities, lines });
   } catch (error) {
     console.error("TfL disruptions error:", error);
     return NextResponse.json(

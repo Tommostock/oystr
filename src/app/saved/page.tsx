@@ -27,7 +27,9 @@ export default function SavedPage() {
 
   /*
    * Enrich saved stations that have empty lines.
-   * Fetches line data from TfL search API and updates the DB.
+   * Uses two strategies:
+   *   1. Direct StopPoint lookup by naptanId (most reliable)
+   *   2. Fallback to search API if the direct lookup fails
    * This fixes stations saved before the lines feature was added.
    */
   useEffect(() => {
@@ -36,15 +38,59 @@ export default function SavedPage() {
         if (station.lines.length > 0) continue;
 
         try {
-          const resp = await fetch(
-            `/api/tfl/search?query=${encodeURIComponent(station.name)}`
+          /*
+           * Strategy 1: Direct StopPoint lookup by naptanId.
+           * The disruptions endpoint fetches the full StopPoint data
+           * which includes line IDs — most reliable since it uses
+           * the exact naptanId rather than a name search.
+           */
+          const directResp = await fetch(
+            `/api/tfl/disruptions?stopId=${station.naptanId}`
           );
-          if (!resp.ok) continue;
+          if (directResp.ok) {
+            const directData = await directResp.json();
+            if (directData.lines?.length > 0) {
+              const lineIds = directData.lines.map(
+                (l: { id: string } | string) =>
+                  typeof l === "string" ? l : l.id
+              );
+              await db.favourites.update(station.naptanId, {
+                lines: lineIds,
+              });
+              continue; /* Success — move to next station */
+            }
+          }
 
-          const results = await resp.json();
-          const match = results.find(
-            (r: { naptanId: string }) => r.naptanId === station.naptanId
-          ) || results[0];
+          /*
+           * Strategy 2: Search by cleaned station name.
+           * Strip common suffixes so the search is more likely
+           * to return a matching result.
+           */
+          const cleanName = station.name
+            .replace(/\s*Underground Station$/i, "")
+            .replace(/\s*DLR Station$/i, "")
+            .replace(/\s*Rail Station$/i, "")
+            .replace(/\s*Station$/i, "")
+            .replace(/\s*\(London\)/i, "")
+            .trim();
+
+          const searchResp = await fetch(
+            `/api/tfl/search?query=${encodeURIComponent(cleanName)}`
+          );
+          if (!searchResp.ok) continue;
+
+          const results = await searchResp.json();
+
+          /* Try exact naptanId match first, then name match, then first result */
+          const match =
+            results.find(
+              (r: { naptanId: string }) => r.naptanId === station.naptanId
+            ) ||
+            results.find(
+              (r: { name: string }) =>
+                r.name.toLowerCase().includes(cleanName.toLowerCase())
+            ) ||
+            results[0];
 
           if (match?.lines?.length > 0) {
             const lineIds = match.lines.map(
@@ -56,7 +102,7 @@ export default function SavedPage() {
             });
           }
         } catch {
-          /* Silently fail */
+          /* Silently fail — line dots are not critical */
         }
       }
     }
