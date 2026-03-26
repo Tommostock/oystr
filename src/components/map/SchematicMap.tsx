@@ -217,17 +217,48 @@ export default function SchematicMap({
   }, []);
 
   /* ========================================
-   * BUILD LINE POLYLINE POINTS
+   * BUILD LINE POLYLINE POINTS (right-angle routing)
+   *
+   * For each pair of consecutive stations, if they don't share
+   * the same X or Y coordinate, we insert a corner waypoint
+   * to create a clean 90-degree turn. This ensures all line
+   * segments are either perfectly horizontal or perfectly vertical.
+   *
+   * Given station A(x1,y1) and station B(x2,y2):
+   *   - If x1 === x2 or y1 === y2: direct line (already orthogonal)
+   *   - Else: insert corner at (x2, y1) — horizontal first, then vertical
    * ======================================== */
   const buildPolylinePoints = useCallback(
     (stationIds: string[]): string => {
-      return stationIds
-        .map((id) => {
-          const s = stationMap.get(id);
-          return s ? `${s.x},${s.y}` : null;
-        })
-        .filter(Boolean)
-        .join(" ");
+      const points: string[] = [];
+
+      for (let i = 0; i < stationIds.length; i++) {
+        const s = stationMap.get(stationIds[i]);
+        if (!s) continue;
+
+        /* Add this station's position */
+        if (i === 0) {
+          points.push(`${s.x},${s.y}`);
+          continue;
+        }
+
+        /* Get previous station */
+        const prev = stationMap.get(stationIds[i - 1]);
+        if (!prev) {
+          points.push(`${s.x},${s.y}`);
+          continue;
+        }
+
+        /* If stations don't share X or Y, add a corner waypoint */
+        if (prev.x !== s.x && prev.y !== s.y) {
+          /* Route: horizontal first, then vertical */
+          points.push(`${s.x},${prev.y}`);
+        }
+
+        points.push(`${s.x},${s.y}`);
+      }
+
+      return points.join(" ");
     },
     [stationMap]
   );
