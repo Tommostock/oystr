@@ -165,18 +165,33 @@ export default function JourneyCard({ journey, index }: JourneyCardProps) {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              const steps = journey.legs
+
+              /* Build origin and destination from first and last leg */
+              const firstLeg = journey.legs[0];
+              const lastLeg = journey.legs[journey.legs.length - 1];
+              const origin = (firstLeg?.departurePoint?.commonName || "")
+                .replace(/ Underground Station$/i, "").replace(/ Station$/i, "").trim();
+              const destination = (lastLeg?.arrivalPoint?.commonName || "")
+                .replace(/ Underground Station$/i, "").replace(/ Station$/i, "").trim();
+
+              /* Build line details (skip walking legs) */
+              const lineDetails = journey.legs
+                .filter((leg) => leg.mode?.name !== "walking")
                 .map((leg) => {
-                  const line = leg.routeOptions?.[0]?.lineIdentifier?.name;
-                  const mode = leg.mode?.name;
-                  const from = leg.departurePoint?.commonName?.replace(/ Underground Station$/i, "").replace(/ Station$/i, "") || "";
-                  const to = leg.arrivalPoint?.commonName?.replace(/ Underground Station$/i, "").replace(/ Station$/i, "") || "";
-                  if (mode === "walking") return `Walk from ${from} to ${to} (${leg.duration} min)`;
-                  return `${line || mode} from ${from} to ${to} (${leg.duration} min)`;
+                  const lineName = leg.routeOptions?.[0]?.lineIdentifier?.name || leg.mode?.name || "";
+                  const direction = leg.instruction?.summary || "";
+                  /* Extract direction from instruction (e.g. "District line to Upminster") */
+                  const dirMatch = direction.match(/to\s+(.+)/i);
+                  const dirText = dirMatch ? `- ${dirMatch[0]}` : "";
+                  return `${lineName} Line ${dirText}`.trim();
                 })
                 .join("\n");
-              const fare = journey.fare ? ` -- \u00A3${(journey.fare.totalCost / 100).toFixed(2)}` : "";
-              const text = `Journey: ${journey.duration} min${fare}\n\n${steps}\n\nPlanned with Oystr`;
+
+              const fare = journey.fare
+                ? ` -- \u00A3${(journey.fare.totalCost / 100).toFixed(2)}`
+                : "";
+
+              const text = `Journey: ${origin} to ${destination}\n${lineDetails}\n${journey.duration} min${fare}\n\nby Oystr`;
 
               if (navigator.share) {
                 navigator.share({ text }).catch(() => {});
@@ -186,7 +201,7 @@ export default function JourneyCard({ journey, index }: JourneyCardProps) {
                 });
               }
             }}
-            className="mt-3 pt-2 border-t border-board-border/50 w-full flex items-center justify-center gap-2 py-2 font-mono text-xs tracking-wider text-amber-faint hover:text-amber transition-colors"
+            className="mt-3 pt-2 border-t border-board-border/50 w-full flex items-center justify-center gap-2 py-2 font-mono text-xs tracking-wider text-amber amber-glow hover:amber-glow-strong transition-colors"
           >
             <Share2 size={12} strokeWidth={1.5} />
             <span>SHARE JOURNEY</span>
