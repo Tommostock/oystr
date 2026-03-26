@@ -27,10 +27,10 @@ import { db, type FavouriteStation } from "@/lib/db";
 export function useFavourites() {
   /*
    * Live query: automatically updates when the favourites table changes.
-   * Returns all favourites sorted by when they were added (newest first).
+   * Returns all favourites sorted alphabetically A-Z by station name.
    */
   const favourites = useLiveQuery(
-    () => db.favourites.orderBy("addedAt").reverse().toArray(),
+    () => db.favourites.orderBy("name").toArray(),
     [], // dependencies — empty means it only re-runs when the table changes
     [] // default value while loading
   );
@@ -105,7 +105,7 @@ export function useFavourites() {
   }
 
   return {
-    /** Array of favourite stations, newest first */
+    /** Array of favourite stations, sorted A-Z by name */
     favourites: favourites || [],
     /** Check if a station is a favourite */
     isFavourite,
