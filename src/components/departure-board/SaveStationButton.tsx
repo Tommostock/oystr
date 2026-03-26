@@ -77,31 +77,23 @@ export default function SaveStationButton({
       onClick={handleToggle}
       disabled={isToggling}
       className={cn(
-        /* Base button styles */
-        "flex items-center gap-2 px-4 py-2",
-        /* Dark background with border */
-        "bg-surface border border-board-border",
+        /* Compact icon-only button */
+        "p-2 shrink-0",
         /* Hover effect */
-        "hover:border-amber-faint transition-colors duration-200",
+        "hover:bg-surface transition-colors duration-200",
         /* Disabled state */
         "disabled:opacity-50",
         className
       )}
       aria-label={saved ? "Remove from saved stations" : "Save this station"}
     >
-      {/* Star icon — filled when saved, outline when not */}
       <Star
-        size={16}
+        size={20}
         strokeWidth={1.5}
         className={cn(
           saved ? "text-amber fill-amber" : "text-amber-faint"
         )}
       />
-
-      {/* Button text */}
-      <span className="font-mono text-xs tracking-wider text-amber uppercase">
-        {saved ? "SAVED" : "SAVE STATION"}
-      </span>
     </button>
   );
 }

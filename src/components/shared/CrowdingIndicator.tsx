@@ -59,8 +59,8 @@ export default function CrowdingIndicator() {
   const config = crowdConfig[level];
 
   return (
-    <div className={`flex items-center gap-1.5 font-mono text-xs tracking-wider px-2 py-0.5 border ${config.color} ${config.border} ${config.bg}`}>
-      <Users size={10} strokeWidth={1.5} />
+    <div className={`flex items-center gap-1 font-mono text-[10px] tracking-wider px-1.5 py-px border ${config.color} ${config.border} ${config.bg}`}>
+      <Users size={8} strokeWidth={1.5} />
       <span>{level}</span>
     </div>
   );

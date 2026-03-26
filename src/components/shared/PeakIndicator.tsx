@@ -50,7 +50,7 @@ export default function PeakIndicator() {
 
   return (
     <span
-      className={`font-mono text-xs tracking-wider px-2 py-0.5 border ${
+      className={`font-mono text-[10px] tracking-wider px-1.5 py-px border ${
         peak
           ? "text-amber border-amber bg-amber/10"
           : "text-good border-good/50 bg-good/5"

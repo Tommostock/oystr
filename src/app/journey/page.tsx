@@ -69,8 +69,18 @@ export default function JourneyPage() {
        * Only fall back to lat,lon coordinates if there's no naptanId
        * (which shouldn't happen, but just in case).
        */
-      const fromValue = fromStation.naptanId || `${fromStation.lat},${fromStation.lon}`;
-      const toValue = toStation.naptanId || `${toStation.lat},${toStation.lon}`;
+      /*
+       * For hub IDs (HUBLST, HUBBAN, etc.), use lat,lon coordinates
+       * instead of the ID. The Journey API returns 300 disambiguation
+       * errors for hub IDs but handles coordinates correctly.
+       * Regular naptan IDs (940GZZLU...) work fine directly.
+       */
+      const fromValue = fromStation.naptanId.startsWith("HUB")
+        ? `${fromStation.lat},${fromStation.lon}`
+        : fromStation.naptanId;
+      const toValue = toStation.naptanId.startsWith("HUB")
+        ? `${toStation.lat},${toStation.lon}`
+        : toStation.naptanId;
 
       const params = new URLSearchParams({
         from: fromValue,
