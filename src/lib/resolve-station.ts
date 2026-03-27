@@ -1,14 +1,14 @@
 /**
- * resolve-station.ts — Resolve station names to naptan IDs
+ * resolve-station.ts — Resolve station names, addresses, and places to naptan IDs
  *
- * When Gemini extracts a station name from natural language (e.g. "Kings Cross"),
- * we need to convert it to a naptan ID that the TfL Journey API accepts.
+ * Handles multiple types of location input:
+ *   - Station names: "Kings Cross" → search TfL → naptan ID
+ *   - Hub IDs: "HUBKGX" → resolve to tube/rail child station
+ *   - Addresses: "10 Gresham Street" → geocode with Nominatim → nearest station
+ *   - Places: "the O2" → geocode → nearest station
+ *   - "CURRENT_LOCATION" → use GPS coords → nearest station
  *
- * This helper calls our own /api/tfl/search endpoint internally (server-side)
- * and returns the best match.
- *
- * Also handles the special "CURRENT_LOCATION" sentinel by calling
- * the nearby stations endpoint with the user's coordinates.
+ * Geocoding uses OpenStreetMap Nominatim (free, no API key, 1 req/sec limit).
  */
 
 import { TFL_API_BASE } from "@/lib/constants";
@@ -21,10 +21,22 @@ export interface ResolvedStation {
   lon: number;
 }
 
+/** Geocoded location from Nominatim */
+interface GeocodedLocation {
+  lat: number;
+  lon: number;
+  displayName: string;
+}
+
 /**
- * Resolve a station name string to a naptan ID.
+ * Resolve a location string to a naptan ID.
  *
- * @param name - Station name from Gemini (e.g. "Kings Cross", "the O2")
+ * Tries multiple strategies in order:
+ *   1. "CURRENT_LOCATION" → use GPS coords → nearest station
+ *   2. TfL station search → direct match
+ *   3. Geocode with Nominatim → find nearest station to those coords
+ *
+ * @param name - Station name, address, or place from Gemini
  *               or "CURRENT_LOCATION" if the user said "from here"
  * @param lat - User's latitude (needed if name is "CURRENT_LOCATION")
  * @param lon - User's longitude (needed if name is "CURRENT_LOCATION")
@@ -40,14 +52,92 @@ export async function resolveStation(
     return resolveFromLocation(lat, lon);
   }
 
-  /* Search the TfL API for the station name */
-  return resolveFromSearch(name);
+  /* Try TfL station search first — works for station names */
+  const stationResult = await resolveFromSearch(name);
+  if (stationResult) return stationResult;
+
+  /*
+   * If TfL search fails, try geocoding the name as an address/place.
+   * This handles things like "10 Gresham Street" or "the O2 Arena".
+   */
+  return resolveFromGeocode(name);
+}
+
+/**
+ * Resolve a place name or address by geocoding it, then finding
+ * the nearest TfL station to those coordinates.
+ *
+ * Uses OpenStreetMap Nominatim (free, no API key required).
+ * Rate limit: 1 request per second — fine for our use case.
+ */
+async function resolveFromGeocode(
+  query: string
+): Promise<ResolvedStation | null> {
+  try {
+    /* Geocode the address/place to lat/lon */
+    const location = await geocodeWithNominatim(query + ", London, UK");
+    if (!location) return null;
+
+    /* Find the nearest TfL station to those coordinates */
+    return resolveFromLocation(location.lat, location.lon);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Geocode an address or place name using OpenStreetMap Nominatim.
+ *
+ * Nominatim is free and requires no API key.
+ * It does require a User-Agent header to identify the app.
+ *
+ * @param query - The address or place to geocode (e.g. "10 Gresham Street, London")
+ * @returns Lat/lon coordinates and display name, or null if not found
+ */
+export async function geocodeWithNominatim(
+  query: string
+): Promise<GeocodedLocation | null> {
+  try {
+    const params = new URLSearchParams({
+      q: query,
+      format: "json",
+      limit: "1",
+      /* Bias results towards London */
+      viewbox: "-0.5103,51.2868,0.3340,51.6919",
+      bounded: "1",
+    });
+
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?${params}`,
+      {
+        headers: {
+          /* Nominatim requires a User-Agent identifying the app */
+          "User-Agent": "Oystr-London-Transport-PWA/1.0",
+        },
+        next: { revalidate: 86400 }, /* Cache for 24 hours — addresses don't move */
+      }
+    );
+
+    if (!response.ok) return null;
+
+    const results = await response.json();
+    if (!results || results.length === 0) return null;
+
+    const best = results[0];
+    return {
+      lat: parseFloat(best.lat),
+      lon: parseFloat(best.lon),
+      displayName: best.display_name || query,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Find the nearest station to the user's coordinates.
  */
-async function resolveFromLocation(
+export async function resolveFromLocation(
   lat?: number,
   lon?: number
 ): Promise<ResolvedStation | null> {

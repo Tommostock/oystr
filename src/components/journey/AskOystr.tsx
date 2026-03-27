@@ -1,15 +1,17 @@
 /**
- * AskOystr.tsx — Natural language journey planning input
+ * AskOystr.tsx — Natural language transport assistant input
  *
- * A text input where users can type questions like:
+ * A text input where users can ask anything about London transport:
  *   "How do I get to the O2 from here?"
- *   "Best way from Stratford to Kings Cross"
- *   "I need to be at Heathrow by 3pm"
+ *   "What's the nearest station to 10 Gresham Street?"
+ *   "When is the last train from Liverpool Street?"
+ *   "Is the Central line running?"
+ *   "How much from Mile End to Heathrow?"
  *
  * The component:
- *   1. Sends the question to /api/gemini/journey
+ *   1. Sends the question to /api/gemini/ask
  *   2. Displays Gemini's plain-English summary
- *   3. Passes structured journey results up to the parent
+ *   3. Passes structured journey results up to the parent (if applicable)
  *
  * If Gemini is unavailable (no API key, rate limited, error),
  * it degrades gracefully — the manual journey planner still works.
@@ -133,7 +135,7 @@ export default function AskOystr({
       }
 
       /* Call the Gemini API route */
-      const response = await fetch("/api/gemini/journey", {
+      const response = await fetch("/api/gemini/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: trimmed, lat, lon }),
@@ -150,6 +152,7 @@ export default function AskOystr({
       if (data.summary) {
         onSummaryReceived(data.summary);
       }
+      /* Only pass journey data for journey/fare type responses */
       if (data.journeys && data.journeys.length > 0) {
         onJourneysReceived(data.journeys);
       }
@@ -201,7 +204,7 @@ export default function AskOystr({
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isLoading}
-            placeholder="How do I get to Kings Cross?"
+            placeholder="Ask anything about London transport..."
             className={cn(
               "w-full bg-transparent",
               "border-b border-amber-faint focus:border-amber",
@@ -263,8 +266,9 @@ export default function AskOystr({
       {!isLoading && !error && !query && (
         <div className="mt-2">
           <AmberText variant="dim" size="xs" className="leading-relaxed">
-            Try: &quot;Best way from Stratford to the O2&quot; or &quot;Get me to
-            Heathrow by 3pm&quot;
+            Try: &quot;How do I get to Kings Cross?&quot; or &quot;Is the
+            Central line running?&quot; or &quot;Last train from Liverpool
+            Street?&quot;
           </AmberText>
         </div>
       )}
