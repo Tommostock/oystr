@@ -70,28 +70,30 @@ function HomeContent() {
   const [selectedStation, setSelectedStation] =
     useState<SelectedStation | null>(null);
 
-  /* Read URL params (used when navigating from the Saved page) */
+  /* Read URL params (used when navigating from Stations / Saved page) */
   const searchParams = useSearchParams();
+  const urlStopId = searchParams.get("stopId");
+  const urlName = searchParams.get("name");
 
   /*
    * If we arrive with ?stopId=X&name=Y in the URL,
    * pre-select that station so the departure board loads immediately.
+   * We depend on the actual string values (not the searchParams object)
+   * so this fires reliably on every station change, even when Next.js
+   * serves a cached version of the page.
    */
   useEffect(() => {
-    const stopId = searchParams.get("stopId");
-    const name = searchParams.get("name");
-
-    if (stopId && name) {
+    if (urlStopId && urlName) {
       setSelectedStation({
-        naptanId: stopId,
-        name: name,
+        naptanId: urlStopId,
+        name: urlName,
         lat: 0,
         lon: 0,
         modes: [],
         lines: [],
       });
     }
-  }, [searchParams]);
+  }, [urlStopId, urlName]);
 
   /*
    * When a station is selected without full details (e.g. from Saved page
