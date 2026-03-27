@@ -101,7 +101,7 @@ export default function RootLayout({
       lang="en"
       className={`${shareTechMono.variable} ${ibmPlexMono.variable} ${vt323.variable} h-full`}
     >
-      <body className="min-h-full flex flex-col bg-board-bg text-amber antialiased pt-[env(safe-area-inset-top)]">
+      <body className="min-h-dvh flex flex-col bg-board-bg text-amber antialiased pt-[env(safe-area-inset-top)]">
         {/* Register service worker for offline caching */}
         <ServiceWorkerRegistration />
 
@@ -118,7 +118,7 @@ export default function RootLayout({
          * behind the fixed BottomNav.
          */}
         <main
-          className="flex-1 page-transition"
+          className="flex-1 page-transition min-h-0"
           style={{ paddingBottom: "calc(3.5rem + env(safe-area-inset-bottom, 0px) + 0.5rem)" }}
         >
           {children}
