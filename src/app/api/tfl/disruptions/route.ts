@@ -71,11 +71,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    /* Parse facilities (lifts, escalators, step-free, address, gates) */
+    /* Parse facilities (lifts, escalators, address, gates) */
     const facilities = {
       lifts: 0,
       escalators: 0,
-      stepFree: false,
       address: "",
       gates: 0,
     };
@@ -95,9 +94,6 @@ export async function GET(request: NextRequest) {
       facilities.escalators = parseInt(getProp("Escalators") || "0") || 0;
       facilities.gates = parseInt(getProp("Gates") || "0") || 0;
       facilities.address = getProp("Address") || "";
-      /* A station is considered step-free if it has lifts */
-      facilities.stepFree = facilities.lifts > 0;
-
       /* Extract line IDs from the StopPoint data */
       lines = (stationData.lines || []).map(
         (l: { id: string; name: string }) => ({

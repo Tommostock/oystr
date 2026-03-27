@@ -29,7 +29,6 @@ interface Disruption {
 interface Facilities {
   lifts: number;
   escalators: number;
-  stepFree: boolean;
   address: string;
   gates: number;
 }
@@ -132,9 +131,9 @@ export default function StationAlerts({ stopId }: StationAlertsProps) {
             {hasDisruptions && facilities ? " / " : ""}
             {facilities && (
               <>
-                {facilities.stepFree ? "STEP-FREE" : "NO STEP-FREE"}
-                {facilities.lifts > 0 && ` / ${facilities.lifts} LIFT${facilities.lifts > 1 ? "S" : ""}`}
-                {facilities.escalators > 0 && ` / ${facilities.escalators} ESC`}
+                {facilities.lifts > 0 && `${facilities.lifts} LIFT${facilities.lifts > 1 ? "S" : ""}`}
+                {facilities.lifts > 0 && facilities.escalators > 0 && " / "}
+                {facilities.escalators > 0 && `${facilities.escalators} ESC`}
               </>
             )}
             {hasTrainTimes && (
@@ -177,36 +176,26 @@ export default function StationAlerts({ stopId }: StationAlertsProps) {
             </div>
           ))}
 
-          {/* Facilities */}
-          {facilities && (
-            <div className="space-y-1.5 pt-1">
+          {/* Facilities (lifts, escalators, gates) */}
+          {facilities && (facilities.lifts > 0 || facilities.escalators > 0 || facilities.gates > 0) && (
+            <div className="pt-1">
               <div className="flex items-center gap-3">
                 <Accessibility
                   size={12}
                   strokeWidth={1.5}
-                  className={cn(
-                    "shrink-0",
-                    facilities.stepFree ? "text-good" : "text-amber-faint"
-                  )}
+                  className="shrink-0 text-amber"
                 />
                 <span className="font-mono text-xs tracking-wider text-amber amber-glow">
-                  {facilities.stepFree
-                    ? "STEP-FREE ACCESS AVAILABLE"
-                    : "NO STEP-FREE ACCESS"}
                   {facilities.lifts > 0 &&
-                    ` -- ${facilities.lifts} LIFT${facilities.lifts > 1 ? "S" : ""}`}
+                    `${facilities.lifts} LIFT${facilities.lifts > 1 ? "S" : ""}`}
+                  {facilities.lifts > 0 && facilities.escalators > 0 && " -- "}
                   {facilities.escalators > 0 &&
-                    ` -- ${facilities.escalators} ESCALATOR${facilities.escalators > 1 ? "S" : ""}`}
+                    `${facilities.escalators} ESCALATOR${facilities.escalators > 1 ? "S" : ""}`}
+                  {(facilities.lifts > 0 || facilities.escalators > 0) && facilities.gates > 0 && " -- "}
                   {facilities.gates > 0 &&
-                    ` -- ${facilities.gates} GATE${facilities.gates > 1 ? "S" : ""}`}
+                    `${facilities.gates} GATE${facilities.gates > 1 ? "S" : ""}`}
                 </span>
               </div>
-              {/* Station address */}
-              {facilities.address && (
-                <div className="font-mono text-xs tracking-wider text-amber amber-glow pl-5">
-                  {facilities.address}
-                </div>
-              )}
             </div>
           )}
 
