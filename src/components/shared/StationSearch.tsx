@@ -297,8 +297,8 @@ export default function StationSearch({
                 {/* Transport modes and indicator as small labels underneath */}
                 <div className="text-amber-faint text-xs mt-1 uppercase">
                   {station.indicator
-                    ? `${station.modes.join(" / ")} -- ${station.indicator}`
-                    : station.modes.join(" / ")}
+                    ? `${(station.modes || []).join(" / ")} -- ${station.indicator}`
+                    : (station.modes || []).join(" / ")}
                 </div>
               </button>
             </li>

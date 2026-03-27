@@ -11,7 +11,7 @@
 
 "use client";
 
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Star, Trash2 } from "lucide-react";
 import { useFavourites } from "@/hooks/useFavourites";
@@ -19,7 +19,7 @@ import { db } from "@/lib/db";
 import { LINE_COLOURS, LINE_NAMES } from "@/lib/constants";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
-import { cn } from "@/lib/utils";
+import { cn, cleanStationName } from "@/lib/utils";
 
 export default function SavedPage() {
   const { favourites, removeFavourite } = useFavourites();
@@ -31,12 +31,21 @@ export default function SavedPage() {
    *   1. Direct StopPoint lookup by naptanId (most reliable)
    *   2. Fallback to search API if the direct lookup fails
    * This fixes stations saved before the lines feature was added.
+   *
+   * The enrichingRef prevents duplicate API calls when the effect
+   * re-triggers after DB updates cause favourites to change.
    */
+  const enrichingRef = React.useRef(false);
   useEffect(() => {
-    async function enrichStations() {
-      for (const station of favourites) {
-        if (station.lines.length > 0) continue;
+    const stationsWithoutLines = favourites.filter(
+      (s) => s.lines.length === 0
+    );
+    if (stationsWithoutLines.length === 0 || enrichingRef.current) return;
 
+    enrichingRef.current = true;
+
+    async function enrichStations() {
+      for (const station of stationsWithoutLines) {
         try {
           /*
            * Strategy 1: Direct StopPoint lookup by naptanId.
@@ -63,16 +72,9 @@ export default function SavedPage() {
 
           /*
            * Strategy 2: Search by cleaned station name.
-           * Strip common suffixes so the search is more likely
-           * to return a matching result.
+           * Uses the shared cleanStationName utility.
            */
-          const cleanName = station.name
-            .replace(/\s*Underground Station$/i, "")
-            .replace(/\s*DLR Station$/i, "")
-            .replace(/\s*Rail Station$/i, "")
-            .replace(/\s*Station$/i, "")
-            .replace(/\s*\(London\)/i, "")
-            .trim();
+          const cleanName = cleanStationName(station.name);
 
           const searchResp = await fetch(
             `/api/tfl/search?query=${encodeURIComponent(cleanName)}`
@@ -105,14 +107,10 @@ export default function SavedPage() {
           /* Silently fail — line dots are not critical */
         }
       }
+      enrichingRef.current = false;
     }
 
-    const stationsWithoutLines = favourites.filter(
-      (s) => s.lines.length === 0
-    );
-    if (stationsWithoutLines.length > 0) {
-      enrichStations();
-    }
+    enrichStations();
   }, [favourites]);
 
   /**
@@ -168,7 +166,7 @@ export default function SavedPage() {
 
       {/* ---- Favourite Station Cards ---- */}
       <div className="space-y-2">
-        {favourites.map((station) => (
+        {[...favourites].sort((a, b) => a.name.localeCompare(b.name)).map((station) => (
           <div
             key={station.naptanId}
             onClick={() =>

@@ -160,7 +160,7 @@ export default function QuickViewWidget({
         SAVED STATIONS
       </div>
       <div className="grid grid-cols-2 gap-2">
-        {favourites.slice(0, 4).map((station) => (
+        {[...favourites].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 4).map((station) => (
           <QuickViewCard
             key={station.naptanId}
             naptanId={station.naptanId}

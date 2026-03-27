@@ -220,26 +220,6 @@
   animation: blink 1s step-end infinite;
 }
 
-/* ========================================
- * PULSING DOT ANIMATION
- * Used for live train position indicators on the map.
- * Gentle opacity pulse only (no scale) so train dots
- * don't look like station markers bouncing.
- * ======================================== */
-@keyframes pulse-dot {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-.animate-pulse-dot {
-  animation: pulse-dot 2s ease-in-out infinite;
-  /* Smooth position transitions so dots glide between updates */
-  transition: cx 2s ease-in-out, cy 2s ease-in-out;
-}
 
 
 /* ========================================

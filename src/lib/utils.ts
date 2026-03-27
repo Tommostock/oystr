@@ -22,15 +22,3 @@ export function cleanStationName(name: string): string {
     .replace(/\s*Station$/i, "")
     .trim();
 }
-
-/**
- * Build TfL API query params with the API key if available.
- * Used by all server-side API routes.
- */
-export function buildTflParams(): URLSearchParams {
-  const params = new URLSearchParams();
-  if (process.env.TFL_APP_KEY) {
-    params.set("app_key", process.env.TFL_APP_KEY);
-  }
-  return params;
-}
