@@ -25,8 +25,10 @@
 import { useState, useEffect } from "react";
 import {
   Sun,
+  Moon,
   Cloud,
   CloudSun,
+  CloudMoon,
   CloudRain,
   CloudSnow,
   CloudLightning,
@@ -47,15 +49,30 @@ interface WeatherIconProps {
 /** Amber colour matching the app's glow theme */
 const AMBER = "#ff9500";
 
-function getWeatherDisplay(code: number): {
+/**
+ * Map WMO weather code to a Lucide icon component.
+ * isDay = false swaps sun-based icons for moon equivalents:
+ *   Sun -> Moon, CloudSun -> CloudMoon
+ * Rain, snow, drizzle, fog, and thunderstorm stay the same
+ * since they don't show the sun anyway.
+ */
+function getWeatherDisplay(
+  code: number,
+  isDay: boolean
+): {
   Icon: typeof Sun;
   label: string;
 } {
   /* Clear */
-  if (code === 0) return { Icon: Sun, label: "Clear" };
+  if (code === 0)
+    return { Icon: isDay ? Sun : Moon, label: isDay ? "Clear" : "Clear night" };
 
   /* Partly cloudy */
-  if (code <= 2) return { Icon: CloudSun, label: "Partly cloudy" };
+  if (code <= 2)
+    return {
+      Icon: isDay ? CloudSun : CloudMoon,
+      label: isDay ? "Partly cloudy" : "Partly cloudy night",
+    };
 
   /* Overcast */
   if (code === 3) return { Icon: Cloud, label: "Overcast" };
@@ -83,6 +100,8 @@ function getWeatherDisplay(code: number): {
 
 export default function WeatherIcon({ lat, lon }: WeatherIconProps) {
   const [weatherCode, setWeatherCode] = useState<number | null>(null);
+  /* Track whether it's daytime (1) or nighttime (0) from Open-Meteo */
+  const [isDay, setIsDay] = useState(true);
 
   useEffect(() => {
     /* Skip if no valid coordinates */
@@ -92,10 +111,11 @@ export default function WeatherIcon({ lat, lon }: WeatherIconProps) {
       try {
         /*
          * Open-Meteo API — free, no key needed, generous rate limits.
-         * We only need the current weather code.
+         * We fetch weather_code and is_day so we can swap sun for moon
+         * icons after sunset.
          */
         const resp = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code&timezone=Europe%2FLondon`
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code,is_day&timezone=Europe%2FLondon`
         );
         if (!resp.ok) return;
 
@@ -103,6 +123,10 @@ export default function WeatherIcon({ lat, lon }: WeatherIconProps) {
         const code = data.current?.weather_code;
         if (typeof code === "number") {
           setWeatherCode(code);
+        }
+        /* is_day: 1 = daytime, 0 = nighttime */
+        if (typeof data.current?.is_day === "number") {
+          setIsDay(data.current.is_day === 1);
         }
       } catch {
         /* Silently fail — weather is not critical */
@@ -119,7 +143,7 @@ export default function WeatherIcon({ lat, lon }: WeatherIconProps) {
   /* Don't render until we have data */
   if (weatherCode === null) return null;
 
-  const { Icon, label } = getWeatherDisplay(weatherCode);
+  const { Icon, label } = getWeatherDisplay(weatherCode, isDay);
 
   return (
     <span
