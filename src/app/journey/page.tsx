@@ -22,6 +22,7 @@ import AmberText from "@/components/shared/AmberText";
 import LoadingBoard from "@/components/shared/LoadingBoard";
 import JourneyCard from "@/components/journey/JourneyCard";
 import TimeSelector from "@/components/journey/TimeSelector";
+import AskOystr from "@/components/journey/AskOystr";
 import { useHomeStation } from "@/hooks/useHomeStation";
 import type { Journey } from "@/lib/tfl-types";
 import { cn } from "@/lib/utils";
@@ -49,6 +50,7 @@ export default function JourneyPage() {
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
 
   /* Home station from localStorage */
   const { homeStation, setHomeStation, clearHomeStation } = useHomeStation();
@@ -248,6 +250,22 @@ export default function JourneyPage() {
         </AmberText>
       </div>
 
+      {/* ---- AI-Powered Natural Language Input ---- */}
+      <AskOystr
+        onJourneysReceived={(results) => {
+          setJourneys(results);
+          setHasSearched(true);
+          setError(null);
+        }}
+        onSummaryReceived={(summary) => setAiSummary(summary)}
+        onClear={() => {
+          setJourneys([]);
+          setAiSummary(null);
+          setHasSearched(false);
+          setError(null);
+        }}
+      />
+
       {/* ---- Directions Home ---- */}
       {homeStation ? (
         <div className="flex gap-2">
@@ -389,6 +407,19 @@ export default function JourneyPage() {
             <AmberText variant="dim" size="sm" className="dot-matrix">
               {error}
             </AmberText>
+          </div>
+        </BoardPanel>
+      )}
+
+      {/* ---- AI Summary ---- */}
+      {aiSummary && !isLoading && (
+        <BoardPanel>
+          <div className="flex items-start gap-2">
+            <div className="flex-1">
+              <AmberText size="sm" className="leading-relaxed">
+                {aiSummary}
+              </AmberText>
+            </div>
           </div>
         </BoardPanel>
       )}
