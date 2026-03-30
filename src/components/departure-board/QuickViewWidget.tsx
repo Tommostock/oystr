@@ -43,6 +43,9 @@ function QuickViewCard({
   onSelect: () => void;
 }) {
   const isBus = modes?.includes("bus") || naptanId.startsWith("490");
+  /* Bus stop IDs often end with the stop letter (e.g. "490000074W" → "W") */
+  const displayLetter = stopLetter
+    || (isBus && /[A-Z]$/.test(naptanId) ? naptanId.slice(-1) : undefined);
   const { arrivals, isLoading } = useArrivals(naptanId);
   /* Show the next 2 arrivals */
   const next2 = arrivals.slice(0, 2);
@@ -59,9 +62,9 @@ function QuickViewCard({
       {/* Station name with line dots or bus stop letter */}
       <div className="flex items-center gap-2 mb-2">
         {isBus ? (
-          stopLetter ? (
+          displayLetter ? (
             <span className="shrink-0 w-5 h-5 flex items-center justify-center border border-amber text-amber text-[10px] font-mono">
-              {stopLetter}
+              {displayLetter}
             </span>
           ) : (
             <span className="shrink-0 text-amber text-[10px] font-mono">BUS</span>

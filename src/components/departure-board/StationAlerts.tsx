@@ -140,7 +140,7 @@ export default function StationAlerts({ stopId }: StationAlertsProps) {
             {hasTrainTimes && (
               <>
                 {(hasDisruptions || facilities) ? " / " : ""}
-                FIRST/LAST TRAINS
+                {isBus ? "FIRST/LAST BUSES" : "FIRST/LAST TRAINS"}
               </>
             )}
           </span>
