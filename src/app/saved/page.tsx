@@ -122,31 +122,25 @@ export default function SavedPage() {
   }, [favourites]);
 
   /*
-   * Enrich saved bus stops that are missing their stop letter.
-   * Fetches the parent StopPoint from TfL, finds the matching child,
-   * and backfills stopLetter + indicator + modes into IndexedDB.
-   * Only runs once per session thanks to the ref guard.
+   * Enrich saved bus stops that are missing their stop letter or route numbers.
+   * Fetches data from the search API (which expands bus groups and fetches
+   * route numbers from StopPoint), then backfills into IndexedDB.
    */
   const busEnrichRef = React.useRef(false);
   useEffect(() => {
     const isBusStop = (s: { naptanId: string; modes?: string[] }) =>
       s.naptanId.startsWith("490") || s.modes?.includes("bus");
 
-    const busStopsMissingLetter = favourites.filter(
-      (s) => isBusStop(s) && !s.stopLetter
+    const busStopsNeedingEnrichment = favourites.filter(
+      (s) => isBusStop(s) && (!s.stopLetter || s.lines.length === 0)
     );
-    if (busStopsMissingLetter.length === 0 || busEnrichRef.current) return;
+    if (busStopsNeedingEnrichment.length === 0 || busEnrichRef.current) return;
 
     busEnrichRef.current = true;
 
     async function enrichBusStops() {
-      for (const station of busStopsMissingLetter) {
+      for (const station of busStopsNeedingEnrichment) {
         try {
-          /*
-           * Calling /StopPoint/{childId} returns the parent group with
-           * all children. We find our child by naptanId to get its
-           * stopLetter and indicator.
-           */
           const resp = await fetch(
             `/api/tfl/search?query=${encodeURIComponent(
               cleanStationName(station.name)
@@ -159,15 +153,19 @@ export default function SavedPage() {
             (r: { naptanId: string }) => r.naptanId === station.naptanId
           );
 
-          if (match?.stopLetter) {
+          if (match) {
+            const lineIds = (match.lines || []).map(
+              (l: { id: string } | string) => typeof l === "string" ? l : l.id
+            );
             await db.favourites.update(station.naptanId, {
-              stopLetter: match.stopLetter,
-              indicator: match.indicator || undefined,
+              stopLetter: match.stopLetter || station.stopLetter || undefined,
+              indicator: match.indicator || station.indicator || undefined,
               modes: match.modes?.length ? match.modes : ["bus"],
+              lines: lineIds.length > 0 ? lineIds : station.lines,
             });
           }
         } catch {
-          /* Silently fail — stop letter is not critical */
+          /* Silently fail */
         }
       }
       busEnrichRef.current = false;
@@ -274,7 +272,9 @@ export default function SavedPage() {
                     </span>
                   </div>
                   <div className="font-mono text-xs tracking-wider text-amber-faint mt-0.5">
-                    {station.indicator ? `BUS -- ${station.indicator.toUpperCase()}` : "BUS STOP"}
+                    {station.lines.length > 0
+                      ? station.lines.join(", ")
+                      : station.indicator ? station.indicator.toUpperCase() : "BUS STOP"}
                   </div>
                 </>
               ) : (

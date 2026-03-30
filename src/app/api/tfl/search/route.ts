@@ -83,17 +83,38 @@ async function expandBusParent(parent: SearchStation): Promise<SearchStation[]> 
      * We create a search result for each child so the user can pick
      * the specific bus stop they want.
      */
+    /*
+     * The StopPoint response includes the full lines (bus routes)
+     * that the search endpoint doesn't return. Use these instead
+     * of the parent's empty lines array.
+     */
+    const parentLines: { id: string; name: string }[] = (data.lines || []).map(
+      (l: { id: string; name: string }) => ({ id: l.id, name: l.name })
+    );
+
     if (data.children && Array.isArray(data.children)) {
       for (const child of data.children) {
         /* Only include children that have a stop letter */
         if (child.stopLetter || child.indicator) {
+          /*
+           * Use child-specific lines if available (they usually match
+           * the parent), otherwise fall back to the parent's lines.
+           */
+          const childLines: { id: string; name: string }[] =
+            child.lines?.length > 0
+              ? child.lines.map((l: { id: string; name: string }) => ({
+                  id: l.id,
+                  name: l.name,
+                }))
+              : parentLines;
+
           children.push({
             naptanId: child.naptanId,
             name: child.commonName || parent.name,
             lat: child.lat ?? parent.lat,
             lon: child.lon ?? parent.lon,
             modes: parent.modes,
-            lines: parent.lines,
+            lines: childLines,
             stopLetter: child.stopLetter || undefined,
             indicator: child.indicator || undefined,
           });
@@ -135,10 +156,35 @@ async function enrichBusStop(station: SearchStation): Promise<SearchStation[]> {
     if (!response.ok) return [station];
 
     const data = await response.json();
+
+    /*
+     * TfL may return the parent group instead of the child directly.
+     * If so, find our child in the children array to get the stop letter,
+     * and use the parent/child lines for route numbers.
+     */
+    const lines: { id: string; name: string }[] = (data.lines || []).map(
+      (l: { id: string; name: string }) => ({ id: l.id, name: l.name })
+    );
+
+    if (data.children && Array.isArray(data.children)) {
+      const child = data.children.find(
+        (c: { naptanId: string }) => c.naptanId === station.naptanId
+      );
+      if (child) {
+        return [{
+          ...station,
+          stopLetter: child.stopLetter || undefined,
+          indicator: child.indicator || undefined,
+          lines: lines.length > 0 ? lines : station.lines,
+        }];
+      }
+    }
+
     return [{
       ...station,
       stopLetter: data.stopLetter || undefined,
       indicator: data.indicator || undefined,
+      lines: lines.length > 0 ? lines : station.lines,
     }];
   } catch {
     return [station];

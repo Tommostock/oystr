@@ -31,6 +31,7 @@ import PeakIndicator from "@/components/shared/PeakIndicator";
 import CrowdingIndicator from "@/components/shared/CrowdingIndicator";
 import WeatherIcon from "@/components/shared/WeatherIcon";
 import { getStationFact } from "@/lib/station-facts";
+import { LINE_NAMES, LINE_COLOURS } from "@/lib/constants";
 import NightTubeIndicator from "@/components/shared/NightTubeIndicator";
 import SavedStationDisruptions from "@/components/shared/SavedStationDisruptions";
 import BoardPanel from "@/components/shared/BoardPanel";
@@ -163,11 +164,15 @@ function HomeContent() {
         );
         if (!resp.ok) return;
         const data = await resp.json();
-        if (data.facilities?.address) {
-          setSelectedStation((prev) =>
-            prev ? { ...prev, address: data.facilities.address } : prev
-          );
-        }
+        setSelectedStation((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            address: data.facilities?.address || prev.address,
+            /* Also pick up lines from the StopPoint data (tube lines or bus routes) */
+            lines: data.lines?.length > 0 ? data.lines : prev.lines,
+          };
+        });
       } catch {
         /* Silently fail — address is not critical */
       }
@@ -272,6 +277,39 @@ function HomeContent() {
               <p className="font-mono text-[10px] tracking-wider text-amber amber-glow leading-relaxed">
                 {getStationFact(selectedStation.name)}
               </p>
+            )}
+            {/* Lines / bus routes serving this station */}
+            {selectedStation.lines.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {selectedStation.modes.includes("bus") ||
+                selectedStation.naptanId?.startsWith("490") ? (
+                  /* Bus: show route numbers as bordered badges */
+                  selectedStation.lines.map((line) => (
+                    <span
+                      key={line.id}
+                      className="border border-amber-faint text-amber font-mono text-[10px] tracking-wider px-1.5 py-0.5"
+                    >
+                      {line.id}
+                    </span>
+                  ))
+                ) : (
+                  /* Tube/rail: show line colour dots with names */
+                  selectedStation.lines.map((line) => (
+                    <span
+                      key={line.id}
+                      className="flex items-center gap-1"
+                    >
+                      <span
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: LINE_COLOURS[line.id] || "#FF9500" }}
+                      />
+                      <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
+                        {LINE_NAMES[line.id] || line.name || line.id}
+                      </span>
+                    </span>
+                  ))
+                )}
+              </div>
             )}
             {/* Row 2: indicators (compact) */}
             <div className="flex items-center gap-2">

@@ -176,17 +176,17 @@ export default function QuickViewWidget({
    */
   const busEnrichRef = useRef(false);
   useEffect(() => {
-    const busStopsMissingLetter = favourites.filter(
+    const busStopsNeedingEnrichment = favourites.filter(
       (s) =>
         (s.naptanId.startsWith("490") || s.modes?.includes("bus")) &&
-        !s.stopLetter
+        (!s.stopLetter || s.lines.length === 0)
     );
-    if (busStopsMissingLetter.length === 0 || busEnrichRef.current) return;
+    if (busStopsNeedingEnrichment.length === 0 || busEnrichRef.current) return;
 
     busEnrichRef.current = true;
 
     async function enrichBusStops() {
-      for (const station of busStopsMissingLetter) {
+      for (const station of busStopsNeedingEnrichment) {
         try {
           const resp = await fetch(
             `/api/tfl/search?query=${encodeURIComponent(
@@ -200,11 +200,15 @@ export default function QuickViewWidget({
             (r: { naptanId: string }) => r.naptanId === station.naptanId
           );
 
-          if (match?.stopLetter) {
+          if (match) {
+            const lineIds = (match.lines || []).map(
+              (l: { id: string } | string) => typeof l === "string" ? l : l.id
+            );
             await db.favourites.update(station.naptanId, {
-              stopLetter: match.stopLetter,
-              indicator: match.indicator || undefined,
+              stopLetter: match.stopLetter || station.stopLetter || undefined,
+              indicator: match.indicator || station.indicator || undefined,
               modes: match.modes?.length ? match.modes : ["bus"],
+              lines: lineIds.length > 0 ? lineIds : station.lines,
             });
           }
         } catch {
