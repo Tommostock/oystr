@@ -31,13 +31,18 @@ function QuickViewCard({
   naptanId,
   name,
   lines,
+  stopLetter,
+  modes,
   onSelect,
 }: {
   naptanId: string;
   name: string;
   lines: string[];
+  stopLetter?: string;
+  modes?: string[];
   onSelect: () => void;
 }) {
+  const isBus = modes?.includes("bus") || naptanId.startsWith("490");
   const { arrivals, isLoading } = useArrivals(naptanId);
   /* Show the next 2 arrivals */
   const next2 = arrivals.slice(0, 2);
@@ -51,17 +56,27 @@ function QuickViewCard({
         "hover:border-amber-faint cursor-pointer"
       )}
     >
-      {/* Station name with line dots */}
+      {/* Station name with line dots or bus stop letter */}
       <div className="flex items-center gap-2 mb-2">
-        <div className="flex gap-0.5">
-          {lines.slice(0, 3).map((lineId) => (
-            <span
-              key={lineId}
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: LINE_COLOURS[lineId] || "#FF9500" }}
-            />
-          ))}
-        </div>
+        {isBus ? (
+          stopLetter ? (
+            <span className="shrink-0 w-5 h-5 flex items-center justify-center border border-amber text-amber text-[10px] font-mono">
+              {stopLetter}
+            </span>
+          ) : (
+            <span className="shrink-0 text-amber text-[10px] font-mono">BUS</span>
+          )
+        ) : (
+          <div className="flex gap-0.5">
+            {lines.slice(0, 3).map((lineId) => (
+              <span
+                key={lineId}
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: LINE_COLOURS[lineId] || "#FF9500" }}
+              />
+            ))}
+          </div>
+        )}
         <span className="font-mono text-xs tracking-wider text-amber uppercase truncate">
           {name
             .replace(/\s*Underground Station$/i, "")
@@ -160,12 +175,14 @@ export default function QuickViewWidget({
         SAVED STATIONS
       </div>
       <div className="grid grid-cols-2 gap-2">
-        {[...favourites].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 4).map((station) => (
+        {[...favourites].sort((a, b) => a.name.localeCompare(b.name)).map((station) => (
           <QuickViewCard
             key={station.naptanId}
             naptanId={station.naptanId}
             name={station.name}
             lines={station.lines}
+            stopLetter={station.stopLetter}
+            modes={station.modes}
             onSelect={() =>
               onStationSelect({
                 naptanId: station.naptanId,
