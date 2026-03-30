@@ -57,6 +57,9 @@ export function useFavourites() {
     lines: string[];
     lat: number;
     lng: number;
+    modes?: string[];
+    stopLetter?: string;
+    indicator?: string;
   }): Promise<void> {
     /* Use put() instead of add() — put() overwrites if the key already exists */
     await db.favourites.put({
@@ -66,6 +69,9 @@ export function useFavourites() {
       lat: station.lat,
       lng: station.lng || 0,
       addedAt: Date.now(),
+      modes: station.modes,
+      stopLetter: station.stopLetter,
+      indicator: station.indicator,
     });
   }
 
@@ -93,6 +99,9 @@ export function useFavourites() {
     lines: string[];
     lat: number;
     lng: number;
+    modes?: string[];
+    stopLetter?: string;
+    indicator?: string;
   }): Promise<boolean> {
     const exists = await isFavourite(station.naptanId);
     if (exists) {

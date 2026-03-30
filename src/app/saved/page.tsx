@@ -13,7 +13,7 @@
 
 import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Star, Trash2 } from "lucide-react";
+import { Star, Trash2, Bus } from "lucide-react";
 import { useFavourites } from "@/hooks/useFavourites";
 import { db } from "@/lib/db";
 import { LINE_COLOURS, LINE_NAMES } from "@/lib/constants";
@@ -37,8 +37,16 @@ export default function SavedPage() {
    */
   const enrichingRef = React.useRef(false);
   useEffect(() => {
+    /*
+     * Only enrich tube/rail stations that are missing line data.
+     * Bus stops (naptanId starts with "490" or modes includes "bus")
+     * don't have lines — skip them to avoid wasted API calls.
+     */
+    const isBusStop = (s: { naptanId: string; modes?: string[] }) =>
+      s.naptanId.startsWith("490") || s.modes?.includes("bus");
+
     const stationsWithoutLines = favourites.filter(
-      (s) => s.lines.length === 0
+      (s) => s.lines.length === 0 && !isBusStop(s)
     );
     if (stationsWithoutLines.length === 0 || enrichingRef.current) return;
 
@@ -153,12 +161,12 @@ export default function SavedPage() {
               className="mx-auto text-amber-faint"
             />
             <AmberText variant="dim" size="sm" className="dot-matrix">
-              NO SAVED STATIONS
+              NO SAVED STOPS
             </AmberText>
             <p className="font-mono text-xs tracking-wider text-amber-faint">
-              SEARCH FOR A STATION AND TAP &quot;SAVE STATION&quot;
+              SEARCH FOR A STATION OR BUS STOP
               <br />
-              TO ADD IT HERE FOR QUICK ACCESS
+              AND TAP THE STAR TO SAVE IT HERE
             </p>
           </div>
         </BoardPanel>
@@ -191,34 +199,59 @@ export default function SavedPage() {
             role="button"
             aria-label={`View departures for ${station.name}`}
           >
-            {/* Station name and line info */}
+            {/* Station name and line/bus info */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-sm tracking-wider text-amber uppercase truncate">
-                  {station.name
-                    .replace(/\s*Underground Station$/i, "")
-                    .replace(/\s*Station$/i, "")}
-                </span>
-                {/* All line colour dots in a horizontal row */}
-                <div className="flex gap-1 shrink-0">
-                  {station.lines.map((lineId) => (
-                    <span
-                      key={lineId}
-                      className="w-2.5 h-2.5 rounded-full"
-                      style={{
-                        backgroundColor: LINE_COLOURS[lineId] || "#FF9500",
-                      }}
-                      title={LINE_NAMES[lineId] || lineId}
-                      aria-hidden="true"
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="font-mono text-xs tracking-wider text-amber-faint mt-0.5">
-                {station.lines
-                  .map((lineId) => LINE_NAMES[lineId] || lineId)
-                  .join(", ")}
-              </div>
+              {/* Detect bus stops: check modes array or naptanId prefix */}
+              {(station.modes?.includes("bus") || station.naptanId.startsWith("490")) ? (
+                <>
+                  {/* Bus stop: show stop letter badge + name */}
+                  <div className="flex items-center gap-2">
+                    {station.stopLetter && (
+                      <span className="shrink-0 w-6 h-6 flex items-center justify-center border border-amber text-amber text-xs font-mono">
+                        {station.stopLetter}
+                      </span>
+                    )}
+                    {!station.stopLetter && (
+                      <Bus size={16} className="shrink-0 text-amber" strokeWidth={1.5} />
+                    )}
+                    <span className="font-mono text-sm tracking-wider text-amber uppercase truncate">
+                      {station.name}
+                    </span>
+                  </div>
+                  <div className="font-mono text-xs tracking-wider text-amber-faint mt-0.5">
+                    {station.indicator ? `BUS -- ${station.indicator.toUpperCase()}` : "BUS STOP"}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Tube/rail station: show line colour dots */}
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm tracking-wider text-amber uppercase truncate">
+                      {station.name
+                        .replace(/\s*Underground Station$/i, "")
+                        .replace(/\s*Station$/i, "")}
+                    </span>
+                    <div className="flex gap-1 shrink-0">
+                      {station.lines.map((lineId) => (
+                        <span
+                          key={lineId}
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{
+                            backgroundColor: LINE_COLOURS[lineId] || "#FF9500",
+                          }}
+                          title={LINE_NAMES[lineId] || lineId}
+                          aria-hidden="true"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="font-mono text-xs tracking-wider text-amber-faint mt-0.5">
+                    {station.lines
+                      .map((lineId) => LINE_NAMES[lineId] || lineId)
+                      .join(", ")}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Remove button */}

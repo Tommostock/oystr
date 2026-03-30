@@ -25,6 +25,9 @@ interface SaveStationButtonProps {
     lat: number;
     lon: number;
     lines: { id: string; name: string }[];
+    modes?: string[];
+    stopLetter?: string;
+    indicator?: string;
   };
   /** Additional CSS classes */
   className?: string;
@@ -63,6 +66,9 @@ export default function SaveStationButton({
         lines: station.lines.map((l) => l.id),
         lat: station.lat,
         lng: station.lon,
+        modes: station.modes,
+        stopLetter: station.stopLetter,
+        indicator: station.indicator,
       });
       setSaved(nowSaved);
     } catch (error) {

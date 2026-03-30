@@ -28,6 +28,12 @@ export interface FavouriteStation {
   lng: number;
   /** When the user saved this station (Unix timestamp) */
   addedAt: number;
+  /** Transport modes (e.g. ["tube", "dlr"] or ["bus"]) */
+  modes?: string[];
+  /** Bus stop letter (e.g. "H") — only for bus stops */
+  stopLetter?: string;
+  /** Bus stop indicator text (e.g. "Stop H") — only for bus stops */
+  indicator?: string;
 }
 
 /** A cached timetable for offline use */
@@ -50,13 +56,25 @@ class OystrDatabase extends Dexie {
     super("oystr");
 
     /*
-     * Schema version 1.
-     * Note: lineStatuses, savedJourneys, and stations tables are kept
-     * in the schema for backwards compatibility with existing user DBs.
-     * They are not actively used yet but removing them would require
-     * a version bump and could cause data loss.
+     * Schema version 1 (original).
+     * Kept for Dexie upgrade path — users with v1 DBs
+     * will automatically migrate to v2.
      */
     this.version(1).stores({
+      favourites: "naptanId, name, addedAt",
+      timetables: "id, lineId, stationId, cachedAt",
+      lineStatuses: "lineId, cachedAt",
+      savedJourneys: "id, savedAt",
+      stations: "naptanId, name, *lines",
+    });
+
+    /*
+     * Schema version 2: adds bus stop support.
+     * New optional fields (modes, stopLetter, indicator) don't need
+     * index changes — Dexie handles added non-indexed fields automatically.
+     * Existing favourites will simply have these fields as undefined.
+     */
+    this.version(2).stores({
       favourites: "naptanId, name, addedAt",
       timetables: "id, lineId, stationId, cachedAt",
       lineStatuses: "lineId, cachedAt",

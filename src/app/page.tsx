@@ -46,6 +46,10 @@ interface SelectedStation {
   lines: { id: string; name: string }[];
   zone?: string;
   address?: string;
+  /** Bus stop letter (e.g. "H") — only for bus stops */
+  stopLetter?: string;
+  /** Bus stop indicator text (e.g. "Stop H") — only for bus stops */
+  indicator?: string;
 }
 
 /**
