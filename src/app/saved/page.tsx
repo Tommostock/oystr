@@ -121,6 +121,61 @@ export default function SavedPage() {
     enrichStations();
   }, [favourites]);
 
+  /*
+   * Enrich saved bus stops that are missing their stop letter.
+   * Fetches the parent StopPoint from TfL, finds the matching child,
+   * and backfills stopLetter + indicator + modes into IndexedDB.
+   * Only runs once per session thanks to the ref guard.
+   */
+  const busEnrichRef = React.useRef(false);
+  useEffect(() => {
+    const isBusStop = (s: { naptanId: string; modes?: string[] }) =>
+      s.naptanId.startsWith("490") || s.modes?.includes("bus");
+
+    const busStopsMissingLetter = favourites.filter(
+      (s) => isBusStop(s) && !s.stopLetter
+    );
+    if (busStopsMissingLetter.length === 0 || busEnrichRef.current) return;
+
+    busEnrichRef.current = true;
+
+    async function enrichBusStops() {
+      for (const station of busStopsMissingLetter) {
+        try {
+          /*
+           * Calling /StopPoint/{childId} returns the parent group with
+           * all children. We find our child by naptanId to get its
+           * stopLetter and indicator.
+           */
+          const resp = await fetch(
+            `/api/tfl/search?query=${encodeURIComponent(
+              cleanStationName(station.name)
+            )}`
+          );
+          if (!resp.ok) continue;
+
+          const results = await resp.json();
+          const match = results.find(
+            (r: { naptanId: string }) => r.naptanId === station.naptanId
+          );
+
+          if (match?.stopLetter) {
+            await db.favourites.update(station.naptanId, {
+              stopLetter: match.stopLetter,
+              indicator: match.indicator || undefined,
+              modes: match.modes?.length ? match.modes : ["bus"],
+            });
+          }
+        } catch {
+          /* Silently fail — stop letter is not critical */
+        }
+      }
+      busEnrichRef.current = false;
+    }
+
+    enrichBusStops();
+  }, [favourites]);
+
   /**
    * Navigate to the home page with the selected station.
    * We use a query parameter to pre-select the station.

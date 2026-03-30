@@ -13,11 +13,13 @@
 
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useFavourites } from "@/hooks/useFavourites";
 import { useArrivals } from "@/hooks/useArrivals";
 import { LINE_COLOURS } from "@/lib/constants";
-import { cn } from "@/lib/utils";
+import { cn, cleanStationName } from "@/lib/utils";
 import { useCountdown } from "@/hooks/useCountdown";
+import { db } from "@/lib/db";
 
 interface QuickViewWidgetProps {
   /** Called when a station card is tapped */
@@ -43,9 +45,6 @@ function QuickViewCard({
   onSelect: () => void;
 }) {
   const isBus = modes?.includes("bus") || naptanId.startsWith("490");
-  /* Bus stop IDs often end with the stop letter (e.g. "490000074W" → "W") */
-  const displayLetter = stopLetter
-    || (isBus && /[A-Z]$/.test(naptanId) ? naptanId.slice(-1) : undefined);
   const { arrivals, isLoading } = useArrivals(naptanId);
   /* Show the next 2 arrivals */
   const next2 = arrivals.slice(0, 2);
@@ -62,9 +61,9 @@ function QuickViewCard({
       {/* Station name with line dots or bus stop letter */}
       <div className="flex items-center gap-2 mb-2">
         {isBus ? (
-          displayLetter ? (
+          stopLetter ? (
             <span className="shrink-0 w-5 h-5 flex items-center justify-center border border-amber text-amber text-[10px] font-mono">
-              {displayLetter}
+              {stopLetter}
             </span>
           ) : (
             <span className="shrink-0 text-amber text-[10px] font-mono">BUS</span>
@@ -168,6 +167,55 @@ export default function QuickViewWidget({
   onStationSelect,
 }: QuickViewWidgetProps) {
   const { favourites } = useFavourites();
+
+  /*
+   * Enrich bus stops missing their stop letter.
+   * Searches TfL for each bus stop and backfills stopLetter/indicator
+   * into IndexedDB. Only runs once per session (ref guard).
+   * The live query in useFavourites auto-updates the UI when DB changes.
+   */
+  const busEnrichRef = useRef(false);
+  useEffect(() => {
+    const busStopsMissingLetter = favourites.filter(
+      (s) =>
+        (s.naptanId.startsWith("490") || s.modes?.includes("bus")) &&
+        !s.stopLetter
+    );
+    if (busStopsMissingLetter.length === 0 || busEnrichRef.current) return;
+
+    busEnrichRef.current = true;
+
+    async function enrichBusStops() {
+      for (const station of busStopsMissingLetter) {
+        try {
+          const resp = await fetch(
+            `/api/tfl/search?query=${encodeURIComponent(
+              cleanStationName(station.name)
+            )}`
+          );
+          if (!resp.ok) continue;
+
+          const results = await resp.json();
+          const match = results.find(
+            (r: { naptanId: string }) => r.naptanId === station.naptanId
+          );
+
+          if (match?.stopLetter) {
+            await db.favourites.update(station.naptanId, {
+              stopLetter: match.stopLetter,
+              indicator: match.indicator || undefined,
+              modes: match.modes?.length ? match.modes : ["bus"],
+            });
+          }
+        } catch {
+          /* Silently fail */
+        }
+      }
+      busEnrichRef.current = false;
+    }
+
+    enrichBusStops();
+  }, [favourites]);
 
   /* Don't render if no saved stations */
   if (favourites.length === 0) return null;
