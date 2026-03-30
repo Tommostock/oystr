@@ -94,6 +94,7 @@ export default function StationAlerts({ stopId }: StationAlertsProps) {
 
   const hasDisruptions = disruptions.length > 0;
   const hasTrainTimes = firstTrains.length > 0 || lastTrains.length > 0;
+  const isBus = stopId.startsWith("490");
 
   return (
     <div className="border border-board-border bg-surface">
@@ -207,7 +208,7 @@ export default function StationAlerts({ stopId }: StationAlertsProps) {
                   <div className="flex items-center gap-2 mb-1">
                     <Clock size={10} strokeWidth={1.5} className="text-good shrink-0" />
                     <span className="font-mono text-[10px] tracking-wider text-good uppercase">
-                      FIRST TRAINS
+                      {isBus ? "FIRST BUSES" : "FIRST TRAINS"}
                     </span>
                   </div>
                   {firstTrains.map((t, i) => (
@@ -232,7 +233,7 @@ export default function StationAlerts({ stopId }: StationAlertsProps) {
                   <div className="flex items-center gap-2 mb-1">
                     <Clock size={10} strokeWidth={1.5} className="text-error shrink-0" />
                     <span className="font-mono text-[10px] tracking-wider text-error uppercase">
-                      LAST TRAINS
+                      {isBus ? "LAST BUSES" : "LAST TRAINS"}
                     </span>
                   </div>
                   {lastTrains.map((t, i) => (
