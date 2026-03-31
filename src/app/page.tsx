@@ -123,11 +123,20 @@ function HomeContent() {
         );
         if (!resp.ok) return;
         const results = await resp.json();
-        const match = results.find(
-          (r: { naptanId: string; name: string }) =>
-            r.naptanId === selectedNaptanId ||
-            r.name.toLowerCase().includes(selectedName!.toLowerCase())
-        );
+        /*
+         * Prefer an exact naptanId match. Fall back to a name match,
+         * but only for non-bus results to avoid picking up a bus stop
+         * and overwriting tube station data with bus modes/lines.
+         */
+        const match =
+          results.find(
+            (r: { naptanId: string }) => r.naptanId === selectedNaptanId
+          ) ||
+          results.find(
+            (r: { naptanId: string; name: string }) =>
+              !r.naptanId.startsWith("490") &&
+              r.name.toLowerCase().includes(selectedName!.toLowerCase())
+          );
         if (match) {
           setSelectedStation((prev) =>
             prev
@@ -136,8 +145,9 @@ function HomeContent() {
                   lat: match.lat || prev.lat,
                   lon: match.lon || prev.lon,
                   zone: match.zone || prev.zone,
-                  modes: match.modes?.length ? match.modes : prev.modes,
-                  lines: match.lines?.length ? match.lines : prev.lines,
+                  /* Only update modes/lines if station has none yet */
+                  modes: prev.modes.length > 0 ? prev.modes : (match.modes || []),
+                  lines: prev.lines.length > 0 ? prev.lines : (match.lines || []),
                 }
               : prev
           );
@@ -171,8 +181,14 @@ function HomeContent() {
           return {
             ...prev,
             address: data.facilities?.address || prev.address,
-            /* Also pick up lines from the StopPoint data (tube lines or bus routes) */
-            lines: data.lines?.length > 0 ? data.lines : prev.lines,
+            /*
+             * Only pick up lines from StopPoint if the station has none yet.
+             * The search/nearby endpoints already provide accurate consolidated
+             * line data — overwriting it with raw StopPoint lines introduces
+             * national rail operators (c2c, greater-anglia, etc.) that don't
+             * have colours in our LINE_COLOURS map.
+             */
+            lines: prev.lines.length > 0 ? prev.lines : (data.lines || []),
           };
         });
       } catch {
@@ -283,8 +299,7 @@ function HomeContent() {
             {/* Lines / bus routes serving this station */}
             {selectedStation.lines.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5">
-                {selectedStation.modes.includes("bus") ||
-                selectedStation.naptanId?.startsWith("490") ? (
+                {selectedStation.naptanId?.startsWith("490") ? (
                   /* Bus: show route numbers as bordered badges */
                   selectedStation.lines.map((line) => (
                     <span
