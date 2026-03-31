@@ -105,18 +105,8 @@ function createBusIcon(stopLetter?: string): L.DivIcon {
   });
 }
 
-/**
- * Create a user location icon with optional heading beam.
- * Uses an SVG fan/beam shape pointing in the user's heading direction
- * (like Google Maps blue cone). The beam rotates via CSS transform.
- *
- * Heading is degrees clockwise from north:
- *   0 = north (up), 90 = east (right), 180 = south (down), 270 = west (left)
- *
- * We use a single static icon when heading is unavailable to avoid
- * Leaflet DOM thrashing from frequent icon recreation.
- */
-const userIconNoHeading = L.divIcon({
+/** Simple blue dot for user location (no heading indicator) */
+const userIcon = L.divIcon({
   className: "",
   iconSize: [22, 22],
   iconAnchor: [11, 11],
@@ -127,41 +117,10 @@ const userIconNoHeading = L.divIcon({
   "></div>`,
 });
 
-function createUserIcon(heading: number | null): L.DivIcon {
-  if (heading === null || isNaN(heading)) return userIconNoHeading;
-
-  return L.divIcon({
-    className: "",
-    iconSize: [60, 60],
-    iconAnchor: [30, 30],
-    html: `<div style="position:relative; width:60px; height:60px;">
-      <svg width="60" height="60" viewBox="0 0 60 60" style="
-        position:absolute; top:0; left:0;
-        transform: rotate(${Math.round(heading)}deg);
-        transform-origin: 30px 30px;
-      ">
-        <path d="M30 4 L18 28 A14 14 0 0 1 42 28 Z"
-          fill="rgba(74, 144, 217, 0.2)"
-          stroke="rgba(74, 144, 217, 0.35)"
-          stroke-width="1"
-        />
-      </svg>
-      <div style="
-        position:absolute; top:50%; left:50%;
-        transform:translate(-50%, -50%);
-        width:18px; height:18px; border-radius:50%;
-        background:#4A90D9; border:3px solid white;
-        box-shadow: 0 0 12px rgba(74, 144, 217, 0.6);
-      "></div>
-    </div>`,
-  });
-}
-
 /* ========================================
  * HELPER: Get primary colour for a station
  * ======================================== */
 function getStationColour(station: NearbyStation): string {
-  /* Use the first line's colour, fall back to amber */
   for (const line of station.lines) {
     const colour = LINE_COLOURS[line.id];
     if (colour) return colour;
@@ -211,26 +170,25 @@ function LocationFollower({
 }
 
 /* ========================================
- * SUB-COMPONENT: Re-center button
+ * SUB-COMPONENT: Flies the map to a specific location
  * ======================================== */
-function RecenterButton({
-  onClick,
+function FlyToStation({
+  target,
+  onArrived,
 }: {
-  onClick: () => void;
+  target: { lat: number; lng: number } | null;
+  onArrived: () => void;
 }) {
-  return (
-    <button
-      onClick={onClick}
-      className="absolute bottom-20 right-4 z-[1000] w-10 h-10 flex items-center justify-center bg-surface border border-amber text-amber hover:bg-amber/10 transition-colors"
-      aria-label="Re-center on my location"
-      title="Re-center on my location"
-    >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <circle cx="12" cy="12" r="3" />
-        <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
-      </svg>
-    </button>
-  );
+  const map = useMap();
+
+  useEffect(() => {
+    if (!target) return;
+    map.flyTo([target.lat, target.lng], 17, { duration: 0.8 });
+    const timer = setTimeout(onArrived, 900);
+    return () => clearTimeout(timer);
+  }, [target, map, onArrived]);
+
+  return null;
 }
 
 /* ========================================
@@ -244,13 +202,13 @@ const RADIUS_OPTIONS = [
 
 /* ========================================
  * MODE FILTER OPTIONS
+ * Elizabeth line consolidated into Tube
  * ======================================== */
 const MODE_FILTERS = [
   { id: "tube", label: "TUBE" },
   { id: "bus", label: "BUS" },
   { id: "dlr", label: "DLR" },
   { id: "overground", label: "OVRG" },
-  { id: "elizabeth-line", label: "ELIZ" },
 ];
 
 /* ========================================
@@ -259,8 +217,6 @@ const MODE_FILTERS = [
 export default function NearbyMap({ initialPosition }: NearbyMapProps) {
   /* User's live position */
   const [userPos, setUserPos] = useState(initialPosition);
-  /* User's heading in degrees from north (null when stationary) */
-  const [heading, setHeading] = useState<number | null>(null);
   /* Whether to auto-follow the user's position */
   const [following, setFollowing] = useState(true);
   /* Nearby stations fetched from API */
@@ -280,8 +236,14 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
     lineId: string;
     stops: { lat: number; lon: number; name: string }[];
   } | null>(null);
-  /* Whether the bottom drawer is expanded */
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  /* Station to fly to (set by drawer tap) */
+  const [flyTarget, setFlyTarget] = useState<{
+    lat: number;
+    lng: number;
+    naptanId: string;
+  } | null>(null);
+  /* Refs to marker popups so we can open them programmatically */
+  const markerRefs = useRef<Map<string, L.Marker>>(new Map());
 
   /* ---- Live location tracking ---- */
   useEffect(() => {
@@ -296,10 +258,6 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
         });
-        /* Use GPS heading when moving (more accurate than compass) */
-        if (pos.coords.heading !== null && !isNaN(pos.coords.heading)) {
-          setHeading(pos.coords.heading);
-        }
       },
       () => {
         /* Silently fail — we already have initialPosition */
@@ -314,40 +272,6 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
     return () => {
       mountedRef.current = false;
       navigator.geolocation.clearWatch(watchId);
-    };
-  }, []);
-
-  /* ---- Device compass heading (fallback when GPS heading unavailable) ---- */
-  useEffect(() => {
-    /*
-     * DeviceOrientationEvent provides compass heading on mobile devices
-     * even when stationary. Uses webkitCompassHeading on iOS, or
-     * calculates from alpha on Android.
-     */
-    function handleOrientation(e: DeviceOrientationEvent) {
-      if (!mountedRef.current) return;
-      /* iOS Safari provides webkitCompassHeading directly */
-      const evt = e as DeviceOrientationEvent & { webkitCompassHeading?: number };
-      let compassHeading: number | null = null;
-
-      if (typeof evt.webkitCompassHeading === "number") {
-        compassHeading = evt.webkitCompassHeading;
-      } else if (e.alpha !== null && e.absolute) {
-        /* Android: alpha is degrees counter-clockwise from north when absolute */
-        compassHeading = (360 - e.alpha) % 360;
-      }
-
-      if (compassHeading !== null && !isNaN(compassHeading)) {
-        setHeading(compassHeading);
-      }
-    }
-
-    window.addEventListener("deviceorientationabsolute", handleOrientation, true);
-    window.addEventListener("deviceorientation", handleOrientation, true);
-
-    return () => {
-      window.removeEventListener("deviceorientationabsolute", handleOrientation, true);
-      window.removeEventListener("deviceorientation", handleOrientation, true);
     };
   }, []);
 
@@ -407,8 +331,38 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
     });
   }, []);
 
-  /* ---- Show a bus/tube route on the map ---- */
+  /* ---- Show/hide a bus/tube route on the map (toggle) ---- */
   const handleShowRoute = useCallback(async (lineId: string) => {
+    /* If the same route is already shown, toggle it off */
+    setActiveRoute((prev) => {
+      if (prev && prev.lineId === lineId) return null;
+      return prev;
+    });
+
+    /* If toggling off, we already set null above */
+    setActiveRoute((prev) => {
+      if (prev === null) {
+        /* Fetch the route */
+        fetch(`/api/tfl/line-route?lineId=${lineId}`)
+          .then((r) => r.ok ? r.json() : [])
+          .then((stops: { naptanId: string; name: string; lat: number; lon: number }[]) => {
+            if (stops.length > 0) {
+              setActiveRoute({ lineId, stops });
+            }
+          })
+          .catch(() => {});
+        return prev; /* will be updated by the then() */
+      }
+      return prev;
+    });
+  }, []);
+
+  /* Simpler route toggle approach */
+  const handleToggleRoute = useCallback(async (lineId: string) => {
+    if (activeRoute?.lineId === lineId) {
+      setActiveRoute(null);
+      return;
+    }
     try {
       const resp = await fetch(`/api/tfl/line-route?lineId=${lineId}`);
       if (!resp.ok) return;
@@ -419,21 +373,43 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
     } catch {
       /* Silently fail */
     }
+  }, [activeRoute]);
+
+  /* ---- Handle drawer station tap: fly to it and open popup ---- */
+  const handleDrawerStationTap = useCallback((station: NearbyStation) => {
+    setFollowing(false);
+    setFlyTarget({ lat: station.lat, lng: station.lon, naptanId: station.naptanId });
   }, []);
+
+  /* After flying to station, open its popup */
+  const handleFlyArrived = useCallback(() => {
+    if (!flyTarget) return;
+    const marker = markerRefs.current.get(flyTarget.naptanId);
+    if (marker) {
+      marker.openPopup();
+    }
+    setFlyTarget(null);
+  }, [flyTarget]);
 
   /* Determine if a station is a bus stop */
   const isBus = (s: NearbyStation) =>
     s.naptanId.startsWith("490") || s.modes?.includes("bus");
 
-  /* Filter stations by active modes */
+  /*
+   * Filter stations by active modes.
+   * Elizabeth line is consolidated into Tube — treat "elizabeth-line"
+   * as matching when "tube" filter is active.
+   */
   const filteredStations = activeModes.size === 0
     ? stations
     : stations.filter((s) =>
-        s.modes.some((m) => activeModes.has(m))
+        s.modes.some((m) => {
+          if (activeModes.has(m)) return true;
+          /* elizabeth-line matches tube filter */
+          if (m === "elizabeth-line" && activeModes.has("tube")) return true;
+          return false;
+        })
       );
-
-  /* Memoize the user icon to avoid re-creating on every render */
-  const currentUserIcon = createUserIcon(heading);
 
   return (
     <div className="relative w-full h-full">
@@ -446,8 +422,8 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
       >
         <TileLayer url={DARK_TILE_URL} />
 
-        {/* User location marker with heading */}
-        <Marker position={[userPos.lat, userPos.lng]} icon={currentUserIcon} />
+        {/* User location marker */}
+        <Marker position={[userPos.lat, userPos.lng]} icon={userIcon} />
 
         {/* Accuracy circle (light blue, subtle) */}
         <Circle
@@ -472,9 +448,16 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
                 ? createBusIcon(station.stopLetter)
                 : createStationIcon(getStationColour(station))
             }
+            ref={(ref) => {
+              if (ref) markerRefs.current.set(station.naptanId, ref);
+            }}
           >
             <Popup className="oystr-popup" maxWidth={280} minWidth={240}>
-              <StationPopup station={station} onShowRoute={handleShowRoute} />
+              <StationPopup
+                station={station}
+                onShowRoute={handleToggleRoute}
+                activeRouteId={activeRoute?.lineId}
+              />
             </Popup>
           </Marker>
         ))}
@@ -511,35 +494,38 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
         {/* Follow user location */}
         <LocationFollower position={userPos} shouldFollow={following} />
 
+        {/* Fly to station from drawer */}
+        <FlyToStation target={flyTarget} onArrived={handleFlyArrived} />
+
         {/* Detect map drag to stop following */}
         <MapDragDetector onDrag={handleMapDrag} />
       </MapContainer>
 
-      {/* ---- Top controls: filter toggle ---- */}
-      <button
-        onClick={() => setFiltersOpen(!filtersOpen)}
-        className="absolute top-4 left-4 z-[1000] w-10 h-10 flex items-center justify-center bg-surface border border-amber text-amber hover:bg-amber/10 transition-colors"
-        aria-label="Filter stops"
-        title="Filter stops"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
-        </svg>
-      </button>
-
-      {/* ---- Clear route button (when a route is active) ---- */}
-      {activeRoute && (
+      {/* ---- Top controls row: filter + re-center ---- */}
+      <div className="absolute top-4 left-4 z-[1000] flex gap-2">
         <button
-          onClick={() => setActiveRoute(null)}
-          className="absolute top-4 left-16 z-[1000] h-10 px-3 flex items-center gap-1.5 bg-surface border border-amber text-amber font-mono text-[10px] tracking-wider uppercase hover:bg-amber/10 transition-colors"
-          aria-label="Clear route"
+          onClick={() => setFiltersOpen(!filtersOpen)}
+          className="w-10 h-10 flex items-center justify-center bg-surface border border-amber text-amber hover:bg-amber/10 transition-colors"
+          aria-label="Filter stops"
+          title="Filter stops"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M18 6L6 18M6 6l12 12" />
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
           </svg>
-          {activeRoute.lineId}
         </button>
-      )}
+
+        <button
+          onClick={handleRecenter}
+          className="w-10 h-10 flex items-center justify-center bg-surface border border-amber text-amber hover:bg-amber/10 transition-colors"
+          aria-label="Re-center on my location"
+          title="Re-center on my location"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+          </svg>
+        </button>
+      </div>
 
       {/* ---- Filter panel (slides down from top) ---- */}
       {filtersOpen && (
@@ -593,17 +579,11 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
         </div>
       )}
 
-      {/* ---- Bottom drawer toggle ---- */}
+      {/* ---- Bottom drawer ---- */}
       <NearbyDrawer
         stations={filteredStations}
-        onStationTap={(station) => {
-          setFollowing(false);
-          /* Scroll map to this station — handled by LocationFollower if we set position */
-        }}
+        onStationTap={handleDrawerStationTap}
       />
-
-      {/* Re-center button */}
-      {!following && <RecenterButton onClick={handleRecenter} />}
     </div>
   );
 }

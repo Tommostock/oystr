@@ -36,8 +36,10 @@ interface Station {
 
 interface StationPopupProps {
   station: Station;
-  /** Called when user taps a route number to show it on the map */
+  /** Called when user taps a route number to show/hide it on the map */
   onShowRoute?: (lineId: string) => void;
+  /** The currently active route ID (for highlighting the active button) */
+  activeRouteId?: string;
 }
 
 /**
@@ -53,7 +55,7 @@ function cleanName(name: string): string {
     .trim();
 }
 
-export default function StationPopup({ station, onShowRoute }: StationPopupProps) {
+export default function StationPopup({ station, onShowRoute, activeRouteId }: StationPopupProps) {
   const [arrivals, setArrivals] = useState<Arrival[]>([]);
   const [loading, setLoading] = useState(true);
   const { toggleFavourite, isFavourite } = useFavourites();
@@ -264,29 +266,33 @@ export default function StationPopup({ station, onShowRoute }: StationPopupProps
           >
             SHOW ROUTE ON MAP
           </span>
-          {station.lines.map((line) => (
-            <button
-              key={line.id}
-              onClick={() => onShowRoute(line.id)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "100%",
-                padding: "10px 12px",
-                border: "1.5px solid #cc7700",
-                background: "rgba(255, 149, 0, 0.05)",
-                color: "#ff9500",
-                fontFamily: "monospace",
-                fontSize: "13px",
-                fontWeight: "bold",
-                letterSpacing: "0.1em",
-                cursor: "pointer",
-              }}
-            >
-              ROUTE {line.id}
-            </button>
-          ))}
+          {station.lines.map((line) => {
+            const isActive = activeRouteId === line.id;
+            return (
+              <button
+                key={line.id}
+                onClick={() => onShowRoute(line.id)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "100%",
+                  padding: "10px 12px",
+                  border: isActive ? "1.5px solid #ff9500" : "1.5px solid #cc7700",
+                  background: isActive ? "rgba(255, 149, 0, 0.15)" : "rgba(255, 149, 0, 0.05)",
+                  color: "#ff9500",
+                  fontFamily: "monospace",
+                  fontSize: "13px",
+                  fontWeight: "bold",
+                  letterSpacing: "0.1em",
+                  cursor: "pointer",
+                  textShadow: isActive ? "0 0 10px rgba(255, 149, 0, 0.6)" : "none",
+                }}
+              >
+                {isActive ? "HIDE ROUTE " : "ROUTE "}{line.id}
+              </button>
+            );
+          })}
         </div>
       )}
 

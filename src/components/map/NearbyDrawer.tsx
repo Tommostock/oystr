@@ -184,29 +184,12 @@ export default function NearbyDrawer({
   return (
     <div
       ref={drawerRef}
-      className={`absolute left-4 right-4 z-[1000] transition-all duration-300 ease-in-out ${
-        isExpanded ? "bottom-16 max-h-[50vh]" : "bottom-16"
-      }`}
+      className="absolute left-4 right-4 bottom-2 z-[1000] flex flex-col"
     >
-      {/* Toggle bar — large tappable button above the bottom nav */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-surface border border-board-border hover:border-amber-faint transition-colors"
-      >
-        <span className="font-mono text-xs tracking-wider text-amber uppercase">
-          {stations.length} STOP{stations.length !== 1 ? "S" : ""} NEARBY
-        </span>
-        {isExpanded ? (
-          <ChevronDown size={16} strokeWidth={1.5} className="text-amber" />
-        ) : (
-          <ChevronUp size={16} strokeWidth={1.5} className="text-amber" />
-        )}
-      </button>
-
-      {/* Station list (only rendered when expanded) */}
+      {/* Station list (opens upward above the toggle bar) */}
       {isExpanded && (
         <div
-          className="bg-surface border border-t-0 border-board-border overflow-y-auto"
+          className="bg-surface border border-b-0 border-board-border overflow-y-auto mb-0"
           style={{ maxHeight: "calc(50vh - 56px)" }}
         >
           {stations.map((station) => (
@@ -222,6 +205,21 @@ export default function NearbyDrawer({
           ))}
         </div>
       )}
+
+      {/* Toggle bar — large tappable button at bottom of map area */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-surface border border-board-border hover:border-amber-faint transition-colors"
+      >
+        <span className="font-mono text-xs tracking-wider text-amber uppercase">
+          {stations.length} STOP{stations.length !== 1 ? "S" : ""} NEARBY
+        </span>
+        {isExpanded ? (
+          <ChevronDown size={16} strokeWidth={1.5} className="text-amber" />
+        ) : (
+          <ChevronUp size={16} strokeWidth={1.5} className="text-amber" />
+        )}
+      </button>
     </div>
   );
 }
