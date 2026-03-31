@@ -287,14 +287,16 @@ export default function SavedPage() {
                         .replace(/\s*Station$/i, "")}
                     </span>
                     <div className="flex gap-1 shrink-0">
-                      {station.lines.map((lineId) => (
+                      {station.lines
+                        .filter((lineId) => LINE_NAMES[lineId])
+                        .map((lineId) => (
                         <span
                           key={lineId}
                           className="w-2.5 h-2.5 rounded-full"
                           style={{
                             backgroundColor: LINE_COLOURS[lineId] || "#FF9500",
                           }}
-                          title={LINE_NAMES[lineId] || lineId}
+                          title={LINE_NAMES[lineId]}
                           aria-hidden="true"
                         />
                       ))}
@@ -302,7 +304,8 @@ export default function SavedPage() {
                   </div>
                   <div className="font-mono text-xs tracking-wider text-amber-faint mt-0.5">
                     {station.lines
-                      .map((lineId) => LINE_NAMES[lineId] || lineId)
+                      .filter((lineId) => LINE_NAMES[lineId])
+                      .map((lineId) => LINE_NAMES[lineId])
                       .join(", ")}
                   </div>
                 </>

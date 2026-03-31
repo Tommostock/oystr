@@ -302,8 +302,10 @@ function HomeContent() {
                     </span>
                   ))
                 ) : (
-                  /* Tube/rail: show line colour dots with names */
-                  selectedStation.lines.map((line) => (
+                  /* Tube/rail: show colour dots + names, only for known TfL lines */
+                  selectedStation.lines
+                    .filter((line) => LINE_NAMES[line.id])
+                    .map((line) => (
                     <span
                       key={line.id}
                       className="flex items-center gap-1"
@@ -313,7 +315,7 @@ function HomeContent() {
                         style={{ backgroundColor: LINE_COLOURS[line.id] || "#FF9500" }}
                       />
                       <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
-                        {LINE_NAMES[line.id] || line.name || line.id}
+                        {LINE_NAMES[line.id]}
                       </span>
                     </span>
                   ))
