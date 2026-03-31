@@ -184,29 +184,31 @@ export default function NearbyDrawer({
   return (
     <div
       ref={drawerRef}
-      className={`absolute left-0 right-0 z-[1000] bg-surface border-t border-board-border transition-all duration-300 ease-in-out ${
-        isExpanded ? "bottom-0 max-h-[55vh]" : "bottom-0 max-h-10"
+      className={`absolute left-4 right-4 z-[1000] transition-all duration-300 ease-in-out ${
+        isExpanded ? "bottom-16 max-h-[50vh]" : "bottom-16"
       }`}
-      style={{ overflowY: isExpanded ? "auto" : "hidden" }}
     >
-      {/* Drag handle / toggle bar */}
+      {/* Toggle bar — large tappable button above the bottom nav */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-4 py-2 border-b border-board-border/50 hover:bg-board-border/30 transition-colors"
+        className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-surface border border-board-border hover:border-amber-faint transition-colors"
       >
-        <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
+        <span className="font-mono text-xs tracking-wider text-amber uppercase">
           {stations.length} STOP{stations.length !== 1 ? "S" : ""} NEARBY
         </span>
         {isExpanded ? (
-          <ChevronDown size={14} strokeWidth={1.5} className="text-amber-faint" />
+          <ChevronDown size={16} strokeWidth={1.5} className="text-amber" />
         ) : (
-          <ChevronUp size={14} strokeWidth={1.5} className="text-amber-faint" />
+          <ChevronUp size={16} strokeWidth={1.5} className="text-amber" />
         )}
       </button>
 
       {/* Station list (only rendered when expanded) */}
       {isExpanded && (
-        <div>
+        <div
+          className="bg-surface border border-t-0 border-board-border overflow-y-auto"
+          style={{ maxHeight: "calc(50vh - 56px)" }}
+        >
           {stations.map((station) => (
             <DrawerRow
               key={station.naptanId}

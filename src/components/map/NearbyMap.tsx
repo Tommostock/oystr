@@ -106,46 +106,54 @@ function createBusIcon(stopLetter?: string): L.DivIcon {
 }
 
 /**
- * Create a user location icon with optional heading cone.
- * When heading is available, shows a semi-transparent blue cone
- * pointing in the direction the user is facing (like Google Maps).
+ * Create a user location icon with optional heading beam.
+ * Uses an SVG fan/beam shape pointing in the user's heading direction
+ * (like Google Maps blue cone). The beam rotates via CSS transform.
+ *
+ * Heading is degrees clockwise from north:
+ *   0 = north (up), 90 = east (right), 180 = south (down), 270 = west (left)
+ *
+ * We use a single static icon when heading is unavailable to avoid
+ * Leaflet DOM thrashing from frequent icon recreation.
  */
+const userIconNoHeading = L.divIcon({
+  className: "",
+  iconSize: [22, 22],
+  iconAnchor: [11, 11],
+  html: `<div style="
+    width: 22px; height: 22px; border-radius: 50%;
+    background: #4A90D9; border: 3px solid white;
+    box-shadow: 0 0 12px rgba(74, 144, 217, 0.6);
+  "></div>`,
+});
+
 function createUserIcon(heading: number | null): L.DivIcon {
-  const hasCone = heading !== null && !isNaN(heading);
+  if (heading === null || isNaN(heading)) return userIconNoHeading;
+
   return L.divIcon({
     className: "",
-    iconSize: [40, 40],
-    iconAnchor: [20, 20],
-    html: `<div style="position:relative; width:40px; height:40px;">
-      ${hasCone ? `
-      <div style="
-        position:absolute; top:0; left:0; width:40px; height:40px;
-        transform: rotate(${heading}deg);
-        transform-origin: center center;
+    iconSize: [60, 60],
+    iconAnchor: [30, 30],
+    html: `<div style="position:relative; width:60px; height:60px;">
+      <svg width="60" height="60" viewBox="0 0 60 60" style="
+        position:absolute; top:0; left:0;
+        transform: rotate(${Math.round(heading)}deg);
+        transform-origin: 30px 30px;
       ">
-        <div style="
-          position:absolute; top:2px; left:50%; transform:translateX(-50%);
-          width:0; height:0;
-          border-left: 12px solid transparent;
-          border-right: 12px solid transparent;
-          border-bottom: 20px solid rgba(74, 144, 217, 0.25);
-        "></div>
-      </div>` : ""}
+        <path d="M30 4 L18 28 A14 14 0 0 1 42 28 Z"
+          fill="rgba(74, 144, 217, 0.2)"
+          stroke="rgba(74, 144, 217, 0.35)"
+          stroke-width="1"
+        />
+      </svg>
       <div style="
         position:absolute; top:50%; left:50%;
         transform:translate(-50%, -50%);
-        width:16px; height:16px; border-radius:50%;
+        width:18px; height:18px; border-radius:50%;
         background:#4A90D9; border:3px solid white;
-        box-shadow: 0 0 10px rgba(74, 144, 217, 0.6);
-        animation: userPulse 2s ease-in-out infinite;
+        box-shadow: 0 0 12px rgba(74, 144, 217, 0.6);
       "></div>
-    </div>
-    <style>
-      @keyframes userPulse {
-        0%, 100% { box-shadow: 0 0 10px rgba(74, 144, 217, 0.6); }
-        50% { box-shadow: 0 0 20px rgba(74, 144, 217, 0.9); }
-      }
-    </style>`,
+    </div>`,
   });
 }
 
@@ -275,7 +283,7 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
   /* Whether the bottom drawer is expanded */
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  /* ---- Live location tracking with heading ---- */
+  /* ---- Live location tracking ---- */
   useEffect(() => {
     mountedRef.current = true;
 
@@ -288,7 +296,7 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
         });
-        /* heading is degrees clockwise from north, or null when stationary */
+        /* Use GPS heading when moving (more accurate than compass) */
         if (pos.coords.heading !== null && !isNaN(pos.coords.heading)) {
           setHeading(pos.coords.heading);
         }
@@ -306,6 +314,40 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
     return () => {
       mountedRef.current = false;
       navigator.geolocation.clearWatch(watchId);
+    };
+  }, []);
+
+  /* ---- Device compass heading (fallback when GPS heading unavailable) ---- */
+  useEffect(() => {
+    /*
+     * DeviceOrientationEvent provides compass heading on mobile devices
+     * even when stationary. Uses webkitCompassHeading on iOS, or
+     * calculates from alpha on Android.
+     */
+    function handleOrientation(e: DeviceOrientationEvent) {
+      if (!mountedRef.current) return;
+      /* iOS Safari provides webkitCompassHeading directly */
+      const evt = e as DeviceOrientationEvent & { webkitCompassHeading?: number };
+      let compassHeading: number | null = null;
+
+      if (typeof evt.webkitCompassHeading === "number") {
+        compassHeading = evt.webkitCompassHeading;
+      } else if (e.alpha !== null && e.absolute) {
+        /* Android: alpha is degrees counter-clockwise from north when absolute */
+        compassHeading = (360 - e.alpha) % 360;
+      }
+
+      if (compassHeading !== null && !isNaN(compassHeading)) {
+        setHeading(compassHeading);
+      }
+    }
+
+    window.addEventListener("deviceorientationabsolute", handleOrientation, true);
+    window.addEventListener("deviceorientation", handleOrientation, true);
+
+    return () => {
+      window.removeEventListener("deviceorientationabsolute", handleOrientation, true);
+      window.removeEventListener("deviceorientation", handleOrientation, true);
     };
   }, []);
 

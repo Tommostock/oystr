@@ -247,10 +247,10 @@ export default function StationPopup({ station, onShowRoute }: StationPopupProps
         <div
           style={{
             display: "flex",
-            flexWrap: "wrap",
-            gap: "4px",
+            flexDirection: "column",
+            gap: "6px",
             marginTop: "8px",
-            paddingTop: "6px",
+            paddingTop: "8px",
             borderTop: "1px solid #1a1a1a",
           }}
         >
@@ -260,28 +260,31 @@ export default function StationPopup({ station, onShowRoute }: StationPopupProps
               letterSpacing: "0.1em",
               textTransform: "uppercase",
               color: "#664400",
-              width: "100%",
-              marginBottom: "2px",
             }}
           >
-            SHOW ROUTE
+            SHOW ROUTE ON MAP
           </span>
           {station.lines.map((line) => (
             <button
               key={line.id}
               onClick={() => onShowRoute(line.id)}
               style={{
-                padding: "2px 6px",
-                border: "1px solid #cc7700",
-                background: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+                padding: "10px 12px",
+                border: "1.5px solid #cc7700",
+                background: "rgba(255, 149, 0, 0.05)",
                 color: "#ff9500",
                 fontFamily: "monospace",
-                fontSize: "10px",
-                letterSpacing: "0.05em",
+                fontSize: "13px",
+                fontWeight: "bold",
+                letterSpacing: "0.1em",
                 cursor: "pointer",
               }}
             >
-              {line.id}
+              ROUTE {line.id}
             </button>
           ))}
         </div>
