@@ -161,6 +161,39 @@ function HomeContent() {
   }, [selectedNaptanId, selectedName, selectedLat, selectedZone]);
 
   /*
+   * Fetch line data from the disruptions/StopPoint endpoint.
+   * The search API often returns empty lines, but the StopPoint
+   * endpoint reliably returns which lines serve a station.
+   * Only runs when we have a station selected with no lines.
+   */
+  const selectedLines = selectedStation?.lines;
+  useEffect(() => {
+    if (!selectedNaptanId) return;
+    if (selectedLines && selectedLines.length > 0) return;
+
+    async function fetchLines() {
+      try {
+        const resp = await fetch(
+          `/api/tfl/disruptions?stopId=${selectedNaptanId}`
+        );
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (data.lines?.length > 0) {
+          setSelectedStation((prev) =>
+            prev && prev.lines.length === 0
+              ? { ...prev, lines: data.lines }
+              : prev
+          );
+        }
+      } catch {
+        /* Silently fail — line display is not critical */
+      }
+    }
+
+    fetchLines();
+  }, [selectedNaptanId, selectedLines]);
+
+  /*
    * Fetch the station address from the disruptions endpoint.
    * The address comes from TfL StopPoint data and is shown
    * below the station name in the header.
