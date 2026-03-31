@@ -114,25 +114,35 @@ export async function GET(request: NextRequest) {
     let allArrivals: { timeToStation: number }[] = [];
 
     /*
-     * Detect hub IDs — they start with "HUB" (e.g. HUBBAN, HUBVIC).
-     * For hub IDs, resolve to child stops and fetch arrivals from each.
-     * For regular naptan IDs, fetch directly.
+     * Support comma-separated stop IDs for consolidated stations.
+     * E.g. "940GZZLULVT,910GLVST" for Liverpool Street (tube + Elizabeth line).
      */
-    if (stopId.startsWith("HUB")) {
-      const childIds = await resolveHubChildren(stopId);
+    const stopIds = stopId.split(",").map((id) => id.trim()).filter(Boolean);
 
-      if (childIds.length === 0) {
-        /* Fallback: try fetching directly anyway */
-        allArrivals = await fetchArrivalsForStop(stopId);
+    for (const id of stopIds) {
+      /*
+       * Detect hub IDs — they start with "HUB" (e.g. HUBBAN, HUBVIC).
+       * For hub IDs, resolve to child stops and fetch arrivals from each.
+       * For regular naptan IDs, fetch directly.
+       */
+      if (id.startsWith("HUB")) {
+        const childIds = await resolveHubChildren(id);
+
+        if (childIds.length === 0) {
+          /* Fallback: try fetching directly anyway */
+          const arrivals = await fetchArrivalsForStop(id);
+          allArrivals = allArrivals.concat(arrivals);
+        } else {
+          /* Fetch arrivals from all child stops in parallel */
+          const results = await Promise.all(
+            childIds.map((childId) => fetchArrivalsForStop(childId))
+          );
+          allArrivals = allArrivals.concat(results.flat());
+        }
       } else {
-        /* Fetch arrivals from all child stops in parallel */
-        const results = await Promise.all(
-          childIds.map((id) => fetchArrivalsForStop(id))
-        );
-        allArrivals = results.flat();
+        const arrivals = await fetchArrivalsForStop(id);
+        allArrivals = allArrivals.concat(arrivals);
       }
-    } else {
-      allArrivals = await fetchArrivalsForStop(stopId);
     }
 
     /* Sort by timeToStation (soonest first) */

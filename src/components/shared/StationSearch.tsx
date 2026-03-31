@@ -42,6 +42,8 @@ interface SearchResult {
   stopLetter?: string;
   /** Bus stop indicator text (e.g. "Stop H") — only for bus stops */
   indicator?: string;
+  /** All naptan IDs for consolidated stations (tube + Elizabeth line + rail) */
+  allNaptanIds?: string[];
 }
 
 interface StationSearchProps {

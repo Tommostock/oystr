@@ -32,6 +32,8 @@ interface NearbyStation {
   lines: { id: string; name: string }[];
   stopLetter?: string;
   indicator?: string;
+  /** All naptan IDs for consolidated stations (tube + Elizabeth line + rail) */
+  allNaptanIds?: string[];
 }
 
 interface NearMeButtonProps {

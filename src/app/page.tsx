@@ -51,6 +51,8 @@ interface SelectedStation {
   stopLetter?: string;
   /** Bus stop indicator text (e.g. "Stop H") — only for bus stops */
   indicator?: string;
+  /** All naptan IDs for consolidated stations (tube + Elizabeth line + rail) */
+  allNaptanIds?: string[];
 }
 
 /**
@@ -231,6 +233,7 @@ function HomeContent() {
                 lon: station.lon,
                 modes: station.modes,
                 lines: station.lines,
+                allNaptanIds: station.allNaptanIds,
               })
             }
           />
@@ -325,7 +328,11 @@ function HomeContent() {
 
           {/* Live departure board for the selected station */}
           <DepartureBoard
-            stopId={selectedStation.naptanId}
+            stopId={
+              selectedStation.allNaptanIds && selectedStation.allNaptanIds.length > 1
+                ? selectedStation.allNaptanIds.join(",")
+                : selectedStation.naptanId
+            }
             stationName={selectedStation.name}
           />
         </div>

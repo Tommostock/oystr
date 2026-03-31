@@ -18,6 +18,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { TFL_API_BASE } from "@/lib/constants";
+import { consolidateStations } from "@/lib/consolidate-stations";
 
 /** Shape of a search result we return to the client */
 interface SearchStation {
@@ -283,7 +284,14 @@ export async function GET(request: NextRequest) {
     const expandedArrays = await Promise.all(expandPromises);
     const stations = expandedArrays.flat();
 
-    return NextResponse.json(stations);
+    /*
+     * Consolidate duplicate station entries (e.g. Liverpool Street appears
+     * as separate tube, Elizabeth line, and rail entries). Merges non-bus
+     * stations with the same name into one entry with all lines combined.
+     */
+    const consolidated = consolidateStations(stations);
+
+    return NextResponse.json(consolidated);
   } catch (error) {
     console.error("TfL search error:", error);
     return NextResponse.json(
