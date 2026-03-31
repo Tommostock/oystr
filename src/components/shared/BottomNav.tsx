@@ -13,7 +13,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Train, List, Route, Activity, Star } from "lucide-react";
+import { Train, List, MapPin, Route, Activity, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_TABS } from "@/lib/constants";
 
@@ -25,6 +25,7 @@ import { NAV_TABS } from "@/lib/constants";
 const iconMap = {
   train: Train,
   list: List,
+  "map-pin": MapPin,
   route: Route,
   activity: Activity,
   star: Star,

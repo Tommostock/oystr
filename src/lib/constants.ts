@@ -89,7 +89,16 @@ export const LINE_STATUS_POLL_INTERVAL = 60_000; // 60 seconds
  * ======================================== */
 export const NAV_TABS = [
   { href: "/", label: "Departures", icon: "train" },
+  { href: "/nearby", label: "Nearby", icon: "map-pin" },
   { href: "/journey", label: "Journey", icon: "route" },
   { href: "/status", label: "Status", icon: "activity" },
   { href: "/saved", label: "Saved", icon: "star" },
 ] as const;
+
+/* ========================================
+ * MAP TILE URL
+ * CartoDB dark_matter — free, no API key required.
+ * Matches the app's dark dot-matrix theme.
+ * ======================================== */
+export const DARK_TILE_URL =
+  "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";

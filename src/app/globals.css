@@ -313,3 +313,36 @@
 .board-scroll-clip {
   overflow: hidden;
 }
+
+/* ========================================
+ * LEAFLET POPUP OVERRIDES
+ * Dark theme to match the app's dot-matrix aesthetic.
+ * ======================================== */
+.leaflet-popup-content-wrapper {
+  background: #111111 !important;
+  border: 1px solid #1a1a1a !important;
+  border-radius: 0 !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6) !important;
+  padding: 0 !important;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+}
+
+.leaflet-popup-tip {
+  background: #111111 !important;
+  border: 1px solid #1a1a1a !important;
+  box-shadow: none !important;
+}
+
+.leaflet-popup-close-button {
+  color: #664400 !important;
+  font-size: 18px !important;
+  top: 4px !important;
+  right: 6px !important;
+}
+
+.leaflet-popup-close-button:hover {
+  color: #ff9500 !important;
+}
