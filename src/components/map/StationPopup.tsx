@@ -36,6 +36,8 @@ interface Station {
 
 interface StationPopupProps {
   station: Station;
+  /** Called when user taps a route number to show it on the map */
+  onShowRoute?: (lineId: string) => void;
 }
 
 /**
@@ -51,7 +53,7 @@ function cleanName(name: string): string {
     .trim();
 }
 
-export default function StationPopup({ station }: StationPopupProps) {
+export default function StationPopup({ station, onShowRoute }: StationPopupProps) {
   const [arrivals, setArrivals] = useState<Arrival[]>([]);
   const [loading, setLoading] = useState(true);
   const { toggleFavourite, isFavourite } = useFavourites();
@@ -236,6 +238,51 @@ export default function StationPopup({ station }: StationPopupProps) {
                 {formatTime(arrival.timeToStation)}
               </span>
             </div>
+          ))}
+        </div>
+      )}
+
+      {/* Route buttons for bus stops */}
+      {isBus && station.lines.length > 0 && onShowRoute && (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "4px",
+            marginTop: "8px",
+            paddingTop: "6px",
+            borderTop: "1px solid #1a1a1a",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "9px",
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: "#664400",
+              width: "100%",
+              marginBottom: "2px",
+            }}
+          >
+            SHOW ROUTE
+          </span>
+          {station.lines.map((line) => (
+            <button
+              key={line.id}
+              onClick={() => onShowRoute(line.id)}
+              style={{
+                padding: "2px 6px",
+                border: "1px solid #cc7700",
+                background: "none",
+                color: "#ff9500",
+                fontFamily: "monospace",
+                fontSize: "10px",
+                letterSpacing: "0.05em",
+                cursor: "pointer",
+              }}
+            >
+              {line.id}
+            </button>
           ))}
         </div>
       )}
