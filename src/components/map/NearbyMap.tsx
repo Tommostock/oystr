@@ -55,20 +55,29 @@ interface NearbyMapProps {
  * ======================================== */
 
 /**
- * Create an SVG circle marker icon for tube/rail stations.
- * Uses the primary line colour for the station.
+ * Create a train icon marker for tube/rail stations.
+ * Uses the Lucide Train SVG path — same icon as the Departures tab.
  */
 function createStationIcon(colour: string): L.DivIcon {
   return L.divIcon({
     className: "",
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-    popupAnchor: [0, -14],
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -16],
     html: `<div style="
-      width: 24px; height: 24px; border-radius: 50%;
-      background: ${colour}; border: 2px solid white;
-      box-shadow: 0 0 6px rgba(0,0,0,0.5);
-    "></div>`,
+      width: 28px; height: 28px;
+      background: #111111; border: 1.5px solid ${colour};
+      box-shadow: 0 0 8px ${colour}40;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 4px;
+    "><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${colour}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 11V4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7"/>
+      <path d="M4 15h16"/>
+      <path d="M4 11h16v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>
+      <path d="m9 21 3 3 3-3"/>
+      <circle cx="8" cy="15" r="0.5" fill="${colour}"/>
+      <circle cx="16" cy="15" r="0.5" fill="${colour}"/>
+    </svg></div>`,
   });
 }
 
