@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from "react";
 import { LINE_COLOURS } from "@/lib/constants";
+import { useFavourites } from "@/hooks/useFavourites";
 
 interface Arrival {
   lineId: string;
@@ -24,8 +25,12 @@ interface Arrival {
 interface Station {
   naptanId: string;
   name: string;
+  lat: number;
+  lon: number;
   modes: string[];
+  lines: { id: string; name: string }[];
   stopLetter?: string;
+  indicator?: string;
   allNaptanIds?: string[];
 }
 
@@ -49,9 +54,16 @@ function cleanName(name: string): string {
 export default function StationPopup({ station }: StationPopupProps) {
   const [arrivals, setArrivals] = useState<Arrival[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toggleFavourite, isFavourite } = useFavourites();
+  const [saved, setSaved] = useState(false);
 
   const isBus =
     station.naptanId.startsWith("490") || station.modes?.includes("bus");
+
+  /* Check if station is already saved */
+  useEffect(() => {
+    isFavourite(station.naptanId).then(setSaved);
+  }, [station.naptanId, isFavourite]);
 
   /* Fetch arrivals when popup opens */
   useEffect(() => {
@@ -228,23 +240,58 @@ export default function StationPopup({ station }: StationPopupProps) {
         </div>
       )}
 
-      {/* View full board link */}
-      <a
-        href={`/?stopId=${station.naptanId}&name=${encodeURIComponent(station.name)}`}
+      {/* Action buttons */}
+      <div
         style={{
-          display: "block",
+          display: "flex",
+          gap: "8px",
           marginTop: "8px",
           paddingTop: "6px",
           borderTop: "1px solid #1a1a1a",
-          fontSize: "10px",
-          letterSpacing: "0.1em",
-          textTransform: "uppercase",
-          color: "#cc7700",
-          textDecoration: "none",
         }}
       >
-        VIEW FULL BOARD
-      </a>
+        <a
+          href={`/?stopId=${station.naptanId}&name=${encodeURIComponent(station.name)}`}
+          style={{
+            flex: 1,
+            fontSize: "10px",
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            color: "#cc7700",
+            textDecoration: "none",
+          }}
+        >
+          VIEW FULL BOARD
+        </a>
+        <button
+          onClick={async () => {
+            const nowSaved = await toggleFavourite({
+              naptanId: station.naptanId,
+              name: station.name,
+              lines: station.lines.map((l) => l.id),
+              lat: station.lat,
+              lng: station.lon,
+              modes: station.modes,
+              stopLetter: station.stopLetter,
+              indicator: station.indicator,
+            });
+            setSaved(nowSaved);
+          }}
+          style={{
+            fontSize: "10px",
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            color: saved ? "#ff9500" : "#664400",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            fontFamily: "monospace",
+            textShadow: saved ? "0 0 8px rgba(255, 149, 0, 0.4)" : "none",
+          }}
+        >
+          {saved ? "SAVED" : "SAVE"}
+        </button>
+      </div>
     </div>
   );
 }

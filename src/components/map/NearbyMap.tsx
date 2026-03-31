@@ -73,23 +73,23 @@ function createStationIcon(colour: string): L.DivIcon {
 }
 
 /**
- * Create an SVG circle marker icon for bus stops.
- * Red circle with white stop letter text inside.
+ * Create a squared amber marker icon for bus stops.
+ * Matches the stop letter badges used in the departure board UI.
  */
 function createBusIcon(stopLetter?: string): L.DivIcon {
   return L.divIcon({
     className: "",
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-    popupAnchor: [0, -16],
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+    popupAnchor: [0, -15],
     html: `<div style="
-      width: 28px; height: 28px; border-radius: 50%;
-      background: #E32017; border: 2px solid white;
-      box-shadow: 0 0 6px rgba(0,0,0,0.5);
+      width: 26px; height: 26px;
+      background: #111111; border: 1.5px solid #ff9500;
+      box-shadow: 0 0 8px rgba(255, 149, 0, 0.3);
       display: flex; align-items: center; justify-content: center;
       font-family: monospace; font-size: 12px; font-weight: bold;
-      color: white;
-    ">${stopLetter || ""}</div>`,
+      color: #ff9500; letter-spacing: 0.05em;
+    ">${stopLetter || "B"}</div>`,
   });
 }
 
@@ -189,6 +189,26 @@ function RecenterButton({
 }
 
 /* ========================================
+ * RADIUS OPTIONS
+ * ======================================== */
+const RADIUS_OPTIONS = [
+  { label: "500m", value: 500 },
+  { label: "1km", value: 1000 },
+  { label: "1.5km", value: 1500 },
+];
+
+/* ========================================
+ * MODE FILTER OPTIONS
+ * ======================================== */
+const MODE_FILTERS = [
+  { id: "tube", label: "TUBE" },
+  { id: "bus", label: "BUS" },
+  { id: "dlr", label: "DLR" },
+  { id: "overground", label: "OVRG" },
+  { id: "elizabeth-line", label: "ELIZ" },
+];
+
+/* ========================================
  * MAIN COMPONENT
  * ======================================== */
 export default function NearbyMap({ initialPosition }: NearbyMapProps) {
@@ -202,6 +222,12 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
   const lastFetchPos = useRef(initialPosition);
   /* Track if component is mounted */
   const mountedRef = useRef(true);
+  /* Search radius in metres */
+  const [radius, setRadius] = useState(800);
+  /* Active mode filters (empty = show all) */
+  const [activeModes, setActiveModes] = useState<Set<string>>(new Set());
+  /* Whether the filter panel is open */
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   /* ---- Live location tracking ---- */
   useEffect(() => {
@@ -235,10 +261,10 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
 
   /* ---- Fetch nearby stations ---- */
   const fetchNearby = useCallback(
-    async (lat: number, lng: number) => {
+    async (lat: number, lng: number, r: number) => {
       try {
         const resp = await fetch(
-          `/api/tfl/nearby?lat=${lat}&lon=${lng}&radius=800`
+          `/api/tfl/nearby?lat=${lat}&lon=${lng}&radius=${r}`
         );
         if (!resp.ok) return;
         const data: NearbyStation[] = await resp.json();
@@ -253,18 +279,18 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
     []
   );
 
-  /* Fetch on mount */
+  /* Fetch on mount and when radius changes */
   useEffect(() => {
-    fetchNearby(initialPosition.lat, initialPosition.lng);
-  }, [initialPosition, fetchNearby]);
+    fetchNearby(userPos.lat, userPos.lng, radius);
+  }, [radius, fetchNearby, userPos.lat, userPos.lng]);
 
   /* Re-fetch when user moves >200m from last fetch point */
   useEffect(() => {
     const dist = distanceBetween(userPos, lastFetchPos.current);
     if (dist > 200) {
-      fetchNearby(userPos.lat, userPos.lng);
+      fetchNearby(userPos.lat, userPos.lng, radius);
     }
-  }, [userPos, fetchNearby]);
+  }, [userPos, fetchNearby, radius]);
 
   /* ---- Handle map drag (stop following) ---- */
   const handleMapDrag = useCallback(() => {
@@ -276,9 +302,29 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
     setFollowing(true);
   }, []);
 
+  /* ---- Toggle a mode filter ---- */
+  const toggleMode = useCallback((modeId: string) => {
+    setActiveModes((prev) => {
+      const next = new Set(prev);
+      if (next.has(modeId)) {
+        next.delete(modeId);
+      } else {
+        next.add(modeId);
+      }
+      return next;
+    });
+  }, []);
+
   /* Determine if a station is a bus stop */
   const isBus = (s: NearbyStation) =>
     s.naptanId.startsWith("490") || s.modes?.includes("bus");
+
+  /* Filter stations by active modes */
+  const filteredStations = activeModes.size === 0
+    ? stations
+    : stations.filter((s) =>
+        s.modes.some((m) => activeModes.has(m))
+      );
 
   return (
     <div className="relative w-full h-full">
@@ -308,7 +354,7 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
         />
 
         {/* Station / bus stop markers */}
-        {stations.map((station) => (
+        {filteredStations.map((station) => (
           <Marker
             key={station.naptanId}
             position={[station.lat, station.lon]}
@@ -330,6 +376,70 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
         {/* Detect map drag to stop following */}
         <MapDragDetector onDrag={handleMapDrag} />
       </MapContainer>
+
+      {/* ---- Top controls: filter toggle ---- */}
+      <button
+        onClick={() => setFiltersOpen(!filtersOpen)}
+        className="absolute top-4 left-4 z-[1000] w-10 h-10 flex items-center justify-center bg-surface border border-amber text-amber hover:bg-amber/10 transition-colors"
+        aria-label="Filter stops"
+        title="Filter stops"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+        </svg>
+      </button>
+
+      {/* ---- Filter panel (slides down from top) ---- */}
+      {filtersOpen && (
+        <div className="absolute top-16 left-4 right-4 z-[1000] bg-surface border border-board-border p-3 space-y-3">
+          {/* Mode filters */}
+          <div>
+            <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mb-2">
+              SHOW
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {MODE_FILTERS.map((mode) => {
+                const isActive = activeModes.size === 0 || activeModes.has(mode.id);
+                return (
+                  <button
+                    key={mode.id}
+                    onClick={() => toggleMode(mode.id)}
+                    className={`px-2.5 py-1 font-mono text-[10px] tracking-wider uppercase border transition-colors ${
+                      isActive
+                        ? "border-amber text-amber bg-amber/10"
+                        : "border-board-border text-amber-faint"
+                    }`}
+                  >
+                    {mode.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Radius control */}
+          <div>
+            <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mb-2">
+              RADIUS
+            </div>
+            <div className="flex gap-1.5">
+              {RADIUS_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setRadius(opt.value)}
+                  className={`px-2.5 py-1 font-mono text-[10px] tracking-wider uppercase border transition-colors ${
+                    radius === opt.value
+                      ? "border-amber text-amber bg-amber/10"
+                      : "border-board-border text-amber-faint"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Re-center button (only when not following) */}
       {!following && <RecenterButton onClick={handleRecenter} />}
