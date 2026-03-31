@@ -89,7 +89,6 @@ export const LINE_STATUS_POLL_INTERVAL = 60_000; // 60 seconds
  * ======================================== */
 export const NAV_TABS = [
   { href: "/", label: "Departures", icon: "train" },
-  { href: "/stations", label: "Stations", icon: "list" },
   { href: "/journey", label: "Journey", icon: "route" },
   { href: "/status", label: "Status", icon: "activity" },
   { href: "/saved", label: "Saved", icon: "star" },

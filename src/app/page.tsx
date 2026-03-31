@@ -20,7 +20,8 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { RotateCcw } from "lucide-react";
+import Link from "next/link";
+import { RotateCcw, List } from "lucide-react";
 import StationSearch from "@/components/shared/StationSearch";
 import NearMeButton from "@/components/shared/NearMeButton";
 import DepartureBoard from "@/components/departure-board/DepartureBoard";
@@ -32,6 +33,7 @@ import CrowdingIndicator from "@/components/shared/CrowdingIndicator";
 import WeatherIcon from "@/components/shared/WeatherIcon";
 import { getStationFact } from "@/lib/station-facts";
 import { LINE_NAMES, LINE_COLOURS } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 import NightTubeIndicator from "@/components/shared/NightTubeIndicator";
 import SavedStationDisruptions from "@/components/shared/SavedStationDisruptions";
 import BoardPanel from "@/components/shared/BoardPanel";
@@ -280,6 +282,23 @@ function HomeContent() {
           />
         )}
       </div>
+
+      {/* ---- Browse All Stations button ---- */}
+      {!selectedStation && (
+        <Link
+          href="/stations"
+          className={cn(
+            "flex items-center justify-center gap-2 w-full py-2.5",
+            "border border-amber-faint text-amber-faint",
+            "hover:border-amber hover:text-amber",
+            "font-mono text-xs tracking-wider uppercase",
+            "transition-colors duration-200"
+          )}
+        >
+          <List size={14} strokeWidth={1.5} />
+          <span>BROWSE ALL STATIONS</span>
+        </Link>
+      )}
 
       {/* ---- Departure Board or Empty State ---- */}
       {selectedStation ? (
