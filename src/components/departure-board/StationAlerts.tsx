@@ -192,8 +192,8 @@ export default function StationAlerts({ stopId }: StationAlertsProps) {
                   {facilities.lifts > 0 && facilities.escalators > 0 && " -- "}
                   {facilities.escalators > 0 &&
                     `${facilities.escalators} ESCALATOR${facilities.escalators > 1 ? "S" : ""}`}
-                  {(facilities.lifts > 0 || facilities.escalators > 0) && facilities.gates > 0 && " -- "}
-                  {facilities.gates > 0 &&
+                  {!isBus && (facilities.lifts > 0 || facilities.escalators > 0) && facilities.gates > 0 && " -- "}
+                  {!isBus && facilities.gates > 0 &&
                     `${facilities.gates} GATE${facilities.gates > 1 ? "S" : ""}`}
                 </span>
               </div>
