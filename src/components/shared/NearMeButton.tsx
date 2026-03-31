@@ -165,13 +165,12 @@ export default function NearMeButton({
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
-      {/* ---- Button ---- */}
+      {/* ---- Button (compact square icon) ---- */}
       <button
         onClick={handleClick}
         disabled={status === "locating"}
         className={cn(
-          "flex items-center gap-2 px-4 py-2.5",
-          "font-mono text-sm tracking-wider uppercase",
+          "flex items-center justify-center w-11 h-11 shrink-0",
           "border transition-colors duration-200",
           status === "idle" &&
             "border-amber text-amber hover:bg-amber/10 cursor-pointer",
@@ -187,22 +186,18 @@ export default function NearMeButton({
             ? "Finding nearby stations..."
             : "Find stations near me"
         }
+        title={status === "error" ? errorMsg : "Find stations near me"}
       >
-        <LocateFixed size={16} strokeWidth={1.5} />
-        <span>
-          {status === "idle" && "NEAR ME"}
-          {status === "locating" && "LOCATING..."}
-          {status === "results" && "NEAR ME"}
-          {status === "error" && errorMsg}
-        </span>
-        {status === "results" && (
-          <X size={14} strokeWidth={1.5} className="ml-1" />
+        {status === "results" ? (
+          <X size={18} strokeWidth={1.5} />
+        ) : (
+          <LocateFixed size={18} strokeWidth={1.5} />
         )}
       </button>
 
       {/* ---- Nearby stations list ---- */}
       {status === "results" && nearbyStations.length > 0 && (
-        <div className="absolute z-50 w-72 mt-2 left-1/2 -translate-x-1/2 bg-surface border border-board-border max-h-80 overflow-y-auto">
+        <div className="absolute z-50 w-72 mt-2 right-0 bg-surface border border-board-border max-h-80 overflow-y-auto">
           <div className="px-3 py-2 border-b border-board-border">
             <span className="font-mono text-xs tracking-wider text-amber-faint">
               {nearbyStations.length} STATIONS WITHIN 1 MILE

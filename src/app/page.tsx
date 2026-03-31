@@ -214,27 +214,26 @@ function HomeContent() {
       </div>
 
       {/* ---- Station Search + Near Me ---- */}
-      <div className="space-y-3">
+      <div className="flex items-start gap-2">
         <StationSearch
           onSelect={(station) => setSelectedStation(station)}
           placeholder="Search for a station..."
+          className="flex-1"
         />
-        {/* Near Me button — auto-detects nearest station via GPS */}
+        {/* Near Me button — compact icon next to search */}
         {!selectedStation && (
-          <div className="flex justify-center">
-            <NearMeButton
-              onStationFound={(station) =>
-                setSelectedStation({
-                  naptanId: station.naptanId,
-                  name: station.name,
-                  lat: station.lat,
-                  lon: station.lon,
-                  modes: station.modes,
-                  lines: station.lines,
-                })
-              }
-            />
-          </div>
+          <NearMeButton
+            onStationFound={(station) =>
+              setSelectedStation({
+                naptanId: station.naptanId,
+                name: station.name,
+                lat: station.lat,
+                lon: station.lon,
+                modes: station.modes,
+                lines: station.lines,
+              })
+            }
+          />
         )}
       </div>
 
