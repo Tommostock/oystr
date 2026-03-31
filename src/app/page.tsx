@@ -181,14 +181,6 @@ function HomeContent() {
           return {
             ...prev,
             address: data.facilities?.address || prev.address,
-            /*
-             * Only pick up lines from StopPoint if the station has none yet.
-             * The search/nearby endpoints already provide accurate consolidated
-             * line data — overwriting it with raw StopPoint lines introduces
-             * national rail operators (c2c, greater-anglia, etc.) that don't
-             * have colours in our LINE_COLOURS map.
-             */
-            lines: prev.lines.length > 0 ? prev.lines : (data.lines || []),
           };
         });
       } catch {
