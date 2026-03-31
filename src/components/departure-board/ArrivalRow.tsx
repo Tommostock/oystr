@@ -22,8 +22,10 @@ import { useCountdown } from "@/hooks/useCountdown";
 interface ArrivalRowProps {
   /** Destination station name */
   destination: string;
-  /** Seconds until arrival — we convert to minutes for display */
+  /** Seconds until arrival — fallback if expectedArrival is missing */
   timeToStation: number;
+  /** ISO timestamp of expected arrival — used for accurate countdown */
+  expectedArrival?: string;
   /** Optional line colour for a small indicator dot */
   lineColour?: string;
   /** Bus route number (e.g. "98") — only for buses */
@@ -49,13 +51,14 @@ function formatTime(seconds: number): string {
 export default function ArrivalRow({
   destination,
   timeToStation,
+  expectedArrival,
   lineColour,
   routeNumber,
   modeName,
   className,
 }: ArrivalRowProps) {
-  /* Live countdown — decrements every second between API polls */
-  const liveSeconds = useCountdown(timeToStation);
+  /* Live countdown — calculates from absolute timestamp for accuracy */
+  const liveSeconds = useCountdown(expectedArrival, timeToStation);
   const timeText = formatTime(liveSeconds);
   /* "DUE" vehicles get a stronger glow to draw attention */
   const isDue = liveSeconds <= 30;

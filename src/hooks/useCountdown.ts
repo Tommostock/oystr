@@ -1,46 +1,66 @@
 /**
- * useCountdown.ts — Real-time countdown between API polls
+ * useCountdown.ts — Real-time countdown from an absolute timestamp
  *
- * Instead of showing a static "3 MIN" that only updates every 30s,
- * this hook decrements the timeToStation value every second so the
- * display counts down in real-time: 3 MIN → 2 MIN → 1 MIN → DUE.
+ * Calculates seconds remaining from an ISO timestamp (expectedArrival)
+ * rather than relying on the relative timeToStation value from TfL.
  *
- * The countdown resets whenever the API provides fresh data
- * (the timeToStation prop changes from the parent).
+ * Why: timeToStation is calculated when TfL generates the response.
+ * By the time it passes through server-side caching (up to 30s) and
+ * client polling (up to 30s), the value can be ~60s stale. Using the
+ * absolute expectedArrival timestamp and the device clock means the
+ * countdown is always accurate regardless of caching delays.
+ *
+ * Falls back to timeToStation countdown if expectedArrival is missing.
  *
  * Usage:
- *   const liveSeconds = useCountdown(arrival.timeToStation);
+ *   const liveSeconds = useCountdown(arrival.expectedArrival, arrival.timeToStation);
  */
 
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 /**
- * Counts down from the given seconds value, decrementing by 1 each second.
- * Resets when the input value changes (new API data arrived).
- * Never goes below 0.
+ * Calculate seconds remaining from an ISO timestamp.
+ * Returns 0 if the time has passed.
  */
-export function useCountdown(serverSeconds: number): number {
-  const [seconds, setSeconds] = useState(serverSeconds);
-  const lastServerValue = useRef(serverSeconds);
+function secondsUntil(isoTimestamp: string): number {
+  const target = new Date(isoTimestamp).getTime();
+  const now = Date.now();
+  return Math.max(0, Math.round((target - now) / 1000));
+}
 
-  /* Reset when server sends new data */
-  useEffect(() => {
-    if (serverSeconds !== lastServerValue.current) {
-      setSeconds(serverSeconds);
-      lastServerValue.current = serverSeconds;
+/**
+ * Counts down to an absolute arrival time, recalculating every second.
+ * Falls back to decrementing timeToStation if no timestamp provided.
+ *
+ * @param expectedArrival - ISO timestamp of expected arrival (e.g. "2026-03-31T14:32:00Z")
+ * @param fallbackSeconds - timeToStation in seconds, used if expectedArrival is missing
+ */
+export function useCountdown(
+  expectedArrival: string | undefined,
+  fallbackSeconds: number
+): number {
+  const getSeconds = useCallback(() => {
+    if (expectedArrival) {
+      return secondsUntil(expectedArrival);
     }
-  }, [serverSeconds]);
+    return fallbackSeconds;
+  }, [expectedArrival, fallbackSeconds]);
 
-  /* Decrement every second */
+  const [seconds, setSeconds] = useState(getSeconds);
+
+  /* Recalculate every second from the absolute timestamp */
   useEffect(() => {
+    /* Set immediately in case props changed */
+    setSeconds(getSeconds());
+
     const interval = setInterval(() => {
-      setSeconds((prev) => Math.max(0, prev - 1));
+      setSeconds(getSeconds());
     }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [getSeconds]);
 
   return seconds;
 }

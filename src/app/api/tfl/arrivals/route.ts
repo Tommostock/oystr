@@ -39,7 +39,9 @@ async function fetchArrivalsForStop(
   const url = `${TFL_API_BASE}/StopPoint/${stopId}/Arrivals?${params}`;
 
   const response = await fetch(url, {
-    next: { revalidate: 30 },
+    /* No server cache — arrivals are time-sensitive and we use the
+       absolute expectedArrival timestamp for accurate countdowns */
+    cache: "no-store",
   });
 
   if (!response.ok) return [];

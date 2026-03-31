@@ -108,6 +108,7 @@ function QuickViewCard({
                   .replace(/\s*\(London\)/i, "")
               }
               timeToStation={arrival.timeToStation}
+              expectedArrival={arrival.expectedArrival}
               lineColour={LINE_COLOURS[arrival.lineId]}
               routeNumber={arrival.modeName === "bus" ? arrival.lineName : undefined}
             />
@@ -124,15 +125,17 @@ function QuickViewCard({
 function QuickArrivalRow({
   destination,
   timeToStation,
+  expectedArrival,
   lineColour,
   routeNumber,
 }: {
   destination: string;
   timeToStation: number;
+  expectedArrival?: string;
   lineColour?: string;
   routeNumber?: string;
 }) {
-  const liveSeconds = useCountdown(timeToStation);
+  const liveSeconds = useCountdown(expectedArrival, timeToStation);
   const isDue = liveSeconds <= 30;
   const timeText = isDue ? "DUE" : `${Math.floor(liveSeconds / 60)}m`;
 

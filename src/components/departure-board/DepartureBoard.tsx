@@ -159,6 +159,7 @@ export default function DepartureBoard({
                     key={`${arrival.vehicleId}-${arrival.expectedArrival}-${index}`}
                     destination={cleanDestination(arrival.destinationName)}
                     timeToStation={arrival.timeToStation}
+                    expectedArrival={arrival.expectedArrival}
                     lineColour={LINE_COLOURS[arrival.lineId]}
                     routeNumber={arrival.lineName}
                     modeName={arrival.modeName}
