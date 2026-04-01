@@ -105,17 +105,46 @@ function createBusIcon(stopLetter?: string): L.DivIcon {
   });
 }
 
-/** Amber dot for user location — matches the app's dot-matrix theme */
-const userIcon = L.divIcon({
-  className: "",
-  iconSize: [22, 22],
-  iconAnchor: [11, 11],
-  html: `<div style="
-    width: 22px; height: 22px; border-radius: 50%;
-    background: #ff9500; border: 3px solid #0a0a0a;
-    box-shadow: 0 0 12px rgba(255, 149, 0, 0.6);
-  "></div>`,
-});
+/**
+ * Create the user location icon.
+ * When heading is available (phone GPS + moving), shows a directional cone
+ * pointing the way the user faces, like Google Maps' blue cone.
+ * When heading is null (stationary or desktop), just shows the amber dot.
+ *
+ * heading: degrees clockwise from north (0 = north, 90 = east, etc.)
+ */
+function createUserIcon(heading: number | null): L.DivIcon {
+  const hasCone = heading !== null && heading !== undefined;
+
+  const coneHtml = hasCone
+    ? `<svg style="position:absolute;top:0;left:0;pointer-events:none"
+          width="40" height="40" viewBox="0 0 40 40">
+         <polygon points="20,20 13,2 27,2"
+           fill="rgba(255,149,0,0.22)"
+           stroke="rgba(255,149,0,0.55)"
+           stroke-width="1"
+           stroke-linejoin="round"/>
+       </svg>`
+    : "";
+
+  return L.divIcon({
+    className: "",
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+    html: `<div style="
+      position:relative; width:40px; height:40px;
+      ${hasCone ? `transform:rotate(${heading}deg);` : ""}
+    ">
+      ${coneHtml}
+      <div style="
+        position:absolute; left:9px; top:9px;
+        width:22px; height:22px; border-radius:50%;
+        background:#ff9500; border:3px solid #0a0a0a;
+        box-shadow:0 0 12px rgba(255,149,0,0.6);
+      "></div>
+    </div>`,
+  });
+}
 
 /* ========================================
  * HELPER: Get primary colour for a station
@@ -215,14 +244,18 @@ const MODE_FILTERS = [
  * MAIN COMPONENT
  * ======================================== */
 export default function NearbyMap({ initialPosition }: NearbyMapProps) {
-  /* User's live position */
-  const [userPos, setUserPos] = useState(initialPosition);
+  /* User's live position, with optional heading (degrees clockwise from north) */
+  const [userPos, setUserPos] = useState<{
+    lat: number;
+    lng: number;
+    heading: number | null;
+  }>({ ...initialPosition, heading: null });
   /* Whether to auto-follow the user's position */
   const [following, setFollowing] = useState(true);
   /* Nearby stations fetched from API */
   const [stations, setStations] = useState<NearbyStation[]>([]);
-  /* Last position we fetched stations for */
-  const lastFetchPos = useRef(initialPosition);
+  /* Last position we fetched stations for (lat/lng only, no heading needed) */
+  const lastFetchPos = useRef<{ lat: number; lng: number }>(initialPosition);
   /* Track if component is mounted */
   const mountedRef = useRef(true);
   /* Search radius in metres */
@@ -257,6 +290,12 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
         setUserPos({
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
+          /*
+           * heading is degrees clockwise from north.
+           * Returns null when stationary or on desktop.
+           * Only available on mobile with real GPS movement.
+           */
+          heading: pos.coords.heading ?? null,
         });
       },
       () => {
@@ -332,32 +371,6 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
   }, []);
 
   /* ---- Show/hide a bus/tube route on the map (toggle) ---- */
-  const handleShowRoute = useCallback(async (lineId: string) => {
-    /* If the same route is already shown, toggle it off */
-    setActiveRoute((prev) => {
-      if (prev && prev.lineId === lineId) return null;
-      return prev;
-    });
-
-    /* If toggling off, we already set null above */
-    setActiveRoute((prev) => {
-      if (prev === null) {
-        /* Fetch the route */
-        fetch(`/api/tfl/line-route?lineId=${lineId}`)
-          .then((r) => r.ok ? r.json() : [])
-          .then((stops: { naptanId: string; name: string; lat: number; lon: number }[]) => {
-            if (stops.length > 0) {
-              setActiveRoute({ lineId, stops });
-            }
-          })
-          .catch(() => {});
-        return prev; /* will be updated by the then() */
-      }
-      return prev;
-    });
-  }, []);
-
-  /* Simpler route toggle approach */
   const handleToggleRoute = useCallback(async (lineId: string) => {
     if (activeRoute?.lineId === lineId) {
       setActiveRoute(null);
@@ -422,8 +435,11 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
       >
         <TileLayer url={DARK_TILE_URL} />
 
-        {/* User location marker */}
-        <Marker position={[userPos.lat, userPos.lng]} icon={userIcon} />
+        {/* User location marker — shows heading cone when GPS heading is available */}
+        <Marker
+          position={[userPos.lat, userPos.lng]}
+          icon={createUserIcon(userPos.heading)}
+        />
 
         {/* Search radius circle — faint amber glow showing pickup area */}
         <Circle
