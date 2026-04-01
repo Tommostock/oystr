@@ -105,15 +105,15 @@ function createBusIcon(stopLetter?: string): L.DivIcon {
   });
 }
 
-/** Simple blue dot for user location (no heading indicator) */
+/** Amber dot for user location — matches the app's dot-matrix theme */
 const userIcon = L.divIcon({
   className: "",
   iconSize: [22, 22],
   iconAnchor: [11, 11],
   html: `<div style="
     width: 22px; height: 22px; border-radius: 50%;
-    background: #4A90D9; border: 3px solid white;
-    box-shadow: 0 0 12px rgba(74, 144, 217, 0.6);
+    background: #ff9500; border: 3px solid #0a0a0a;
+    box-shadow: 0 0 12px rgba(255, 149, 0, 0.6);
   "></div>`,
 });
 
