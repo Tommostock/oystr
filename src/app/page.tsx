@@ -304,7 +304,7 @@ function HomeContent() {
                 OYSTR
               </div>
               <div className="font-mono text-[10px] tracking-wider text-amber-faint mt-1 uppercase">
-                VERSION 0.1.0
+                VERSION 1.0.0
               </div>
             </div>
 
