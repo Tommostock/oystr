@@ -71,7 +71,7 @@ export default function BottomNav() {
               href={tab.href}
               className={cn(
                 /* Base styles: centered column layout */
-                "flex flex-col items-center justify-center",
+                "relative flex flex-col items-center justify-center",
                 "w-full h-full",
                 /* Transition for smooth colour changes */
                 "transition-colors duration-200",
@@ -82,6 +82,15 @@ export default function BottomNav() {
               )}
               aria-current={isActive ? "page" : undefined}
             >
+              {/* Active indicator line at top of tab */}
+              {isActive && (
+                <span
+                  className="absolute top-0 left-2 right-2 h-[2px] bg-amber"
+                  style={{
+                    boxShadow: "0 0 8px rgba(255, 149, 0, 0.5), 0 2px 4px rgba(255, 149, 0, 0.3)",
+                  }}
+                />
+              )}
               {/* Tab icon */}
               <IconComponent size={20} strokeWidth={1.5} />
               {/* Tab label */}

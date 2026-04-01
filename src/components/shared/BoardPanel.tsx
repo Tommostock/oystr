@@ -47,8 +47,8 @@ export default function BoardPanel({
       className={cn(
         /* Core board panel styles */
         "board-panel",
-        /* Add scanline overlay if enabled */
-        scanlines && "scanline",
+        /* Add animated scanline overlay if enabled */
+        scanlines && "scanline-flicker relative",
         /* Padding inside the panel */
         "p-4",
         /* Any extra classes */

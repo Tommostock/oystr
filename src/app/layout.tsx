@@ -18,6 +18,8 @@ import BottomNav from "@/components/shared/BottomNav";
 import OfflineBanner from "@/components/shared/OfflineBanner";
 import InstallPrompt from "@/components/shared/InstallPrompt";
 import ServiceWorkerRegistration from "@/components/shared/ServiceWorkerRegistration";
+import SplashScreen from "@/components/shared/SplashScreen";
+import OnboardingOverlay from "@/components/shared/OnboardingOverlay";
 
 /* ========================================
  * FONT LOADING
@@ -102,6 +104,9 @@ export default function RootLayout({
       className={`${shareTechMono.variable} ${ibmPlexMono.variable} ${vt323.variable} h-full`}
     >
       <body className="min-h-dvh flex flex-col bg-board-bg text-amber antialiased pt-[env(safe-area-inset-top)]">
+        {/* Splash screen — shows once on first visit */}
+        <SplashScreen />
+
         {/* Register service worker for offline caching */}
         <ServiceWorkerRegistration />
 
@@ -110,6 +115,9 @@ export default function RootLayout({
 
         {/* Install prompt — shows for first-time visitors when app is installable */}
         <InstallPrompt />
+
+        {/* Onboarding — 4-step walkthrough for first-time users */}
+        <OnboardingOverlay />
 
         {/*
          * Main content area.

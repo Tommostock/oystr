@@ -73,6 +73,43 @@ export function useFavourites() {
       stopLetter: station.stopLetter,
       indicator: station.indicator,
     });
+
+    /*
+     * Background: cache timetables for offline use.
+     * Fetches the scheduled timetable for each line serving this station
+     * and stores it in IndexedDB. Non-blocking — doesn't affect the UI.
+     */
+    cacheTimetablesForStation(station.naptanId, station.lines);
+  }
+
+  /**
+   * Fetch and cache timetables for a saved station.
+   * Runs in the background — failures are silently ignored.
+   */
+  async function cacheTimetablesForStation(
+    stationId: string,
+    lines: string[]
+  ): Promise<void> {
+    for (const lineId of lines) {
+      try {
+        const resp = await fetch(
+          `/api/tfl/timetable?lineId=${lineId}&stationId=${stationId}`
+        );
+        if (!resp.ok) continue;
+
+        const data = await resp.json();
+
+        await db.timetables.put({
+          id: `${lineId}-${stationId}`,
+          lineId,
+          stationId,
+          data,
+          cachedAt: Date.now(),
+        });
+      } catch {
+        /* Silently fail — timetable caching is best-effort */
+      }
+    }
   }
 
   /**

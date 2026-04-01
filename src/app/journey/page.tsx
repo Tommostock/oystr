@@ -14,7 +14,7 @@
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { ArrowDownUp, Home, X } from "lucide-react";
 import StationSearch from "@/components/shared/StationSearch";
 import BoardPanel from "@/components/shared/BoardPanel";
@@ -54,6 +54,10 @@ export default function JourneyPage() {
 
   /* Home station from localStorage */
   const { homeStation, setHomeStation, clearHomeStation } = useHomeStation();
+
+  /* Swap animation state */
+  const [isSwapping, setIsSwapping] = useState(false);
+  const swapTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   /**
    * Plan a journey between the two selected stations.
@@ -117,15 +121,25 @@ export default function JourneyPage() {
   }, [fromStation, toStation, timeIs, dateTime]);
 
   /**
-   * Swap the From and To stations.
+   * Swap the From and To stations with a slide animation.
    */
   const handleSwap = () => {
-    const temp = fromStation;
-    setFromStation(toStation);
-    setToStation(temp);
-    /* Clear previous results since direction changed */
-    setJourneys([]);
-    setHasSearched(false);
+    /* Trigger animation */
+    setIsSwapping(true);
+
+    /* Swap data halfway through the animation */
+    if (swapTimerRef.current) clearTimeout(swapTimerRef.current);
+    swapTimerRef.current = setTimeout(() => {
+      const temp = fromStation;
+      setFromStation(toStation);
+      setToStation(temp);
+      /* Clear previous results since direction changed */
+      setJourneys([]);
+      setHasSearched(false);
+    }, 200);
+
+    /* Remove animation class after it completes */
+    setTimeout(() => setIsSwapping(false), 400);
   };
 
   /**
@@ -316,7 +330,7 @@ export default function JourneyPage() {
       <BoardPanel>
         <div className="space-y-3">
           {/* From station */}
-          <div>
+          <div className={isSwapping ? "swap-animate-down" : ""}>
             <label className="block font-mono text-xs tracking-wider text-amber-faint mb-1 uppercase">
               From
             </label>
@@ -342,8 +356,9 @@ export default function JourneyPage() {
               className={cn(
                 "p-2 border border-board-border",
                 "text-amber-faint hover:text-amber hover:border-amber-faint",
-                "transition-colors duration-200",
-                "disabled:opacity-30"
+                "transition-all duration-200",
+                "disabled:opacity-30",
+                isSwapping && "rotate-180 text-amber border-amber-faint"
               )}
               aria-label="Swap departure and destination"
             >
@@ -352,7 +367,7 @@ export default function JourneyPage() {
           </div>
 
           {/* To station */}
-          <div>
+          <div className={isSwapping ? "swap-animate-up" : ""}>
             <label className="block font-mono text-xs tracking-wider text-amber-faint mb-1 uppercase">
               To
             </label>

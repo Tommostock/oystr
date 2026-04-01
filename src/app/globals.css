@@ -271,20 +271,7 @@
  * Fade-in animation when navigating between tabs.
  * Applied to the main content area in layout.tsx.
  * ======================================== */
-@keyframes page-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.page-transition {
-  animation: page-fade-in 0.2s ease-out;
-}
+/* page-transition class is defined below with the board-scroll style */
 
 /* ========================================
  * DOT-MATRIX SCROLL ANIMATION
@@ -345,4 +332,153 @@
 
 .leaflet-popup-close-button:hover {
   color: #ff9500 !important;
+}
+
+/* ========================================
+ * SPLASH SCREEN ANIMATIONS
+ * Logo glow intensifies as the board "powers on".
+ * ======================================== */
+@keyframes splash-glow {
+  0% {
+    opacity: 0;
+    text-shadow: none;
+  }
+  40% {
+    opacity: 1;
+    text-shadow: 0 0 4px rgba(255, 149, 0, 0.2);
+  }
+  100% {
+    text-shadow: 0 0 20px rgba(255, 149, 0, 0.6), 0 0 40px rgba(255, 149, 0, 0.3);
+  }
+}
+
+@keyframes splash-subtitle {
+  0% { opacity: 0; }
+  60% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* ========================================
+ * AMBIENT SCANLINE FLICKER
+ * Subtle opacity variation on the scanline overlay,
+ * simulating the slight flicker of real LED boards.
+ * Use: className="scanline-flicker"
+ * ======================================== */
+@keyframes scanline-flicker {
+  0%, 100% { opacity: 0.03; }
+  25% { opacity: 0.05; }
+  50% { opacity: 0.02; }
+  75% { opacity: 0.04; }
+}
+
+.scanline-flicker::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 3px
+  );
+  pointer-events: none;
+  z-index: 10;
+  animation: scanline-flicker 4s ease-in-out infinite;
+}
+
+/* ========================================
+ * STAGGERED ROW ANIMATION
+ * Each row in a departure board group slides in
+ * with a slight delay, like a real board updating.
+ * ======================================== */
+.board-row-stagger {
+  animation: board-scroll-in 0.35s ease-out backwards;
+}
+
+.board-row-stagger:nth-child(1) { animation-delay: 0ms; }
+.board-row-stagger:nth-child(2) { animation-delay: 60ms; }
+.board-row-stagger:nth-child(3) { animation-delay: 120ms; }
+.board-row-stagger:nth-child(4) { animation-delay: 180ms; }
+
+/* ========================================
+ * PAGE SLIDE TRANSITION
+ * Slides content up from below like a real board update,
+ * replacing the simple fade-in.
+ * ======================================== */
+@keyframes page-board-scroll {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-transition {
+  animation: page-board-scroll 0.3s ease-out;
+}
+
+/* ========================================
+ * JOURNEY SWAP ANIMATION
+ * Slides the From/To inputs past each other.
+ * ======================================== */
+@keyframes swap-down {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(calc(100% + 2.75rem)); opacity: 0.6; }
+  100% { transform: translateY(0); }
+}
+
+@keyframes swap-up {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(calc(-100% - 2.75rem)); opacity: 0.6; }
+  100% { transform: translateY(0); }
+}
+
+.swap-animate-down {
+  animation: swap-down 0.4s ease-in-out;
+}
+
+.swap-animate-up {
+  animation: swap-up 0.4s ease-in-out;
+}
+
+/* ========================================
+ * MAP TILE AMBER TINT
+ * Applies a subtle amber tint to Leaflet map tiles
+ * so the map feels integrated with the app's colour scheme.
+ * ======================================== */
+.leaflet-tile-pane {
+  filter: sepia(0.15) hue-rotate(15deg) brightness(0.95);
+}
+
+/* ========================================
+ * ONBOARDING SPOTLIGHT
+ * Semi-transparent overlay with a spotlight cutout
+ * highlighting a specific UI element.
+ * ======================================== */
+@keyframes onboarding-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.onboarding-overlay {
+  animation: onboarding-fade-in 0.3s ease-out;
+}
+
+@keyframes onboarding-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(255, 149, 0, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(255, 149, 0, 0.15); }
+}
+
+.onboarding-highlight {
+  animation: onboarding-pulse 2s ease-in-out infinite;
 }

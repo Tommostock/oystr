@@ -14,13 +14,15 @@
 "use client";
 
 import { useArrivals } from "@/hooks/useArrivals";
+import { useLineStatus } from "@/hooks/useLineStatus";
 import { LINE_COLOURS } from "@/lib/constants";
-import type { ArrivalPrediction } from "@/lib/tfl-types";
+import type { ArrivalPrediction, LineStatus } from "@/lib/tfl-types";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
 import PullToRefresh from "@/components/shared/PullToRefresh";
 import BoardSkeleton from "./BoardSkeleton";
 import ArrivalRow from "./ArrivalRow";
+import OfflineTimetable from "./OfflineTimetable";
 
 interface DepartureBoardProps {
   /** The station's Naptan ID */
@@ -93,12 +95,37 @@ function cleanDestination(name: string | undefined): string {
     .trim();
 }
 
+/**
+ * Get the status text and colour for a line.
+ * Returns null if good service (no need to show anything).
+ */
+function getLineStatusInfo(
+  lineId: string,
+  lineStatuses: LineStatus[]
+): { text: string; colour: string } | null {
+  const status = lineStatuses.find((l) => l.id === lineId);
+  if (!status || status.lineStatuses.length === 0) return null;
+
+  const detail = status.lineStatuses[0];
+  /* Don't show anything for "Good Service" — only disruptions */
+  if (detail.statusSeverity === 10) return null;
+
+  const severity = detail.statusSeverity;
+  /* Red for severe (suspended, closed, part-closed), amber for minor/major delays */
+  const colour =
+    severity <= 5 ? "#ff3b30" : severity <= 8 ? "#ff9500" : "#cc7700";
+
+  return { text: detail.statusSeverityDescription.toUpperCase(), colour };
+}
+
 export default function DepartureBoard({
   stopId,
   stationName,
 }: DepartureBoardProps) {
   /* Fetch live arrivals with automatic polling every 30 seconds */
   const { arrivals, isLoading, error, refresh } = useArrivals(stopId);
+  /* Fetch line statuses for the status indicators */
+  const { lines: lineStatuses } = useLineStatus();
 
   /* ---- Loading state: show skeleton rows instead of blinking text ---- */
   if (isLoading && arrivals.length === 0) {
@@ -110,30 +137,14 @@ export default function DepartureBoard({
     );
   }
 
-  /* ---- Error state ---- */
+  /* ---- Error state — show offline timetable as fallback ---- */
   if (error && arrivals.length === 0) {
-    return (
-      <BoardPanel title={stationName}>
-        <div className="py-6 text-center">
-          <AmberText variant="dim" size="sm" className="dot-matrix">
-            TFL DATA UNAVAILABLE
-          </AmberText>
-        </div>
-      </BoardPanel>
-    );
+    return <OfflineTimetable stopId={stopId} stationName={stationName} />;
   }
 
-  /* ---- No arrivals ---- */
+  /* ---- No arrivals — show offline timetable as fallback ---- */
   if (arrivals.length === 0) {
-    return (
-      <BoardPanel title={stationName}>
-        <div className="py-6 text-center">
-          <AmberText variant="dim" size="sm" className="dot-matrix">
-            NO ARRIVALS DATA AVAILABLE
-          </AmberText>
-        </div>
-      </BoardPanel>
-    );
+    return <OfflineTimetable stopId={stopId} stationName={stationName} />;
   }
 
   /* ---- Group arrivals by platform ---- */
@@ -151,8 +162,32 @@ export default function DepartureBoard({
             ? `BUS STOP ${platformName}`
             : platformName;
 
+          /* Check line status for the first arrival's line in this group */
+          const lineId = firstArrival?.lineId;
+          const statusInfo =
+            lineId && !isBusGroup
+              ? getLineStatusInfo(lineId, lineStatuses)
+              : null;
+
           return (
             <BoardPanel key={platformName} title={groupTitle}>
+              {/* Line status indicator — only shows when disrupted */}
+              {statusInfo && (
+                <div
+                  className="flex items-center gap-2 mb-2 px-1 py-1.5 border-b border-board-border/50"
+                >
+                  <span
+                    className="w-1.5 h-1.5 rounded-full shrink-0"
+                    style={{ backgroundColor: statusInfo.colour }}
+                  />
+                  <span
+                    className="font-mono text-[10px] tracking-wider uppercase"
+                    style={{ color: statusInfo.colour }}
+                  >
+                    {statusInfo.text}
+                  </span>
+                </div>
+              )}
               <div role="table" aria-label={`Departures from ${groupTitle}`}>
                 {groups[platformName].map((arrival, index) => (
                   <ArrivalRow
@@ -163,6 +198,7 @@ export default function DepartureBoard({
                     lineColour={LINE_COLOURS[arrival.lineId]}
                     routeNumber={arrival.lineName}
                     modeName={arrival.modeName}
+                    className="board-row-stagger"
                   />
                 ))}
               </div>
