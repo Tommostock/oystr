@@ -165,36 +165,6 @@
 }
 
 /* ========================================
- * SCANLINE OVERLAY
- * Creates subtle horizontal lines over panels,
- * simulating the look of an LED dot-matrix display.
- * Use: className="scanline" on a positioned container.
- * ======================================== */
-.scanline {
-  position: relative;
-}
-
-.scanline::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  /* Repeating thin lines every 3px, very low opacity */
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 0, 0, 0.15) 2px,
-    rgba(0, 0, 0, 0.15) 3px
-  );
-  opacity: 0.03;
-  pointer-events: none;
-  z-index: 10;
-}
-
-/* ========================================
  * BOARD PANEL
  * The recessed panel style used for departure boards.
  * Use: className="board-panel"
@@ -425,30 +395,6 @@
 
 .page-transition {
   animation: page-board-scroll 0.3s ease-out;
-}
-
-/* ========================================
- * JOURNEY SWAP ANIMATION
- * Slides the From/To inputs past each other.
- * ======================================== */
-@keyframes swap-down {
-  0% { transform: translateY(0); }
-  50% { transform: translateY(calc(100% + 2.75rem)); opacity: 0.6; }
-  100% { transform: translateY(0); }
-}
-
-@keyframes swap-up {
-  0% { transform: translateY(0); }
-  50% { transform: translateY(calc(-100% - 2.75rem)); opacity: 0.6; }
-  100% { transform: translateY(0); }
-}
-
-.swap-animate-down {
-  animation: swap-down 0.4s ease-in-out;
-}
-
-.swap-animate-up {
-  animation: swap-up 0.4s ease-in-out;
 }
 
 /* ========================================

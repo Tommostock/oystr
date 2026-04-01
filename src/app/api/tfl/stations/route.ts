@@ -95,9 +95,56 @@ export async function GET() {
       }
     }
 
+    /*
+     * Consolidate stations that share the same name.
+     * Some interchanges like Bank have multiple naptanIds
+     * (one per "side" of the station). We merge them so
+     * "Bank" appears once with all its lines combined.
+     */
+    const nameMap = new Map<
+      string,
+      {
+        naptanId: string;
+        name: string;
+        zone: string;
+        lines: string[];
+        modes: string[];
+        allNaptanIds: string[];
+      }
+    >();
+
+    for (const station of stationMap.values()) {
+      if (station.name.length === 0) continue;
+
+      const key = station.name.toLowerCase();
+      if (nameMap.has(key)) {
+        /* Merge into existing entry */
+        const existing = nameMap.get(key)!;
+        existing.allNaptanIds.push(station.naptanId);
+        for (const line of station.lines) {
+          if (!existing.lines.includes(line)) {
+            existing.lines.push(line);
+          }
+        }
+        for (const mode of station.modes) {
+          if (!existing.modes.includes(mode)) {
+            existing.modes.push(mode);
+          }
+        }
+        /* Keep the zone from whichever entry has one */
+        if (!existing.zone && station.zone) {
+          existing.zone = station.zone;
+        }
+      } else {
+        nameMap.set(key, {
+          ...station,
+          allNaptanIds: [station.naptanId],
+        });
+      }
+    }
+
     /* Sort alphabetically */
-    const stations = Array.from(stationMap.values())
-      .filter((s) => s.name.length > 0)
+    const stations = Array.from(nameMap.values())
       .sort((a, b) => a.name.localeCompare(b.name));
 
     return NextResponse.json(stations);
