@@ -118,7 +118,10 @@ export default function NearbyPage() {
   }
 
   return (
-    <div className="h-full bg-board-bg">
+    <div
+      className="bg-board-bg"
+      style={{ height: "calc(100dvh - 3.5rem - env(safe-area-inset-bottom, 0px) - 0.5rem)" }}
+    >
       {position && <NearbyMap initialPosition={position} />}
     </div>
   );
