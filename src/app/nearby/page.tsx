@@ -118,7 +118,7 @@ export default function NearbyPage() {
   }
 
   return (
-    <div className="h-[calc(100dvh-3.5rem)] bg-board-bg">
+    <div className="h-full bg-board-bg">
       {position && <NearbyMap initialPosition={position} />}
     </div>
   );

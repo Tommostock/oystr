@@ -41,8 +41,8 @@ export default function BottomNav() {
   return (
     <nav
       className={cn(
-        /* Fixed to bottom, full width */
-        "fixed bottom-0 left-0 right-0 z-50",
+        /* Fixed to bottom, full width, above everything including map */
+        "fixed bottom-0 left-0 right-0 z-[9000]",
         /* Dark background with top border */
         "bg-board-bg border-t border-board-border",
         /* Safe area padding for phones with home indicators */

@@ -184,7 +184,8 @@ export default function NearbyDrawer({
   return (
     <div
       ref={drawerRef}
-      className="absolute left-4 right-4 bottom-2 z-[1000] flex flex-col"
+      className="absolute left-4 right-4 z-[1000] flex flex-col"
+      style={{ bottom: "calc(3.5rem + env(safe-area-inset-bottom, 0px) + 0.5rem)" }}
     >
       {/* Station list (opens upward above the toggle bar) */}
       {isExpanded && (

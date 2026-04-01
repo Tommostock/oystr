@@ -425,16 +425,17 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
         {/* User location marker */}
         <Marker position={[userPos.lat, userPos.lng]} icon={userIcon} />
 
-        {/* Accuracy circle (light blue, subtle) */}
+        {/* Search radius circle — faint amber glow showing pickup area */}
         <Circle
           center={[userPos.lat, userPos.lng]}
-          radius={50}
+          radius={radius}
           pathOptions={{
-            color: "#4A90D9",
-            fillColor: "#4A90D9",
-            fillOpacity: 0.08,
-            weight: 1,
-            opacity: 0.3,
+            color: "#ff9500",
+            fillColor: "#ff9500",
+            fillOpacity: 0.04,
+            weight: 1.5,
+            opacity: 0.25,
+            dashArray: "6 4",
           }}
         />
 

@@ -18,10 +18,10 @@
 
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { RotateCcw, List } from "lucide-react";
+import { RotateCcw, List, HelpCircle } from "lucide-react";
 import StationSearch from "@/components/shared/StationSearch";
 import NearMeButton from "@/components/shared/NearMeButton";
 import DepartureBoard from "@/components/departure-board/DepartureBoard";
@@ -78,6 +78,28 @@ function HomeContent() {
   /* The station the user has selected (null = none selected yet) */
   const [selectedStation, setSelectedStation] =
     useState<SelectedStation | null>(null);
+
+  /* About popup state */
+  const [showAbout, setShowAbout] = useState(false);
+  const aboutRef = useRef<HTMLDivElement>(null);
+
+  /* Close About popup when clicking outside */
+  useEffect(() => {
+    if (!showAbout) return;
+    const handleClick = (e: MouseEvent) => {
+      if (aboutRef.current && !aboutRef.current.contains(e.target as Node)) {
+        setShowAbout(false);
+      }
+    };
+    /* Delay to prevent immediate close from the button click */
+    const timer = setTimeout(() => {
+      document.addEventListener("mousedown", handleClick);
+    }, 50);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("mousedown", handleClick);
+    };
+  }, [showAbout]);
 
   /* Read URL params (used when navigating from Stations / Saved page) */
   const searchParams = useSearchParams();
@@ -256,7 +278,71 @@ function HomeContent() {
             {selectedStation ? "Your London Transport Companion" : getGreeting()}
           </span>
         </div>
+
+        {/* About button — top right */}
+        <button
+          onClick={() => setShowAbout(true)}
+          className="absolute right-0 w-9 h-9 flex items-center justify-center border border-board-border text-amber-faint hover:text-amber hover:border-amber-faint transition-colors"
+          aria-label="About Oystr"
+        >
+          <HelpCircle size={18} strokeWidth={1.5} />
+        </button>
       </div>
+
+      {/* ---- About Popup ---- */}
+      {showAbout && (
+        <div className="fixed inset-0 z-[8500] flex items-center justify-center bg-black/70">
+          <div
+            ref={aboutRef}
+            className="mx-6 max-w-sm w-full bg-surface border border-amber/30 p-6 space-y-4"
+          >
+            <div className="text-center">
+              <div
+                className="font-board text-3xl tracking-[0.15em] text-amber uppercase"
+                style={{ textShadow: "0 0 12px rgba(255, 149, 0, 0.5)" }}
+              >
+                OYSTR
+              </div>
+              <div className="font-mono text-[10px] tracking-wider text-amber-faint mt-1 uppercase">
+                VERSION 0.1.0
+              </div>
+            </div>
+
+            <div className="border-t border-board-border pt-4">
+              <h3 className="font-mono text-xs tracking-wider text-amber uppercase mb-2">
+                ABOUT OYSTR
+              </h3>
+              <p className="font-mono text-[11px] leading-relaxed text-amber-dim">
+                Your London transport companion. Live departure times, journey planning,
+                nearby station maps, and line status updates -- all styled like the
+                iconic amber dot-matrix boards found across the TfL network.
+              </p>
+            </div>
+
+            <div className="border-t border-board-border pt-3 space-y-1.5">
+              <div className="flex justify-between font-mono text-[10px] tracking-wider">
+                <span className="text-amber-faint">DATA SOURCE</span>
+                <span className="text-amber-dim">TFL UNIFIED API</span>
+              </div>
+              <div className="flex justify-between font-mono text-[10px] tracking-wider">
+                <span className="text-amber-faint">FRAMEWORK</span>
+                <span className="text-amber-dim">NEXT.JS + VERCEL</span>
+              </div>
+              <div className="flex justify-between font-mono text-[10px] tracking-wider">
+                <span className="text-amber-faint">DEVELOPER</span>
+                <span className="text-amber-dim">TOM</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowAbout(false)}
+              className="w-full py-2.5 border border-amber text-amber font-mono text-xs tracking-wider uppercase hover:bg-amber/10 transition-colors"
+            >
+              CLOSE
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ---- Station Search + Near Me ---- */}
       <div className="flex items-start gap-2">
