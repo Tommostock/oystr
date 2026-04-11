@@ -131,9 +131,17 @@ export default function TimeSelector({ onTimeChange }: TimeSelectorProps) {
             "border border-board-border focus:border-amber",
             "font-mono text-sm tracking-wider",
             "outline-none transition-colors duration-200",
+            /*
+             * iOS Safari adds default padding/width to input[type="time"]
+             * which causes it to render wider than its container.
+             * appearance-none strips the default UA styling and
+             * min-w-0 prevents the implicit content-based min width.
+             */
+            "appearance-none min-w-0 block",
             /* Custom styling for the time picker */
             "[color-scheme:dark]"
           )}
+          style={{ boxSizing: "border-box" }}
         />
       )}
     </div>
