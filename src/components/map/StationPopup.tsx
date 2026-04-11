@@ -13,6 +13,7 @@
 import { useEffect, useState } from "react";
 import { LINE_COLOURS } from "@/lib/constants";
 import { useFavourites } from "@/hooks/useFavourites";
+import { isBusStop } from "@/lib/utils";
 
 interface Arrival {
   lineId: string;
@@ -61,8 +62,7 @@ export default function StationPopup({ station, onShowRoute, activeRouteId }: St
   const { toggleFavourite, isFavourite } = useFavourites();
   const [saved, setSaved] = useState(false);
 
-  const isBus =
-    station.naptanId.startsWith("490") || station.modes?.includes("bus");
+  const isBus = isBusStop(station.naptanId, station.modes);
 
   /* Check if station is already saved */
   useEffect(() => {

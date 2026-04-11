@@ -13,6 +13,7 @@
 import { useState, useEffect, useRef } from "react";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import { LINE_COLOURS } from "@/lib/constants";
+import { isBusStop } from "@/lib/utils";
 
 interface NearbyStation {
   naptanId: string;
@@ -69,8 +70,7 @@ function DrawerRow({
 }) {
   const [nextArrival, setNextArrival] = useState<Arrival | null>(null);
   const [fetched, setFetched] = useState(false);
-  const isBus =
-    station.naptanId.startsWith("490") || station.modes?.includes("bus");
+  const isBus = isBusStop(station.naptanId, station.modes);
 
   /* Fetch next arrival when drawer expands (lazy) */
   useEffect(() => {

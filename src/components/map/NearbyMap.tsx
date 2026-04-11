@@ -28,6 +28,7 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { DARK_TILE_URL, LINE_COLOURS } from "@/lib/constants";
+import { isBusStop } from "@/lib/utils";
 import StationPopup from "./StationPopup";
 import NearbyDrawer from "./NearbyDrawer";
 
@@ -404,9 +405,8 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
     setFlyTarget(null);
   }, [flyTarget]);
 
-  /* Determine if a station is a bus stop */
-  const isBus = (s: NearbyStation) =>
-    s.naptanId.startsWith("490") || s.modes?.includes("bus");
+  /* Determine if a station is a bus stop (strict — excludes multi-modal stations) */
+  const isBus = (s: NearbyStation) => isBusStop(s.naptanId, s.modes);
 
   /*
    * Filter stations by active modes.

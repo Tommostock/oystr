@@ -19,7 +19,7 @@ import { db } from "@/lib/db";
 import { LINE_COLOURS, LINE_NAMES } from "@/lib/constants";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
-import { cn, cleanStationName } from "@/lib/utils";
+import { cn, cleanStationName, isBusStop } from "@/lib/utils";
 
 export default function SavedPage() {
   const { favourites, removeFavourite } = useFavourites();
@@ -39,14 +39,10 @@ export default function SavedPage() {
   useEffect(() => {
     /*
      * Only enrich tube/rail stations that are missing line data.
-     * Bus stops (naptanId starts with "490" or modes includes "bus")
-     * don't have lines — skip them to avoid wasted API calls.
+     * Bus stops don't have lines — skip them to avoid wasted API calls.
      */
-    const isBusStop = (s: { naptanId: string; modes?: string[] }) =>
-      s.naptanId.startsWith("490") || s.modes?.includes("bus");
-
     const stationsWithoutLines = favourites.filter(
-      (s) => s.lines.length === 0 && !isBusStop(s)
+      (s) => s.lines.length === 0 && !isBusStop(s.naptanId, s.modes)
     );
     if (stationsWithoutLines.length === 0 || enrichingRef.current) return;
 
@@ -128,11 +124,8 @@ export default function SavedPage() {
    */
   const busEnrichRef = React.useRef(false);
   useEffect(() => {
-    const isBusStop = (s: { naptanId: string; modes?: string[] }) =>
-      s.naptanId.startsWith("490") || s.modes?.includes("bus");
-
     const busStopsNeedingEnrichment = favourites.filter(
-      (s) => isBusStop(s) && (!s.stopLetter || s.lines.length === 0)
+      (s) => isBusStop(s.naptanId, s.modes) && (!s.stopLetter || s.lines.length === 0)
     );
     if (busStopsNeedingEnrichment.length === 0 || busEnrichRef.current) return;
 
@@ -254,8 +247,8 @@ export default function SavedPage() {
           >
             {/* Station name and line/bus info */}
             <div className="flex-1 min-w-0">
-              {/* Detect bus stops: check modes array or naptanId prefix */}
-              {(station.modes?.includes("bus") || station.naptanId.startsWith("490")) ? (
+              {/* Detect bus stops — strict check excludes multi-modal stations */}
+              {isBusStop(station.naptanId, station.modes) ? (
                 <>
                   {/* Bus stop: show stop letter badge + name */}
                   <div className="flex items-center gap-2">

@@ -17,7 +17,7 @@ import { useEffect, useRef } from "react";
 import { useFavourites } from "@/hooks/useFavourites";
 import { useArrivals } from "@/hooks/useArrivals";
 import { LINE_COLOURS } from "@/lib/constants";
-import { cn, cleanStationName } from "@/lib/utils";
+import { cn, cleanStationName, isBusStop } from "@/lib/utils";
 import { useCountdown } from "@/hooks/useCountdown";
 import { db } from "@/lib/db";
 
@@ -44,7 +44,11 @@ function QuickViewCard({
   modes?: string[];
   onSelect: () => void;
 }) {
-  const isBus = modes?.includes("bus") || naptanId.startsWith("490");
+  /*
+   * Use the strict isBusStop check — multi-modal stations like London City
+   * Airport (DLR + nearby bus) should show their line colour dot, not "BUS".
+   */
+  const isBus = isBusStop(naptanId, modes);
   const { arrivals, isLoading } = useArrivals(naptanId);
   /* Show the next 2 arrivals */
   const next2 = arrivals.slice(0, 2);

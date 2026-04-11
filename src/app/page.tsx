@@ -392,10 +392,15 @@ function HomeContent() {
           {/* Selected station header */}
           <div className="border border-board-border bg-surface p-3 space-y-2">
             {/* Row 1: Station name + weather + zone + save icon */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-baseline gap-2 min-w-0">
-                <div className="flex items-start">
-                  <h2 className="font-board text-2xl tracking-wider text-amber uppercase amber-glow truncate">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 min-w-0 flex-1">
+                <div className="flex items-start min-w-0">
+                  {/*
+                   * break-words allows long station names (e.g. King's Cross
+                   * & St Pancras International) to wrap onto multiple lines
+                   * inside the card instead of overflowing to the right.
+                   */}
+                  <h2 className="font-board text-2xl tracking-wider text-amber uppercase amber-glow break-words">
                     {selectedStation.name
                       .replace(/\s*Underground Station$/i, "")
                       .replace(/\s*DLR Station$/i, "")
