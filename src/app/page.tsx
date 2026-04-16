@@ -36,6 +36,7 @@ import { LINE_NAMES, LINE_COLOURS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import NightTubeIndicator from "@/components/shared/NightTubeIndicator";
 import SavedStationDisruptions from "@/components/shared/SavedStationDisruptions";
+import StrikeAlert from "@/components/shared/StrikeAlert";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
 
@@ -385,6 +386,9 @@ function HomeContent() {
           <span>BROWSE ALL STATIONS</span>
         </Link>
       )}
+
+      {/* ---- Strike Alert (only shows when strikes are planned) ---- */}
+      {!selectedStation && <StrikeAlert />}
 
       {/* ---- Departure Board or Empty State ---- */}
       {selectedStation ? (
