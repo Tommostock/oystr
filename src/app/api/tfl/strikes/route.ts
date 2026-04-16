@@ -6,15 +6,17 @@
  *
  * Uses three data sources:
  *   1. /Line/Mode/{modes}/Disruption — planned and real-time disruptions
- *   2. /Line/Mode/{modes}/Status — current line statuses (reasons may mention strikes)
- *   3. /Line/Mode/{modes}/Status/{from}/to/{to} — status for the next 7 days
- *      to catch planned strikes that haven't started yet
+ *   2. /Line/Mode/{modes}/Status — current line statuses
+ *   3. /Line/Mode/{modes}/Status/{from}/to/{to} — status for next 7 days
+ *
+ * The TfL API stores strike data in multiple places:
+ *   - Line.disruptions[] — top-level disruptions on the Line object
+ *   - LineStatus.disruption — nested inside each status entry
+ *   - LineStatus.reason — free-text reason field
+ *   - LineStatus.validityPeriods — date ranges for planned disruptions
  *
  * Strike-related disruptions are identified by keywords like
- * "strike", "industrial action", "walk out", "walkout" in the
- * description or reason text.
- *
- * Strikes are shown from 7 days before through to the strike date.
+ * "strike", "industrial action", "walk out" etc.
  *
  * Returns:
  *   Array of StrikeInfo objects with description, affected lines,
@@ -55,6 +57,104 @@ function formatDate(date: Date): string {
   return date.toISOString().split("T")[0];
 }
 
+/**
+ * Try to add a strike entry, deduplicating by description.
+ * If the description already exists, merge the affected lines.
+ * Returns true if a new entry was added.
+ */
+function addStrike(
+  strikes: StrikeInfo[],
+  seenDescriptions: Set<string>,
+  entry: {
+    description: string;
+    affectedLines: string[];
+    lastUpdated: string;
+    category: string;
+    fromDate: string;
+    toDate: string;
+  }
+): boolean {
+  const descKey = entry.description.trim().toLowerCase();
+
+  if (seenDescriptions.has(descKey)) {
+    /* Already seen — merge affected lines into the existing entry */
+    const existing = strikes.find(
+      (s) => s.description.trim().toLowerCase() === descKey
+    );
+    if (existing) {
+      for (const line of entry.affectedLines) {
+        if (!existing.affectedLines.includes(line)) {
+          existing.affectedLines.push(line);
+        }
+      }
+      /* Update dates if the existing entry has none */
+      if (!existing.fromDate && entry.fromDate) existing.fromDate = entry.fromDate;
+      if (!existing.toDate && entry.toDate) existing.toDate = entry.toDate;
+    }
+    return false;
+  }
+
+  seenDescriptions.add(descKey);
+  strikes.push({
+    id: `strike-${strikes.length}`,
+    description: entry.description.trim(),
+    affectedLines: [...entry.affectedLines],
+    lastUpdated: entry.lastUpdated,
+    category: entry.category,
+    fromDate: entry.fromDate,
+    toDate: entry.toDate,
+  });
+  return true;
+}
+
+/**
+ * Extract the earliest fromDate and latest toDate from an array
+ * of validity periods.
+ */
+function extractDateRange(
+  periods: Array<{ fromDate?: string; toDate?: string }> | undefined
+): { fromDate: string; toDate: string } {
+  if (!periods || periods.length === 0) return { fromDate: "", toDate: "" };
+
+  const fromDates = periods
+    .map((v) => v.fromDate)
+    .filter(Boolean)
+    .sort() as string[];
+  const toDates = periods
+    .map((v) => v.toDate)
+    .filter(Boolean)
+    .sort() as string[];
+
+  return {
+    fromDate: fromDates.length > 0 ? fromDates[0] : "",
+    toDate: toDates.length > 0 ? toDates[toDates.length - 1] : "",
+  };
+}
+
+/**
+ * Check if a strike falls within our display window.
+ * Show strikes that haven't ended yet and start within 7 days.
+ */
+function isWithinWindow(
+  fromDate: string,
+  toDate: string,
+  today: Date,
+  windowEnd: Date
+): boolean {
+  /* If no dates at all, include it (better to show than hide) */
+  if (!fromDate && !toDate) return true;
+
+  if (toDate) {
+    const strikeEnd = new Date(toDate);
+    if (strikeEnd < today) return false; // Already passed
+  }
+  if (fromDate) {
+    const strikeStart = new Date(fromDate);
+    if (strikeStart > windowEnd) return false; // Too far out
+  }
+  return true;
+}
+
 export async function GET() {
   try {
     const params = new URLSearchParams();
@@ -70,25 +170,26 @@ export async function GET() {
     const sevenDaysOut = new Date(today);
     sevenDaysOut.setDate(today.getDate() + 7);
 
-    const fromDate = formatDate(today);
-    const toDate = formatDate(sevenDaysOut);
+    const fromDateStr = formatDate(today);
+    const toDateStr = formatDate(sevenDaysOut);
 
     /*
-     * Fetch disruptions, current status, and future status in parallel.
+     * Fetch all three data sources in parallel:
      *
-     * - Disruptions include planned works with validity date ranges
-     * - Current status catches any active strikes right now
-     * - Future status (7-day range) catches planned closures due to strikes
+     * 1. Disruptions — planned and real-time (top-level disruption objects)
+     * 2. Current status — live line statuses
+     * 3. Future status (7-day range) — includes planned closures/strikes
+     *    with validity periods and nested disruption objects
      */
     const [disruptionsRes, statusRes, futureStatusRes] = await Promise.all([
       fetch(`${TFL_API_BASE}/Line/Mode/${modes}/Disruption?${params}`, {
-        next: { revalidate: 300 }, // Cache for 5 minutes
+        next: { revalidate: 300 },
       }),
       fetch(`${TFL_API_BASE}/Line/Mode/${modes}/Status?${params}`, {
         next: { revalidate: 60 },
       }),
       fetch(
-        `${TFL_API_BASE}/Line/Mode/${modes}/Status/${fromDate}/to/${toDate}?${params}`,
+        `${TFL_API_BASE}/Line/Mode/${modes}/Status/${fromDateStr}/to/${toDateStr}?detail=true&${params}`,
         { next: { revalidate: 300 } }
       ),
     ]);
@@ -96,23 +197,18 @@ export async function GET() {
     const strikes: StrikeInfo[] = [];
     const seenDescriptions = new Set<string>();
 
-    /* ---- Process disruptions (best source — includes validity dates) ---- */
+    /* ---- 1. Process /Disruption endpoint ---- */
     if (disruptionsRes.ok) {
       const disruptions = await disruptionsRes.json();
 
       for (const disruption of disruptions) {
         const description = disruption.description || "";
         const closureText = disruption.closureText || "";
-        const combined = `${description} ${closureText}`;
+        const additionalInfo = disruption.additionalInfo || "";
+        const combined = `${description} ${closureText} ${additionalInfo}`;
 
         if (!isStrikeRelated(combined)) continue;
 
-        /* Deduplicate by description text */
-        const descKey = description.trim().toLowerCase();
-        if (seenDescriptions.has(descKey)) continue;
-        seenDescriptions.add(descKey);
-
-        /* Extract affected line names */
         const affectedLines: string[] = [];
         if (disruption.affectedRoutes) {
           for (const route of disruption.affectedRoutes) {
@@ -122,64 +218,32 @@ export async function GET() {
           }
         }
 
-        /*
-         * Extract validity dates from the disruption.
-         * TfL disruptions have a validity array with fromDate/toDate.
-         * Use the earliest fromDate and latest toDate.
-         */
-        let strikeFrom = "";
-        let strikeTo = "";
+        /* Extract validity dates */
+        const { fromDate, toDate } = extractDateRange(disruption.validity);
 
-        if (disruption.validity && disruption.validity.length > 0) {
-          const fromDates = disruption.validity
-            .map((v: { fromDate: string }) => v.fromDate)
-            .filter(Boolean)
-            .sort();
-          const toDates = disruption.validity
-            .map((v: { toDate: string }) => v.toDate)
-            .filter(Boolean)
-            .sort();
+        if (!isWithinWindow(fromDate, toDate, today, sevenDaysOut)) continue;
 
-          if (fromDates.length > 0) strikeFrom = fromDates[0];
-          if (toDates.length > 0) strikeTo = toDates[toDates.length - 1];
-        }
-
-        /*
-         * Only include strikes within our 7-day window:
-         * - Strike hasn't ended yet (toDate >= today or no toDate)
-         * - Strike starts within 7 days (fromDate <= 7 days out or no fromDate)
-         */
-        if (strikeTo) {
-          const strikeEnd = new Date(strikeTo);
-          if (strikeEnd < today) continue; // Strike already passed
-        }
-        if (strikeFrom) {
-          const strikeStart = new Date(strikeFrom);
-          if (strikeStart > sevenDaysOut) continue; // Too far in the future
-        }
-
-        strikes.push({
-          id: `disruption-${strikes.length}`,
-          description: description.trim(),
+        addStrike(strikes, seenDescriptions, {
+          description,
           affectedLines,
           lastUpdated: disruption.lastUpdate || disruption.created || "",
           category: disruption.category || "Unknown",
-          fromDate: strikeFrom,
-          toDate: strikeTo,
+          fromDate,
+          toDate,
         });
       }
     }
 
-    /* ---- Process current line status reasons ---- */
+    /* ---- 2. Process current /Status endpoint ---- */
     if (statusRes.ok) {
       const lines = await statusRes.json();
-      processStatusLines(lines, strikes, seenDescriptions, "", "");
+      processLines(lines, strikes, seenDescriptions, today, sevenDaysOut);
     }
 
-    /* ---- Process future (7-day) line status reasons ---- */
+    /* ---- 3. Process future date-range /Status endpoint ---- */
     if (futureStatusRes.ok) {
       const lines = await futureStatusRes.json();
-      processStatusLines(lines, strikes, seenDescriptions, fromDate, toDate);
+      processLines(lines, strikes, seenDescriptions, today, sevenDaysOut);
     }
 
     return NextResponse.json(strikes);
@@ -193,71 +257,138 @@ export async function GET() {
 }
 
 /**
- * Process line status data and extract strike-related entries.
- * Used for both current status and future date-range status.
+ * Process Line objects from the TfL /Status endpoints.
+ *
+ * Checks three places for strike info on each line:
+ *   1. line.disruptions[] — top-level disruptions array
+ *   2. lineStatuses[].disruption — nested disruption object
+ *   3. lineStatuses[].reason — free-text reason field
+ *
+ * Also extracts validity periods for date display.
  */
-function processStatusLines(
+function processLines(
   lines: Array<{
     id: string;
     name: string;
+    disruptions?: Array<{
+      category?: string;
+      description?: string;
+      closureText?: string;
+      additionalInfo?: string;
+      affectedRoutes?: Array<{ name?: string }>;
+      created?: string;
+      lastUpdate?: string;
+    }>;
     lineStatuses?: Array<{
       reason?: string;
-      validityPeriods?: Array<{ fromDate: string; toDate: string }>;
+      statusSeverityDescription?: string;
+      disruption?: {
+        category?: string;
+        description?: string;
+        closureText?: string;
+        additionalInfo?: string;
+        affectedRoutes?: Array<{ name?: string }>;
+        created?: string;
+        lastUpdate?: string;
+      };
+      validityPeriods?: Array<{
+        fromDate?: string;
+        toDate?: string;
+        isNow?: boolean;
+      }>;
     }>;
   }>,
   strikes: StrikeInfo[],
   seenDescriptions: Set<string>,
-  defaultFrom: string,
-  defaultTo: string
+  today: Date,
+  windowEnd: Date
 ) {
   for (const line of lines) {
+    /* --- Check top-level line.disruptions[] --- */
+    if (line.disruptions) {
+      for (const disruption of line.disruptions) {
+        const desc = disruption.description || "";
+        const closure = disruption.closureText || "";
+        const additional = disruption.additionalInfo || "";
+        const combined = `${desc} ${closure} ${additional}`;
+
+        if (!isStrikeRelated(combined)) continue;
+
+        const affectedLines: string[] = [line.name];
+        if (disruption.affectedRoutes) {
+          for (const route of disruption.affectedRoutes) {
+            if (route.name && !affectedLines.includes(route.name)) {
+              affectedLines.push(route.name);
+            }
+          }
+        }
+
+        addStrike(strikes, seenDescriptions, {
+          description: desc || closure,
+          affectedLines,
+          lastUpdated: disruption.lastUpdate || disruption.created || "",
+          category: disruption.category || "PlannedWork",
+          fromDate: "",
+          toDate: "",
+        });
+      }
+    }
+
+    /* --- Check each lineStatus entry --- */
     if (!line.lineStatuses) continue;
 
     for (const status of line.lineStatuses) {
-      const reason = status.reason || "";
-      if (!reason || !isStrikeRelated(reason)) continue;
+      /* Extract validity dates for this status entry */
+      const { fromDate, toDate } = extractDateRange(status.validityPeriods);
 
-      const descKey = reason.trim().toLowerCase();
+      /* Check the nested disruption object */
+      if (status.disruption) {
+        const d = status.disruption;
+        const desc = d.description || "";
+        const closure = d.closureText || "";
+        const additional = d.additionalInfo || "";
+        const combined = `${desc} ${closure} ${additional}`;
 
-      if (seenDescriptions.has(descKey)) {
-        /* Already seen — just add this line to the existing entry */
-        const existing = strikes.find(
-          (s) => s.description.trim().toLowerCase() === descKey
-        );
-        if (existing && !existing.affectedLines.includes(line.name)) {
-          existing.affectedLines.push(line.name);
+        if (isStrikeRelated(combined)) {
+          if (!isWithinWindow(fromDate, toDate, today, windowEnd)) continue;
+
+          const affectedLines: string[] = [line.name];
+          if (d.affectedRoutes) {
+            for (const route of d.affectedRoutes) {
+              if (route.name && !affectedLines.includes(route.name)) {
+                affectedLines.push(route.name);
+              }
+            }
+          }
+
+          addStrike(strikes, seenDescriptions, {
+            description: desc || closure,
+            affectedLines,
+            lastUpdated: d.lastUpdate || d.created || "",
+            category: d.category || "PlannedWork",
+            fromDate,
+            toDate,
+          });
+
+          /* Already found a strike in this status — don't double-count reason */
+          continue;
         }
-        continue;
-      }
-      seenDescriptions.add(descKey);
-
-      /* Extract validity dates if available */
-      let strikeFrom = defaultFrom;
-      let strikeTo = defaultTo;
-
-      if (status.validityPeriods && status.validityPeriods.length > 0) {
-        const fromDates = status.validityPeriods
-          .map((v) => v.fromDate)
-          .filter(Boolean)
-          .sort();
-        const toDates = status.validityPeriods
-          .map((v) => v.toDate)
-          .filter(Boolean)
-          .sort();
-
-        if (fromDates.length > 0) strikeFrom = fromDates[0];
-        if (toDates.length > 0) strikeTo = toDates[toDates.length - 1];
       }
 
-      strikes.push({
-        id: `status-${line.id}-${strikes.length}`,
-        description: reason.trim(),
-        affectedLines: [line.name],
-        lastUpdated: new Date().toISOString(),
-        category: "RealTime",
-        fromDate: strikeFrom,
-        toDate: strikeTo,
-      });
+      /* Check the reason text as fallback */
+      const reason = status.reason || "";
+      if (reason && isStrikeRelated(reason)) {
+        if (!isWithinWindow(fromDate, toDate, today, windowEnd)) continue;
+
+        addStrike(strikes, seenDescriptions, {
+          description: reason,
+          affectedLines: [line.name],
+          lastUpdated: new Date().toISOString(),
+          category: "RealTime",
+          fromDate,
+          toDate,
+        });
+      }
     }
   }
 }
