@@ -95,6 +95,47 @@ export interface Journey {
   };
 }
 
+/* ========================================
+ * STRIKES / PLANNED DISRUPTIONS
+ * Returned by /Line/Mode/{modes}/Disruption
+ * Each object represents a current or planned disruption
+ * which may include industrial action / strikes.
+ * ======================================== */
+
+export interface TfLDisruption {
+  /** Category of disruption: "RealTime", "PlannedWork", "Information", "Event" etc. */
+  category: string;
+  /** Human-readable category description */
+  categoryDescription: string;
+  /** Full description of the disruption */
+  description: string;
+  /** When the disruption was created */
+  created: string;
+  /** When the disruption was last updated */
+  lastUpdate: string;
+  /** Lines affected by this disruption */
+  affectedRoutes: {
+    id: string;
+    name: string;
+  }[];
+  /** Closure text (if applicable) */
+  closureText?: string;
+}
+
+/** Processed strike info ready for display */
+export interface StrikeInfo {
+  /** Unique key for React rendering */
+  id: string;
+  /** Description of the strike action */
+  description: string;
+  /** Lines affected */
+  affectedLines: string[];
+  /** When the disruption data was last updated */
+  lastUpdated: string;
+  /** Category from TfL (e.g. "PlannedWork", "RealTime") */
+  category: string;
+}
+
 export interface JourneyLeg {
   /** Human-readable instruction */
   instruction: {

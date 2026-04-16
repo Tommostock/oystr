@@ -21,6 +21,7 @@ import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
 import LoadingBoard from "@/components/shared/LoadingBoard";
 import LineStatusCard from "@/components/line-status/LineStatusCard";
+import StrikesPanel from "@/components/status/StrikesPanel";
 
 /**
  * Sort lines by severity, then alphabetically within each group.
@@ -188,6 +189,9 @@ export default function StatusPage() {
           </div>
         </div>
       </BoardPanel>
+
+      {/* ---- Strikes / Industrial Action ---- */}
+      <StrikesPanel />
 
       {/* ---- Line Status Cards ---- */}
       <div className="space-y-2">
