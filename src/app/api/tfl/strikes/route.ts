@@ -22,7 +22,7 @@
  *   and from/to dates.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { TFL_API_BASE } from "@/lib/constants";
 import type { StrikeInfo } from "@/lib/tfl-types";
 
@@ -146,8 +146,11 @@ function isWithinWindow(from: string, to: string, today: Date, windowEnd: Date):
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    /* Check for debug mode via query parameter */
+    const debugMode = request.nextUrl.searchParams.get("debug") === "true";
+
     const params = new URLSearchParams();
     if (process.env.TFL_APP_KEY) {
       params.set("app_key", process.env.TFL_APP_KEY);
@@ -161,34 +164,79 @@ export async function GET() {
     const fromDateStr = formatDate(today);
     const toDateStr = formatDate(sevenDaysOut);
 
+    /* Build URLs for logging */
+    const disruptionsUrl = `${TFL_API_BASE}/Line/Mode/${modes}/Disruption?${params}`;
+    const statusUrl = `${TFL_API_BASE}/Line/Mode/${modes}/Status?${params}`;
+    const futureStatusUrl = `${TFL_API_BASE}/Line/Mode/${modes}/Status/${fromDateStr}/to/${toDateStr}?detail=true&${params}`;
+
     /*
      * Fetch all three data sources in parallel.
      * The date-range endpoint with ?detail=true returns full
      * disruption objects and validity periods.
      */
     const [disruptionsRes, statusRes, futureStatusRes] = await Promise.all([
-      fetch(`${TFL_API_BASE}/Line/Mode/${modes}/Disruption?${params}`, {
-        next: { revalidate: 300 },
-      }),
-      fetch(`${TFL_API_BASE}/Line/Mode/${modes}/Status?${params}`, {
-        next: { revalidate: 60 },
-      }),
-      fetch(
-        `${TFL_API_BASE}/Line/Mode/${modes}/Status/${fromDateStr}/to/${toDateStr}?detail=true&${params}`,
-        { next: { revalidate: 300 } }
-      ),
+      fetch(disruptionsUrl, { next: { revalidate: 300 } }),
+      fetch(statusUrl, { next: { revalidate: 60 } }),
+      fetch(futureStatusUrl, { next: { revalidate: 300 } }),
     ]);
 
     const strikes: StrikeInfo[] = [];
     const seenDescriptions = new Set<string>();
 
+    /* Parse all raw responses (needed for both normal + debug mode) */
+    const rawDisruptions = disruptionsRes.ok ? await disruptionsRes.json() : null;
+    const rawStatus = statusRes.ok ? await statusRes.json() : null;
+    const rawFutureStatus = futureStatusRes.ok ? await futureStatusRes.json() : null;
+
+    /* ================================================================
+     * DEBUG MODE: Return raw TfL data so we can see what's there
+     * Visit /api/tfl/strikes?debug=true to use this.
+     * ================================================================ */
+    if (debugMode) {
+      /* Summarise future status: for each line, show all lineStatus entries
+         with their severity, description, reason, disruption, and validity */
+      const futureStatusSummary = Array.isArray(rawFutureStatus)
+        ? rawFutureStatus.map((line: any) => ({
+            id: line.id,
+            name: line.name,
+            modeName: line.modeName,
+            disruptionsCount: line.disruptions?.length || 0,
+            disruptions: line.disruptions || [],
+            lineStatuses: (line.lineStatuses || []).map((ls: any) => ({
+              severity: ls.statusSeverity,
+              description: ls.statusSeverityDescription,
+              reason: ls.reason || null,
+              disruption: ls.disruption || null,
+              validityPeriods: ls.validityPeriods || [],
+            })),
+          }))
+        : null;
+
+      return NextResponse.json({
+        _debug: true,
+        dateRange: { from: fromDateStr, to: toDateStr },
+        urls: {
+          disruptions: disruptionsUrl.replace(/app_key=[^&]+/, "app_key=REDACTED"),
+          status: statusUrl.replace(/app_key=[^&]+/, "app_key=REDACTED"),
+          futureStatus: futureStatusUrl.replace(/app_key=[^&]+/, "app_key=REDACTED"),
+        },
+        responses: {
+          disruptions: { ok: disruptionsRes.ok, status: disruptionsRes.status },
+          status: { ok: statusRes.ok, status: statusRes.status },
+          futureStatus: { ok: futureStatusRes.ok, status: futureStatusRes.status },
+        },
+        disruptionCount: Array.isArray(rawDisruptions) ? rawDisruptions.length : 0,
+        rawDisruptions: rawDisruptions,
+        futureStatusLineCount: futureStatusSummary?.length || 0,
+        futureStatusSummary: futureStatusSummary,
+      });
+    }
+
     /* ================================================================
      * STRATEGY 1: Keyword matching on /Disruption endpoint
      * ================================================================ */
-    if (disruptionsRes.ok) {
-      const disruptions = await disruptionsRes.json();
-
-      for (const disruption of disruptions) {
+    if (Array.isArray(rawDisruptions)) {
+      for (const disruption of rawDisruptions) {
         const description = disruption.description || "";
         const closureText = disruption.closureText || "";
         const additionalInfo = disruption.additionalInfo || "";
@@ -223,21 +271,17 @@ export async function GET() {
      * STRATEGY 2: Keyword matching on current /Status endpoint
      * Check reason text and nested disruption objects.
      * ================================================================ */
-    if (statusRes.ok) {
-      const lines = await statusRes.json();
-      scanLinesForKeywords(lines, strikes, seenDescriptions, today, sevenDaysOut);
+    if (Array.isArray(rawStatus)) {
+      scanLinesForKeywords(rawStatus, strikes, seenDescriptions, today, sevenDaysOut);
     }
 
     /* ================================================================
      * STRATEGY 3: Keyword matching on future /Status endpoint
      * Same check but on the 7-day date-range response.
      * ================================================================ */
-    let futureLines: any[] = [];
-    if (futureStatusRes.ok) {
-      futureLines = await futureStatusRes.json();
-      if (Array.isArray(futureLines)) {
-        scanLinesForKeywords(futureLines, strikes, seenDescriptions, today, sevenDaysOut);
-      }
+    const futureLines: any[] = Array.isArray(rawFutureStatus) ? rawFutureStatus : [];
+    if (futureLines.length > 0) {
+      scanLinesForKeywords(futureLines, strikes, seenDescriptions, today, sevenDaysOut);
     }
 
     /* ================================================================
@@ -249,7 +293,7 @@ export async function GET() {
      * by date. When 3+ lines are closed on the same date, that's
      * almost certainly a strike or major industrial action.
      * ================================================================ */
-    if (Array.isArray(futureLines) && futureLines.length > 0) {
+    if (futureLines.length > 0) {
       detectMassClosures(futureLines, strikes, seenDescriptions, today, sevenDaysOut);
     }
 
