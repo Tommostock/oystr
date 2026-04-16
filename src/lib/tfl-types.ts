@@ -120,6 +120,11 @@ export interface TfLDisruption {
   }[];
   /** Closure text (if applicable) */
   closureText?: string;
+  /** Validity periods — when the disruption is active */
+  validity?: {
+    fromDate: string;
+    toDate: string;
+  }[];
 }
 
 /** Processed strike info ready for display */
@@ -134,6 +139,10 @@ export interface StrikeInfo {
   lastUpdated: string;
   /** Category from TfL (e.g. "PlannedWork", "RealTime") */
   category: string;
+  /** Start date of the strike (ISO string) */
+  fromDate: string;
+  /** End date of the strike (ISO string) */
+  toDate: string;
 }
 
 export interface JourneyLeg {
