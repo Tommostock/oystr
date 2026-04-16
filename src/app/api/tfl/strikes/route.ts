@@ -166,33 +166,83 @@ export async function GET(request: NextRequest) {
 
     /*
      * The date-range status endpoint uses LINE IDS, not modes.
-     * /Line/Mode/{modes}/Status works for current status,
-     * but /Line/{ids}/Status/{from}/to/{to} is needed for future dates.
+     * /Line/{ids}/Status/{startDate}/to/{endDate}
+     * Use just the core tube lines to avoid 404 from unknown IDs.
      */
-    const allLineIds = [
-      "bakerloo", "central", "circle", "district", "hammersmith-city",
-      "jubilee", "metropolitan", "northern", "piccadilly", "victoria",
-      "waterloo-city", "elizabeth", "dlr",
-      "london-overground", "liberty", "lioness", "mildmay",
-      "suffragette", "weaver", "windrush",
-      "tram",
-    ].join(",");
+    const tubeLineIds = "bakerloo,central,circle,district,hammersmith-city,jubilee,metropolitan,northern,piccadilly,victoria,waterloo-city";
 
     /* Build URLs for logging */
     const disruptionsUrl = `${TFL_API_BASE}/Line/Mode/${modes}/Disruption?${params}`;
     const statusUrl = `${TFL_API_BASE}/Line/Mode/${modes}/Status?${params}`;
-    const futureStatusUrl = `${TFL_API_BASE}/Line/${allLineIds}/Status/${fromDateStr}/to/${toDateStr}?detail=true&${params}`;
+    const futureStatusUrl = `${TFL_API_BASE}/Line/${tubeLineIds}/Status/${fromDateStr}/to/${toDateStr}?${params}`;
 
     /*
      * Fetch all three data sources in parallel.
-     * The date-range endpoint with ?detail=true returns full
-     * disruption objects and validity periods.
      */
     const [disruptionsRes, statusRes, futureStatusRes] = await Promise.all([
       fetch(disruptionsUrl, { next: { revalidate: 300 } }),
       fetch(statusUrl, { next: { revalidate: 60 } }),
       fetch(futureStatusUrl, { next: { revalidate: 300 } }),
     ]);
+
+    /*
+     * In debug mode, also try several URL variants to find what works.
+     * This helps diagnose 404s from the TfL API.
+     */
+    let debugVariants: Record<string, any> | undefined;
+    if (debugMode) {
+      const variants: Record<string, string> = {
+        "tube_only_no_detail": `${TFL_API_BASE}/Line/${tubeLineIds}/Status/${fromDateStr}/to/${toDateStr}?${params}`,
+        "single_line_central": `${TFL_API_BASE}/Line/central/Status/${fromDateStr}/to/${toDateStr}?${params}`,
+        "single_line_with_detail": `${TFL_API_BASE}/Line/central/Status/${fromDateStr}/to/${toDateStr}?detail=true&${params}`,
+        "mode_based": `${TFL_API_BASE}/Line/Mode/tube/Status/${fromDateStr}/to/${toDateStr}?${params}`,
+        "disruption_mode_tube": `${TFL_API_BASE}/Line/Mode/tube/Disruption?${params}`,
+      };
+
+      debugVariants = {};
+      const variantEntries = Object.entries(variants);
+      const variantResults = await Promise.all(
+        variantEntries.map(([, url]) =>
+          fetch(url, { cache: "no-store" }).then(
+            (r) => ({ ok: r.ok, status: r.status, url }),
+            (err) => ({ ok: false, status: 0, error: String(err), url })
+          )
+        )
+      );
+
+      /* Also fetch body for any that succeed, to see the data shape */
+      for (let i = 0; i < variantEntries.length; i++) {
+        const [name] = variantEntries[i];
+        const result = variantResults[i];
+        if (result.ok) {
+          /* Re-fetch to get body (the first fetch was consumed) */
+          const bodyRes = await fetch(variants[name], { cache: "no-store" });
+          const body = await bodyRes.json();
+          const lineCount = Array.isArray(body) ? body.length : 0;
+          /* Summarise: just show first line's statuses as a sample */
+          let sample = null;
+          if (Array.isArray(body) && body.length > 0) {
+            const first = body[0];
+            sample = {
+              id: first.id,
+              name: first.name,
+              lineStatusCount: first.lineStatuses?.length || 0,
+              lineStatuses: (first.lineStatuses || []).map((ls: any) => ({
+                severity: ls.statusSeverity,
+                description: ls.statusSeverityDescription,
+                reason: ls.reason || null,
+                hasDisruption: !!ls.disruption,
+                validityPeriodCount: ls.validityPeriods?.length || 0,
+                validityPeriods: ls.validityPeriods || [],
+              })),
+            };
+          }
+          debugVariants[name] = { ...result, lineCount, sample };
+        } else {
+          debugVariants[name] = result;
+        }
+      }
+    }
 
     const strikes: StrikeInfo[] = [];
     const seenDescriptions = new Set<string>();
@@ -243,6 +293,7 @@ export async function GET(request: NextRequest) {
         rawDisruptions: rawDisruptions,
         futureStatusLineCount: futureStatusSummary?.length || 0,
         futureStatusSummary: futureStatusSummary,
+        urlVariants: debugVariants,
       });
     }
 
