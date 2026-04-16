@@ -164,10 +164,24 @@ export async function GET(request: NextRequest) {
     const fromDateStr = formatDate(today);
     const toDateStr = formatDate(sevenDaysOut);
 
+    /*
+     * The date-range status endpoint uses LINE IDS, not modes.
+     * /Line/Mode/{modes}/Status works for current status,
+     * but /Line/{ids}/Status/{from}/to/{to} is needed for future dates.
+     */
+    const allLineIds = [
+      "bakerloo", "central", "circle", "district", "hammersmith-city",
+      "jubilee", "metropolitan", "northern", "piccadilly", "victoria",
+      "waterloo-city", "elizabeth", "dlr",
+      "london-overground", "liberty", "lioness", "mildmay",
+      "suffragette", "weaver", "windrush",
+      "tram",
+    ].join(",");
+
     /* Build URLs for logging */
     const disruptionsUrl = `${TFL_API_BASE}/Line/Mode/${modes}/Disruption?${params}`;
     const statusUrl = `${TFL_API_BASE}/Line/Mode/${modes}/Status?${params}`;
-    const futureStatusUrl = `${TFL_API_BASE}/Line/Mode/${modes}/Status/${fromDateStr}/to/${toDateStr}?detail=true&${params}`;
+    const futureStatusUrl = `${TFL_API_BASE}/Line/${allLineIds}/Status/${fromDateStr}/to/${toDateStr}?detail=true&${params}`;
 
     /*
      * Fetch all three data sources in parallel.
