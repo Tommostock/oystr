@@ -45,12 +45,29 @@ export interface CachedTimetable {
   cachedAt: number;
 }
 
+/** A saved National Rail journey (long-distance intercity route) */
+export interface SavedRailJourney {
+  /** Unique key — always "${fromCrs}-${toCrs}" so saving twice is idempotent */
+  id: string;
+  /** Origin station CRS code (e.g. "KGX") */
+  fromCrs: string;
+  /** Origin station display name (e.g. "London Kings Cross") */
+  fromName: string;
+  /** Destination station CRS code (e.g. "LDS") */
+  toCrs: string;
+  /** Destination station display name (e.g. "Leeds") */
+  toName: string;
+  /** Unix timestamp when the user saved this route */
+  addedAt: number;
+}
+
 /* ========================================
  * DATABASE CLASS
  * ======================================== */
 class OystrDatabase extends Dexie {
   favourites!: Table<FavouriteStation>;
   timetables!: Table<CachedTimetable>;
+  savedRailJourneys!: Table<SavedRailJourney>;
 
   constructor() {
     super("oystr");
@@ -58,7 +75,7 @@ class OystrDatabase extends Dexie {
     /*
      * Schema version 1 (original).
      * Kept for Dexie upgrade path — users with v1 DBs
-     * will automatically migrate to v2.
+     * will automatically migrate to v2/v3.
      */
     this.version(1).stores({
       favourites: "naptanId, name, addedAt",
@@ -80,6 +97,21 @@ class OystrDatabase extends Dexie {
       lineStatuses: "lineId, cachedAt",
       savedJourneys: "id, savedAt",
       stations: "naptanId, name, *lines",
+    });
+
+    /*
+     * Schema version 3: adds National Rail support.
+     * New `savedRailJourneys` table stores long-distance routes
+     * (e.g. London Kings Cross -> Leeds). Keyed by "${fromCrs}-${toCrs}"
+     * so saving the same route twice is a no-op.
+     */
+    this.version(3).stores({
+      favourites: "naptanId, name, addedAt",
+      timetables: "id, lineId, stationId, cachedAt",
+      lineStatuses: "lineId, cachedAt",
+      savedJourneys: "id, savedAt",
+      stations: "naptanId, name, *lines",
+      savedRailJourneys: "id, fromCrs, toCrs, addedAt",
     });
   }
 }

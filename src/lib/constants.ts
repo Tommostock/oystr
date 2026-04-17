@@ -77,20 +77,36 @@ export const LINE_NAMES: Record<string, string> = {
 export const TFL_API_BASE = "https://api.tfl.gov.uk";
 
 /* ========================================
+ * NATIONAL RAIL (RDM) API CONFIGURATION
+ * Base URL for the Rail Data Marketplace LDBWS REST API.
+ * Used by /api/rail/* routes for live National Rail departures.
+ *
+ * Requires a free API key from https://raildata.org.uk
+ * (subscribe to "Live Departure Board Service - Public").
+ * Set the key as RDM_API_KEY in .env.local.
+ * ======================================== */
+export const RDM_API_BASE =
+  "https://api1.raildata.org.uk/1010-live-departure-board-dep1_2/LDBWS/api/20220120";
+
+/* ========================================
  * POLLING INTERVALS (in milliseconds)
- * How often we refresh live data from TfL.
+ * How often we refresh live data from TfL / National Rail.
  * ======================================== */
 export const ARRIVALS_POLL_INTERVAL = 30_000; // 30 seconds
 export const LINE_STATUS_POLL_INTERVAL = 60_000; // 60 seconds
+export const RAIL_DEPARTURES_POLL_INTERVAL = 30_000; // 30 seconds
 
 /* ========================================
  * NAVIGATION TABS
  * Used by the BottomNav component.
+ * RAIL sits between JOURNEY and STATUS — long-distance is conceptually
+ * closer to journey planning than to live London status.
  * ======================================== */
 export const NAV_TABS = [
-  { href: "/", label: "Departures", icon: "train" },
+  { href: "/", label: "Depart", icon: "train" },
   { href: "/nearby", label: "Nearby", icon: "map-pin" },
-  { href: "/journey", label: "Journey", icon: "route" },
+  { href: "/journey", label: "Plan", icon: "route" },
+  { href: "/rail", label: "Rail", icon: "train-front" },
   { href: "/status", label: "Status", icon: "activity" },
   { href: "/saved", label: "Saved", icon: "star" },
 ] as const;

@@ -16,6 +16,11 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://oystr.vercel.app/rail</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://oystr.vercel.app/status</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>

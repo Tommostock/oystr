@@ -2,7 +2,7 @@
  * BottomNav.tsx — Bottom tab navigation bar
  *
  * The main navigation for the app. Fixed to the bottom of the screen.
- * 5 tabs: Departures, Stations, Journey, Status, Saved.
+ * 6 tabs: Depart, Nearby, Plan, Rail, Status, Saved.
  *
  * Active tab shows in bright amber with glow.
  * Inactive tabs are dim amber.
@@ -13,7 +13,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Train, List, MapPin, Route, Activity, Star } from "lucide-react";
+import {
+  Train,
+  TrainFront,
+  List,
+  MapPin,
+  Route,
+  Activity,
+  Star,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_TABS } from "@/lib/constants";
 
@@ -24,6 +32,7 @@ import { NAV_TABS } from "@/lib/constants";
  * ======================================== */
 const iconMap = {
   train: Train,
+  "train-front": TrainFront,
   list: List,
   "map-pin": MapPin,
   route: Route,
@@ -91,10 +100,10 @@ export default function BottomNav() {
                   }}
                 />
               )}
-              {/* Tab icon */}
-              <IconComponent size={20} strokeWidth={1.5} />
-              {/* Tab label */}
-              <span className="text-[10px] mt-1 tracking-wider uppercase font-mono">
+              {/* Tab icon — slightly smaller so 6 tabs fit on 390px iPhone */}
+              <IconComponent size={18} strokeWidth={1.5} />
+              {/* Tab label — tight letter-spacing for 6-tab layout */}
+              <span className="text-[9px] mt-1 tracking-wide uppercase font-mono">
                 {tab.label}
               </span>
             </Link>
