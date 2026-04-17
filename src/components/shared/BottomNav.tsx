@@ -102,8 +102,15 @@ export default function BottomNav() {
               )}
               {/* Tab icon — slightly smaller so 6 tabs fit on 390px iPhone */}
               <IconComponent size={18} strokeWidth={1.5} />
-              {/* Tab label — tight letter-spacing for 6-tab layout */}
-              <span className="text-[9px] mt-1 tracking-wide uppercase font-mono">
+              {/*
+               * Tab label — the pl-[0.025em] compensates for the trailing
+               * letter-spacing from tracking-wide (0.025em). Without it,
+               * labels like "RAIL" and "PLAN" look slightly off-centre vs
+               * the icon above, because letter-spacing adds a gap after
+               * every character including the last one, shifting the
+               * visual centre of the ink leftward within its container.
+               */}
+              <span className="text-[9px] mt-1 tracking-wide uppercase font-mono pl-[0.025em]">
                 {tab.label}
               </span>
             </Link>
