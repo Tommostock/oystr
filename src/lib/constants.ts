@@ -77,6 +77,45 @@ export const LINE_NAMES: Record<string, string> = {
 export const TFL_API_BASE = "https://api.tfl.gov.uk";
 
 /* ========================================
+ * NIGHT TUBE
+ *
+ * Five Tube lines plus part of the Overground run a full 24h service
+ * on Friday and Saturday nights. The eligible lines are set by TfL
+ * and change rarely — keeping them in a constant means the UI can
+ * cheaply flag a line as "NIGHT TUBE" during the active window.
+ *
+ * Night Tube runs roughly 00:30 Sat → 05:30 Sat, and 00:30 Sun → 05:30 Sun
+ * (i.e. Fri and Sat nights in everyday speech).
+ * ======================================== */
+export const NIGHT_TUBE_LINES: string[] = [
+  "central",
+  "jubilee",
+  "northern",
+  "piccadilly",
+  "victoria",
+];
+
+/**
+ * Is Night Tube currently active?
+ *
+ * Active window covers both the "late Friday into Saturday" and
+ * "late Saturday into Sunday" periods. Defined loosely as:
+ *   - After 23:00 on Fri / Sat, OR
+ *   - Before 06:00 on Sat / Sun.
+ *
+ * Accepts an optional Date for testability; defaults to now.
+ */
+export function isNightTubeActive(date: Date = new Date()): boolean {
+  const day = date.getDay(); /* 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat */
+  const hour = date.getHours();
+  /* Late Fri or late Sat: after 23:00 */
+  if ((day === 5 || day === 6) && hour >= 23) return true;
+  /* Early Sat or early Sun: before 06:00 */
+  if ((day === 6 || day === 0) && hour < 6) return true;
+  return false;
+}
+
+/* ========================================
  * NATIONAL RAIL (RDM) API CONFIGURATION
  * Base URL for the Rail Data Marketplace LDBWS REST API.
  * Used by /api/rail/* routes for live National Rail departures.

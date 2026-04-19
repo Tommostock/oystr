@@ -17,10 +17,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { Moon, RefreshCw } from "lucide-react";
 import { useLineStatus } from "@/hooks/useLineStatus";
 import { usePinnedLines } from "@/hooks/usePinnedLines";
-import { LINE_COLOURS, LINE_NAMES } from "@/lib/constants";
+import {
+  LINE_COLOURS,
+  LINE_NAMES,
+  NIGHT_TUBE_LINES,
+  isNightTubeActive,
+} from "@/lib/constants";
 import type { LineStatus } from "@/lib/tfl-types";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
@@ -114,6 +119,14 @@ export default function StatusPage() {
     if (lines.length > 0) setLastUpdated(new Date());
   }, [lines]);
 
+  /*
+   * Night Tube window check. Re-evaluated on mount — the window is
+   * wide enough (6+ hours) that users don't typically keep the page
+   * open across the boundary. A re-check per render is plenty.
+   */
+  const nightTubeActive = isNightTubeActive();
+  const nightTubeSet = new Set(NIGHT_TUBE_LINES);
+
   /* ---- Loading state ---- */
   if (isLoading && lines.length === 0) {
     return (
@@ -202,6 +215,21 @@ export default function StatusPage() {
           )}
         </BoardPanel>
 
+        {/* ---- Night Tube banner (only during Fri/Sat night window) ---- */}
+        {nightTubeActive && (
+          <div className="flex items-center gap-2 p-3 border border-amber/40 bg-amber/10">
+            <Moon size={14} strokeWidth={1.5} className="text-amber shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="font-mono text-xs tracking-wider text-amber amber-glow uppercase">
+                NIGHT TUBE ACTIVE
+              </span>
+              <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-0.5">
+                CENTRAL, JUBILEE, NORTHERN, PICCADILLY, VICTORIA
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ---- Strikes / Industrial Action ---- */}
         <StrikesPanel />
 
@@ -224,6 +252,7 @@ export default function StatusPage() {
                 reason={reason}
                 isPinned={isPinned(line.id)}
                 onTogglePin={togglePin}
+                isNightTube={nightTubeActive && nightTubeSet.has(line.id)}
               />
             );
           })}

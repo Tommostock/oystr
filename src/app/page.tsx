@@ -25,6 +25,7 @@ import { RotateCcw, List, HelpCircle } from "lucide-react";
 import StationSearch from "@/components/shared/StationSearch";
 import NearMeButton from "@/components/shared/NearMeButton";
 import DepartureBoard from "@/components/departure-board/DepartureBoard";
+import LastTrainBanner from "@/components/departure-board/LastTrainBanner";
 import QuickViewWidget from "@/components/departure-board/QuickViewWidget";
 import SaveStationButton from "@/components/departure-board/SaveStationButton";
 import StationAlerts from "@/components/departure-board/StationAlerts";
@@ -479,6 +480,13 @@ function HomeContent() {
 
           {/* Accessibility and disruption alerts */}
           <StationAlerts stopId={selectedStation.naptanId} />
+
+          {/*
+           * Last-train banner — only renders during late-evening hours
+           * and once timetable data has loaded. Cheaply short-circuits
+           * the rest of the day so mounting it here is free.
+           */}
+          <LastTrainBanner stopId={selectedStation.naptanId} />
 
           {/* Live departure board for the selected station */}
           <DepartureBoard

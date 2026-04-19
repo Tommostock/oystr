@@ -14,9 +14,53 @@
 
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, ChevronUp, Star } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ChevronDown, ChevronUp, Star, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+/**
+ * Try to extract an "expected to clear / resume / return" time from a
+ * disruption reason string. TfL often writes things like:
+ *   "Severe delays. Expected to clear by 14:30."
+ *   "Service resumes at around 09:00."
+ *
+ * Returns a Date for today at that time, or null if no time could be
+ * parsed. If the parsed time is earlier than 'now' we bump to tomorrow
+ * (covers late-night parses rolling over midnight).
+ */
+function parseExpectedClear(reason: string): Date | null {
+  if (!reason) return null;
+  /*
+   * Match 3-4 digit 24h time (e.g. 14:30 or 0930) near any of the
+   * common "back"/"clear"/"resume" phrasings. Kept loose because TfL
+   * text varies — we just want something plausible.
+   */
+  const match = reason.match(
+    /(?:expected|back|clear|resume[ds]?|restored?|running|return)\s+(?:to\s+(?:be\s+)?(?:clear|resume|return|normal|running)\s+)?(?:by|at|around|approximately|approx\.?|from)?\s*(\d{1,2}):?(\d{2})/i
+  );
+  if (!match) return null;
+
+  const hh = parseInt(match[1], 10);
+  const mm = parseInt(match[2], 10);
+  if (isNaN(hh) || isNaN(mm) || hh > 23 || mm > 59) return null;
+
+  const d = new Date();
+  d.setHours(hh, mm, 0, 0);
+  /* If parsed time has already passed today, assume tomorrow */
+  if (d.getTime() < Date.now() - 5 * 60 * 1000) {
+    d.setDate(d.getDate() + 1);
+  }
+  return d;
+}
+
+/** Format a minutes-from-now count into "IN 12 MIN" or "IN 2H 15M". */
+function formatMinutesUntil(ms: number): string {
+  const mins = Math.max(0, Math.round(ms / 60_000));
+  if (mins < 60) return `IN ${mins} MIN`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `IN ${h}H` : `IN ${h}H ${m}M`;
+}
 
 interface LineStatusCardProps {
   /** TfL line ID */
@@ -35,6 +79,8 @@ interface LineStatusCardProps {
   isPinned?: boolean;
   /** Called when the user toggles the pin — swallows the row-tap event */
   onTogglePin?: (lineId: string) => void;
+  /** When true, render the small NIGHT TUBE badge next to the line name */
+  isNightTube?: boolean;
 }
 
 /**
@@ -55,6 +101,7 @@ export default function LineStatusCard({
   reason,
   isPinned = false,
   onTogglePin,
+  isNightTube = false,
 }: LineStatusCardProps) {
   /* Whether the disruption detail is expanded */
   const [isExpanded, setIsExpanded] = useState(false);
@@ -111,9 +158,16 @@ export default function LineStatusCard({
           aria-hidden="true"
         />
 
-        {/* Line name */}
-        <span className="flex-1 font-mono text-sm tracking-wider text-amber uppercase">
-          {lineName}
+        {/* Line name + optional Night Tube badge */}
+        <span className="flex-1 font-mono text-sm tracking-wider text-amber uppercase flex items-center gap-2 min-w-0">
+          <span className="truncate">{lineName}</span>
+          {isNightTube && (
+            /* Small pill only shown when the Night Tube window is
+               currently active AND this line runs during that window. */
+            <span className="shrink-0 font-mono text-[9px] tracking-wider uppercase px-1.5 py-0.5 border border-amber/40 text-amber bg-amber/10">
+              NIGHT
+            </span>
+          )}
         </span>
 
         {/* Status text */}
@@ -138,14 +192,58 @@ export default function LineStatusCard({
         )}
       </div>
 
-      {/* ---- Expanded Detail: disruption reason ---- */}
+      {/* ---- Expanded Detail: disruption reason + expected-clear countdown ---- */}
       {isExpanded && hasDetail && (
-        <div className="px-3 pb-3 pt-0 border-t border-board-border">
-          <p className="font-mono text-sm tracking-wider text-amber amber-glow leading-relaxed mt-2">
-            {reason}
-          </p>
+        <ExpandedDetail reason={reason} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * ExpandedDetail — renders a disruption reason with an optional
+ * live-updating "expected back by HH:MM (IN X MIN)" pill when the
+ * reason text mentions a clear/resume time.
+ */
+function ExpandedDetail({ reason }: { reason: string }) {
+  const [now, setNow] = useState<number>(() => Date.now());
+
+  const expectedClear = parseExpectedClear(reason);
+
+  /* Tick every 30s so the countdown stays fresh. Only runs while
+     expected-clear has been parsed — no work otherwise. */
+  useEffect(() => {
+    if (!expectedClear) return;
+    const id = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, [expectedClear]);
+
+  const msUntil = expectedClear ? expectedClear.getTime() - now : 0;
+  const showCountdown = expectedClear && msUntil > 0 && msUntil < 6 * 60 * 60 * 1000;
+
+  return (
+    <div className="px-3 pb-3 pt-0 border-t border-board-border">
+      {showCountdown && (
+        <div className="flex items-center gap-1.5 mt-2">
+          <Clock
+            size={12}
+            strokeWidth={1.5}
+            className="text-amber shrink-0"
+          />
+          <span className="font-mono text-[10px] tracking-wider text-amber amber-glow uppercase">
+            EXPECTED BACK BY{" "}
+            {expectedClear!.toLocaleTimeString("en-GB", {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            })}{" "}
+            -- {formatMinutesUntil(msUntil)}
+          </span>
         </div>
       )}
+      <p className="font-mono text-sm tracking-wider text-amber amber-glow leading-relaxed mt-2">
+        {reason}
+      </p>
     </div>
   );
 }

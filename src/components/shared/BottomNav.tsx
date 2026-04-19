@@ -47,6 +47,15 @@ export default function BottomNav() {
   /* usePathname gives us the current URL path (e.g. "/" or "/journey") */
   const pathname = usePathname();
 
+  /*
+   * Hide the bottom nav on /widget routes. Those routes are designed
+   * for embedding in iOS widgets / home-screen bookmarks where the
+   * viewport is tiny and any navigation chrome would dominate. The
+   * root layout is always applied in Next.js App Router so this is
+   * the cleanest way to opt a route out of app shell UI.
+   */
+  if (pathname.startsWith("/widget")) return null;
+
   return (
     <nav
       className={cn(

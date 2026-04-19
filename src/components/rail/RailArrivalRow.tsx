@@ -70,21 +70,34 @@ export default function RailArrivalRow({
   const platformIsKnown = !!departure.platform?.trim();
   const clickable = !!onClick && !!departure.serviceId;
 
+  /*
+   * Delay / cancellation reason for display. RDM provides human-readable
+   * text like "a fault with the train" or "train crew being delayed".
+   * We prefer cancelReason when cancelled, delayReason when delayed,
+   * and fall back to nothing.
+   */
+  const reason = departure.cancelled
+    ? departure.cancelReason
+    : departure.delayed
+      ? departure.delayReason
+      : undefined;
+  const hasReason = !!reason && reason.trim().length > 0;
+
   const content = (
     <div
       className={cn(
         /* Horizontal layout: platform | dest/operator stack | time/status stack */
-        "flex items-center gap-3 py-2.5",
+        "flex items-start gap-3 py-2.5",
         "border-b border-board-border/50 last:border-b-0",
         clickable && "cursor-pointer hover:bg-board-border/30 transition-colors",
         className
       )}
       role="row"
-      aria-label={`${departure.destination} at ${departure.scheduledDeparture}, ${status.text.toLowerCase()}`}
+      aria-label={`${departure.destination} at ${departure.scheduledDeparture}, ${status.text.toLowerCase()}${hasReason ? ` — ${reason}` : ""}`}
     >
       {/* ---- Platform. "TBA" gets smaller, dimmer type so it reads as
            metadata rather than looking like a wrong/broken value. ---- */}
-      <div className="shrink-0 w-12 text-center">
+      <div className="shrink-0 w-12 text-center pt-0.5">
         {platformIsKnown ? (
           <span className="font-board text-xl text-amber amber-glow tracking-wider">
             {platform}
@@ -96,7 +109,7 @@ export default function RailArrivalRow({
         )}
       </div>
 
-      {/* ---- Destination + operator (shortened for mobile). ---- */}
+      {/* ---- Destination + operator + optional delay reason. ---- */}
       <div className="flex-1 min-w-0">
         <div className="font-board text-xl text-amber amber-glow tracking-wider uppercase truncate">
           {departure.destination || "UNKNOWN"}
@@ -106,10 +119,24 @@ export default function RailArrivalRow({
             {shortOperatorName(departure.operator)}
           </div>
         )}
+        {hasReason && (
+          /*
+           * Reason line appears only when the train is delayed or
+           * cancelled — sentence case (not uppercase) to read as prose
+           * next to the uppercase metadata above. Colour matches the
+           * status colour so the reason visually belongs to the status.
+           */
+          <div
+            className="font-mono text-[11px] tracking-wide leading-snug mt-1 first-letter:uppercase"
+            style={{ color: status.colour, opacity: 0.9 }}
+          >
+            {reason}
+          </div>
+        )}
       </div>
 
       {/* ---- Scheduled time + status ---- */}
-      <div className="shrink-0 text-right min-w-[5rem]">
+      <div className="shrink-0 text-right min-w-[5rem] pt-0.5">
         <div className="font-board text-xl text-amber amber-glow tracking-wider">
           {departure.scheduledDeparture || "--:--"}
         </div>

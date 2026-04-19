@@ -11,12 +11,26 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 export default function SplashScreen() {
   const [visible, setVisible] = useState(true);
   const [fadeOut, setFadeOut] = useState(false);
+  const pathname = usePathname();
+
+  /*
+   * Widget embeds should skip the splash — they live inside an iOS
+   * home-screen widget / bookmark and the blinking "OYSTR" logo
+   * would be confusing in that tiny context. Bailing here means the
+   * splash never mounts state/timers on widget routes.
+   */
+  const isWidget = pathname?.startsWith("/widget") ?? false;
 
   useEffect(() => {
+    if (isWidget) {
+      setVisible(false);
+      return;
+    }
     /* Don't show splash if user has already seen it this session */
     if (sessionStorage.getItem("oystr-splash-seen")) {
       setVisible(false);
@@ -36,7 +50,7 @@ export default function SplashScreen() {
       clearTimeout(fadeTimer);
       clearTimeout(removeTimer);
     };
-  }, []);
+  }, [isWidget]);
 
   if (!visible) return null;
 

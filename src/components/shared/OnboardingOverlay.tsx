@@ -52,6 +52,16 @@ export default function OnboardingOverlay() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    /*
+     * Widget routes never show onboarding — the widget view is for
+     * users who already know the app; showing a multi-step overlay
+     * there would be hostile.
+     */
+    if (
+      typeof window !== "undefined" &&
+      window.location?.pathname?.startsWith("/widget")
+    )
+      return;
     /* Only show onboarding once — check localStorage */
     if (localStorage.getItem("oystr-onboarding-done")) return;
 
