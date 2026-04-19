@@ -20,7 +20,7 @@
 
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useId } from "react";
 import { Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { searchStations } from "@/lib/uk-rail-stations";
@@ -56,6 +56,13 @@ export default function RailStationSearch({
   const [results, setResults] = useState<UKRailStation[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
+  /*
+   * Unique listbox id for this component instance, so that when the
+   * page renders multiple RailStationSearch instances (FROM and TO)
+   * each input's aria-controls points at its own dropdown. React's
+   * useId guarantees HTML-id uniqueness even under SSR.
+   */
+  const listboxId = useId();
 
   /* Sync when parent changes the value prop (e.g. on route swap) */
   useEffect(() => {
@@ -169,6 +176,7 @@ export default function RailStationSearch({
           )}
           aria-label={label ? `${label} rail station` : "Search rail station"}
           aria-expanded={isOpen}
+          aria-controls={listboxId}
           aria-autocomplete="list"
           role="combobox"
         />
@@ -187,6 +195,7 @@ export default function RailStationSearch({
       {/* ---- Autocomplete Dropdown ---- */}
       {isOpen && results.length > 0 && (
         <ul
+          id={listboxId}
           className={cn(
             "absolute z-50 w-full mt-1",
             "bg-surface border border-board-border",

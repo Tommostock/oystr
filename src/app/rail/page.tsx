@@ -34,7 +34,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Star, StarOff, ArrowLeftRight, TrainFront, Mail } from "lucide-react";
+import { Star, ArrowLeftRight, TrainFront, Mail } from "lucide-react";
 import AmberText from "@/components/shared/AmberText";
 import BoardPanel from "@/components/shared/BoardPanel";
 import RailStationSearch from "@/components/rail/RailStationSearch";
@@ -212,9 +212,15 @@ function RailPageFull() {
                 currentSaved ? "Route already saved" : "Save this route"
               }
             >
+              {/*
+               * Same Star icon in both states — filled when saved,
+               * outline when not. A crossed-out "StarOff" icon here
+               * would read as "this star is disabled", which is the
+               * wrong affordance for "already saved".
+               */}
               {currentSaved ? (
                 <>
-                  <StarOff size={14} strokeWidth={1.5} />
+                  <Star size={14} strokeWidth={1.5} fill="currentColor" />
                   <span className="font-mono text-[10px] tracking-wider uppercase">
                     SAVED
                   </span>
