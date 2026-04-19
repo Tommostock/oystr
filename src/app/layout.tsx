@@ -59,8 +59,14 @@ const vt323 = VT323({
  * Includes PWA-related tags for mobile install.
  * ======================================== */
 export const metadata: Metadata = {
-  /* Base URL for resolving OG images and other metadata URLs */
-  metadataBase: new URL("https://oystr.vercel.app"),
+  /*
+   * Base URL for resolving OG images and other metadata URLs.
+   * oystrapp.vercel.app is the actual production domain for this
+   * project on Vercel — oystr.vercel.app is owned by someone else
+   * entirely and happens to be squatted. Anything pointing at
+   * oystr.vercel.app would hit the wrong site.
+   */
+  metadataBase: new URL("https://oystrapp.vercel.app"),
   title: "Oystr - London Transport",
   description:
     "Live London transport departures, journey planning, and offline timetables",
@@ -81,7 +87,7 @@ export const metadata: Metadata = {
     title: "Oystr - London Transport",
     description: "Live departures and journey planning for London transport",
     type: "website",
-    url: "https://oystr.vercel.app",
+    url: "https://oystrapp.vercel.app",
     siteName: "Oystr",
   },
   /* Twitter/X card — shows a large image preview when shared */
