@@ -222,7 +222,7 @@ export default function SavedPage() {
       {/* ---- Page Header ---- */}
       <div className="text-center pt-4 pb-2">
         <AmberText as="h1" size="lg" uppercase className="dot-matrix">
-          Saved Stations
+          Saved
         </AmberText>
       </div>
 
