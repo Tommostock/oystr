@@ -46,23 +46,31 @@ function getSortPriority(severity: number): number {
 }
 
 function sortLines(lines: LineStatus[], pinnedIds: string[]): LineStatus[] {
+  const pinnedSet = new Set(pinnedIds);
   return [...lines].sort((a, b) => {
-    /* Pinned lines always win over unpinned — they float to the top
-       regardless of severity. Pin order is preserved (first-pinned first). */
-    const aPinned = pinnedIds.indexOf(a.id);
-    const bPinned = pinnedIds.indexOf(b.id);
-    if (aPinned !== -1 && bPinned === -1) return -1;
-    if (aPinned === -1 && bPinned !== -1) return 1;
-    if (aPinned !== -1 && bPinned !== -1) return aPinned - bPinned;
+    const aPinned = pinnedSet.has(a.id);
+    const bPinned = pinnedSet.has(b.id);
 
+    /* Pinned lines always win over unpinned — they float to the top
+       as a single alphabetical group. Pinned lines are sorted
+       alphabetically amongst themselves (easier to locate than by
+       pin-order). */
+    if (aPinned && !bPinned) return -1;
+    if (!aPinned && bPinned) return 1;
+
+    const aName = LINE_NAMES[a.id] || a.name;
+    const bName = LINE_NAMES[b.id] || b.name;
+    if (aPinned && bPinned) {
+      return aName.localeCompare(bName);
+    }
+
+    /* Both unpinned: severity group, then alphabetical within group */
     const aSeverity = a.lineStatuses?.[0]?.statusSeverity ?? 10;
     const bSeverity = b.lineStatuses?.[0]?.statusSeverity ?? 10;
     const aPriority = getSortPriority(aSeverity);
     const bPriority = getSortPriority(bSeverity);
     if (aPriority !== bPriority) return aPriority - bPriority;
 
-    const aName = LINE_NAMES[a.id] || a.name;
-    const bName = LINE_NAMES[b.id] || b.name;
     return aName.localeCompare(bName);
   });
 }

@@ -35,9 +35,22 @@ export function cleanStationName(name: string): string {
  * This is the canonical check for bus classification across the app.
  */
 export function isBusStop(naptanId: string, modes?: string[]): boolean {
+  if (!naptanId) return false;
   /* Pure bus stops in NaPTAN always start with "490" */
-  if (naptanId?.startsWith("490")) return true;
-  /* If mode info is available AND it's ONLY bus, treat as bus */
+  if (naptanId.startsWith("490")) return true;
+  /*
+   * Rail (including DLR and National Rail) NaPTAN codes always start
+   * with "910". Tube codes start with "940". If the naptanId says
+   * rail or tube, it is NOT a bus stop regardless of what the stored
+   * modes array says — the modes may be stale (e.g. a station saved
+   * before multi-modal enrichment landed, where TfL only returned
+   * "bus" amongst the modes). London City Airport DLR is the classic
+   * example — a 910-prefix DLR station that used to display with a
+   * bus icon on the saved page.
+   */
+  if (naptanId.startsWith("910")) return false;
+  if (naptanId.startsWith("940")) return false;
+  /* Fallback: if mode info is available AND it's ONLY bus, treat as bus */
   if (modes && modes.length > 0 && modes.every((m) => m === "bus")) return true;
   return false;
 }

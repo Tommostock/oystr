@@ -31,12 +31,11 @@ import AmberText from "@/components/shared/AmberText";
 import LoadingBoard from "@/components/shared/LoadingBoard";
 import JourneyCard from "@/components/journey/JourneyCard";
 import TimeSelector from "@/components/journey/TimeSelector";
-import AskOystr from "@/components/journey/AskOystr";
 import { useHomeStation } from "@/hooks/useHomeStation";
 import { useSavedJourneys } from "@/hooks/useSavedJourneys";
 import { useRecentJourneys } from "@/hooks/useRecentJourneys";
 import type { Journey } from "@/lib/tfl-types";
-import { cn } from "@/lib/utils";
+import { cn, cleanStationName } from "@/lib/utils";
 
 /* ========================================
  * TYPES
@@ -61,7 +60,6 @@ export default function JourneyPage() {
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
 
   /* Home station from localStorage */
   const { homeStation, setHomeStation, clearHomeStation } = useHomeStation();
@@ -375,70 +373,76 @@ export default function JourneyPage() {
         </AmberText>
       </div>
 
-      {/* ---- AI-Powered Natural Language Input ---- */}
-      <AskOystr
-        onJourneysReceived={(results) => {
-          setJourneys(results);
-          setHasSearched(true);
-          setError(null);
-        }}
-        onSummaryReceived={(summary) => setAiSummary(summary)}
-        onClear={() => {
-          setJourneys([]);
-          setAiSummary(null);
-          setHasSearched(false);
-          setError(null);
-        }}
-      />
-
-      {/* ---- Saved journeys (one-tap restore) ---- */}
+      {/*
+       * Saved journeys.
+       *
+       * Rendered as a horizontal scroll strip (not a stacked list) so
+       * up to 5 saved journeys are browsable in a single on-screen
+       * row without pushing the main search form off the page. Each
+       * chip uses cleanStationName() to strip "Underground Station"
+       * / "Rail Station" / "DLR Station" suffixes — otherwise long
+       * station pairs overflow horizontally even within a chip.
+       *
+       * Horizontal scroll uses snap-x for nicer touch UX.
+       */}
       {savedJourneys.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase px-1">
             SAVED JOURNEYS
           </div>
-          {savedJourneys.map((j) => (
-            <div
-              key={j.id}
-              onClick={() => openSavedPair(j)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  openSavedPair(j);
-                }
-              }}
-              tabIndex={0}
-              role="button"
-              aria-label={`Open ${j.fromName} to ${j.toName}`}
-              className="border border-board-border bg-surface p-3 cursor-pointer hover:border-amber-faint focus:border-amber-faint focus:outline-none transition-colors flex items-center gap-2"
-            >
-              <Star
-                size={12}
-                strokeWidth={1.5}
-                fill="currentColor"
-                className="text-amber shrink-0"
-              />
-              <span className="flex-1 min-w-0 font-mono text-xs tracking-wider text-amber uppercase truncate">
-                {j.fromName} -&gt; {j.toName}
-              </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeJourney(j.id);
+          <div
+            className="flex gap-2 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1"
+            style={{ scrollbarWidth: "none" }}
+          >
+            {savedJourneys.slice(0, 5).map((j) => (
+              <div
+                key={j.id}
+                onClick={() => openSavedPair(j)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    openSavedPair(j);
+                  }
                 }}
-                className="shrink-0 p-1.5 text-amber-faint hover:text-red-500 transition-colors"
-                aria-label={`Remove ${j.fromName} to ${j.toName}`}
+                tabIndex={0}
+                role="button"
+                aria-label={`Open ${j.fromName} to ${j.toName}`}
+                className="shrink-0 snap-start border border-board-border bg-surface p-2.5 cursor-pointer hover:border-amber-faint focus:border-amber-faint focus:outline-none transition-colors flex items-center gap-1.5 min-w-0"
               >
-                <Trash2 size={12} strokeWidth={1.5} />
-              </button>
-            </div>
-          ))}
+                <Star
+                  size={11}
+                  strokeWidth={1.5}
+                  fill="currentColor"
+                  className="text-amber shrink-0"
+                />
+                <span className="font-mono text-[11px] tracking-wider text-amber uppercase whitespace-nowrap">
+                  {cleanStationName(j.fromName)} -&gt; {cleanStationName(j.toName)}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeJourney(j.id);
+                  }}
+                  className="shrink-0 ml-1 p-1 text-amber-faint hover:text-red-500 transition-colors"
+                  aria-label={`Remove ${j.fromName} to ${j.toName}`}
+                >
+                  <Trash2 size={11} strokeWidth={1.5} />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* ---- Recent journeys (localStorage, capped at 3) ---- */}
+      {/*
+       * Recent journeys (localStorage, capped at 5).
+       *
+       * Same horizontal scroll pattern as saved journeys so the
+       * two lists read as parallel strips. Condensed names via
+       * cleanStationName() to keep chips compact.
+       */}
       {recents.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <div className="flex items-center gap-1.5 px-1">
             <Clock
               size={10}
@@ -449,16 +453,19 @@ export default function JourneyPage() {
               RECENT
             </span>
           </div>
-          <div className="flex flex-col gap-1.5">
-            {recents.map((r, i) => (
+          <div
+            className="flex gap-2 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1"
+            style={{ scrollbarWidth: "none" }}
+          >
+            {recents.slice(0, 5).map((r, i) => (
               <button
                 key={`${r.fromNaptanId}-${r.toNaptanId}-${i}`}
                 onClick={() => openSavedPair(r)}
-                className="border border-board-border bg-surface/60 px-3 py-2 text-left hover:border-amber-faint transition-colors"
+                className="shrink-0 snap-start border border-board-border bg-surface/60 px-2.5 py-1.5 text-left hover:border-amber-faint transition-colors"
                 aria-label={`Re-run ${r.fromName} to ${r.toName}`}
               >
-                <span className="font-mono text-xs tracking-wider text-amber-faint uppercase truncate block">
-                  {r.fromName} -&gt; {r.toName}
+                <span className="font-mono text-[11px] tracking-wider text-amber-faint uppercase whitespace-nowrap">
+                  {cleanStationName(r.fromName)} -&gt; {cleanStationName(r.toName)}
                 </span>
               </button>
             ))}
@@ -628,19 +635,6 @@ export default function JourneyPage() {
                 RETRY
               </span>
             </button>
-          </div>
-        </BoardPanel>
-      )}
-
-      {/* ---- AI Summary ---- */}
-      {aiSummary && !isLoading && (
-        <BoardPanel>
-          <div className="flex items-start gap-2">
-            <div className="flex-1">
-              <AmberText size="sm" className="leading-relaxed">
-                {aiSummary}
-              </AmberText>
-            </div>
           </div>
         </BoardPanel>
       )}

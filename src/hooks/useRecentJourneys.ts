@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 const STORAGE_KEY = "oystr-recent-journeys";
-const MAX_RECENTS = 3;
+const MAX_RECENTS = 5;
 
 export interface RecentJourney {
   fromNaptanId: string;

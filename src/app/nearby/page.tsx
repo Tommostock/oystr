@@ -175,13 +175,25 @@ export default function NearbyPage() {
     );
   }
 
-  /* ---- Ready state: full-bleed map (no header — map fills viewport) ---- */
+  /* ---- Ready state: compact title strip + map filling the remaining height ---- */
   return (
-    <div
-      className="bg-board-bg"
-      style={{ height: "calc(100dvh - 3.5rem - env(safe-area-inset-bottom, 0px) - 0.5rem)" }}
+    <div className="bg-board-bg flex flex-col"
+         style={{ height: "calc(100dvh - 3.5rem - env(safe-area-inset-bottom, 0px) - 0.5rem)" }}
     >
-      {position && <NearbyMap initialPosition={position} />}
+      {/* Title strip — matches the other tabs' header pattern but
+          kept compact so the map still gets the vast majority of
+          the viewport. */}
+      <div className="shrink-0 text-center py-2 border-b border-board-border">
+        <AmberText as="h1" size="base" uppercase className="dot-matrix">
+          Nearby
+        </AmberText>
+        <div className="font-mono text-[9px] tracking-wider text-amber-faint uppercase mt-0.5">
+          LIVE MAP OF STATIONS AROUND YOU
+        </div>
+      </div>
+      <div className="flex-1 relative">
+        {position && <NearbyMap initialPosition={position} />}
+      </div>
     </div>
   );
 }
