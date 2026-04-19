@@ -33,8 +33,8 @@
 
 "use client";
 
-import { useState, useRef } from "react";
-import { Star, ArrowLeftRight, TrainFront, Mail } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Star, ArrowLeftRight, TrainFront, Mail, Check } from "lucide-react";
 import AmberText from "@/components/shared/AmberText";
 import BoardPanel from "@/components/shared/BoardPanel";
 import RailStationSearch from "@/components/rail/RailStationSearch";
@@ -57,6 +57,20 @@ interface StationSelection {
   crs: string;
   name: string;
 }
+
+/*
+ * Quick-pick chips for London terminals. Tom travels from Kings Cross,
+ * Euston, and Paddington the most; St Pancras and Waterloo are the next
+ * most common. One tap populates the FROM input.
+ */
+const LONDON_TERMINAL_CHIPS: { crs: string; label: string; name: string }[] = [
+  { crs: "KGX", label: "KGX", name: "London Kings Cross" },
+  { crs: "EUS", label: "EUS", name: "London Euston" },
+  { crs: "PAD", label: "PAD", name: "London Paddington" },
+  { crs: "STP", label: "STP", name: "London St Pancras International" },
+  { crs: "WAT", label: "WAT", name: "London Waterloo" },
+  { crs: "LST", label: "LST", name: "London Liverpool Street" },
+];
 
 /* ========================================
  * TOP-LEVEL PAGE COMPONENT
@@ -91,6 +105,14 @@ function RailPageFull() {
   const [expandedDeparture, setExpandedDeparture] =
     useState<RailDeparture | null>(null);
 
+  /*
+   * Transient feedback after a save. Flipping this to true for ~1.5s
+   * after addJourney() completes gives the user clear visual
+   * confirmation that the save succeeded — without needing a full
+   * toast component.
+   */
+  const [justSaved, setJustSaved] = useState(false);
+
   /* Hook managing saved routes */
   const { journeys, addJourney, removeJourney } = useSavedRailJourneys();
 
@@ -105,6 +127,11 @@ function RailPageFull() {
 
   const handleToSelect = (station: UKRailStation) => {
     setToStation({ crs: station.crs, name: station.name });
+  };
+
+  /** One-tap pick a common London terminal as the FROM station. */
+  const handleTerminalChip = (terminal: { crs: string; name: string }) => {
+    setFromStation({ crs: terminal.crs, name: terminal.name });
   };
 
   /** Swap FROM and TO — handy for return journeys */
@@ -124,7 +151,7 @@ function RailPageFull() {
     }, 50);
   };
 
-  /** Save current FROM/TO pair to favourites */
+  /** Save current FROM/TO pair to favourites and flash the feedback state. */
   const handleSaveCurrentRoute = async () => {
     if (!fromStation || !toStation) return;
     await addJourney({
@@ -133,7 +160,19 @@ function RailPageFull() {
       toCrs: toStation.crs,
       toName: toStation.name,
     });
+    setJustSaved(true);
   };
+
+  /*
+   * Auto-clear the justSaved flash after 1.5s. Using an effect rather
+   * than inline setTimeout keeps the timeout tied to component
+   * lifecycle — if the user navigates away mid-flash, nothing leaks.
+   */
+  useEffect(() => {
+    if (!justSaved) return;
+    const t = setTimeout(() => setJustSaved(false), 1500);
+    return () => clearTimeout(t);
+  }, [justSaved]);
 
   /* Is the currently-selected route already saved? */
   const currentSaved =
@@ -174,20 +213,50 @@ function RailPageFull() {
         </div>
       )}
 
-      {/* ---- FROM / TO search ---- */}
-      <BoardPanel title="PLAN A JOURNEY">
+      {/* ---- FROM / TO search (renamed from "PLAN A JOURNEY" to avoid
+           collision with the separate PLAN nav tab for TfL journeys). */}
+      <BoardPanel title="NEW ROUTE">
         <div className="space-y-3">
+          {/* Quick chips for London terminals — one tap sets FROM. */}
+          <div>
+            <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mb-1.5">
+              QUICK FROM
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {LONDON_TERMINAL_CHIPS.map((t) => {
+                const isActive = fromStation?.crs === t.crs;
+                return (
+                  <button
+                    key={t.crs}
+                    onClick={() => handleTerminalChip(t)}
+                    aria-label={`Set from to ${t.name}`}
+                    title={t.name}
+                    className={`px-2.5 py-1 font-mono text-[10px] tracking-wider uppercase border transition-colors ${
+                      isActive
+                        ? "border-amber text-amber bg-amber/10"
+                        : "border-board-border text-amber-faint hover:border-amber-faint hover:text-amber"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <RailStationSearch
             label="FROM"
-            placeholder="London Kings Cross..."
+            placeholder="Or search any UK station..."
             value={fromStation?.name || ""}
             onSelect={handleFromSelect}
+            onClear={() => setFromStation(null)}
           />
           <RailStationSearch
             label="TO (OPTIONAL)"
-            placeholder="Leeds, Edinburgh..."
+            placeholder="Filter to destination..."
             value={toStation?.name || ""}
             onSelect={handleToSelect}
+            onClear={() => setToStation(null)}
           />
 
           {/* Action row: Swap + Save */}
@@ -207,18 +276,34 @@ function RailPageFull() {
             <button
               onClick={handleSaveCurrentRoute}
               disabled={!fromStation || !toStation || currentSaved}
-              className="flex-1 flex items-center justify-center gap-2 py-2 border border-amber text-amber hover:bg-amber hover:text-board-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className={`flex-1 flex items-center justify-center gap-2 py-2 border transition-all duration-200 disabled:cursor-not-allowed ${
+                justSaved
+                  ? "border-amber bg-amber text-board-bg amber-glow"
+                  : "border-amber text-amber hover:bg-amber hover:text-board-bg disabled:opacity-40"
+              }`}
               aria-label={
                 currentSaved ? "Route already saved" : "Save this route"
               }
             >
               {/*
-               * Same Star icon in both states — filled when saved,
-               * outline when not. A crossed-out "StarOff" icon here
-               * would read as "this star is disabled", which is the
-               * wrong affordance for "already saved".
+               * Three visual states on the save button:
+               *   1. justSaved (transient, ~1.5s): filled amber bg with a
+               *      check mark and "SAVED!" — confirms action succeeded.
+               *   2. currentSaved (persistent): filled Star + "SAVED".
+               *   3. default: outline Star + "SAVE ROUTE".
+               *
+               * Using StarOff for state 2 would read as "this star is
+               * disabled", which is the wrong affordance for "already
+               * saved"; so we use a filled Star instead.
                */}
-              {currentSaved ? (
+              {justSaved ? (
+                <>
+                  <Check size={14} strokeWidth={2} />
+                  <span className="font-mono text-[10px] tracking-wider uppercase">
+                    SAVED!
+                  </span>
+                </>
+              ) : currentSaved ? (
                 <>
                   <Star size={14} strokeWidth={1.5} fill="currentColor" />
                   <span className="font-mono text-[10px] tracking-wider uppercase">

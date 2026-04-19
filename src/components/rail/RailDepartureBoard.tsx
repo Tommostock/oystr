@@ -7,19 +7,23 @@
  * Tapping a row opens the ServiceDetailSheet (controlled by the parent
  * via onServiceTap).
  *
- * Renders one BoardPanel with up to `maxRows` rows. Shows friendly states for:
- *   - Loading (skeleton)
- *   - API key not configured (helpful message)
- *   - Error (fallback message, retry hint)
- *   - No departures (empty state)
+ * Renders one BoardPanel with up to `maxRows` rows, wrapped in a
+ * pull-to-refresh handler. Shows friendly states for:
+ *   - Loading (dot-matrix indicator)
+ *   - API key not configured (helpful setup message)
+ *   - Error (fallback message + retry button)
+ *   - No departures at all (empty state)
+ *   - No direct trains when a destination is set (explains a change may be required)
  */
 
 "use client";
 
+import { RefreshCw } from "lucide-react";
 import { useRailDepartures } from "@/hooks/useRailDepartures";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
 import LoadingBoard from "@/components/shared/LoadingBoard";
+import PullToRefresh from "@/components/shared/PullToRefresh";
 import RailArrivalRow from "./RailArrivalRow";
 import type { RailDeparture } from "@/lib/rail-types";
 
@@ -50,17 +54,18 @@ export default function RailDepartureBoard({
   maxRows = 10,
   onServiceTap,
 }: RailDepartureBoardProps) {
-  const { departures, isLoading, error, notConfigured } = useRailDepartures({
-    fromCrs,
-    toCrs,
-    numRows: maxRows,
-  });
+  const { departures, isLoading, error, notConfigured, refresh } =
+    useRailDepartures({
+      fromCrs,
+      toCrs,
+      numRows: maxRows,
+    });
 
   const title = toName
     ? `${fromName.toUpperCase()} --> ${toName.toUpperCase()}`
     : fromName.toUpperCase();
 
-  /* ---- Not configured: friendly message ---- */
+  /* ---- Not configured: friendly setup prompt ---- */
   if (notConfigured) {
     return (
       <BoardPanel title={title}>
@@ -89,63 +94,88 @@ export default function RailDepartureBoard({
     );
   }
 
-  /* ---- Error state ---- */
+  /* ---- Error state — offer an explicit RETRY ---- */
   if (error && departures.length === 0) {
     return (
       <BoardPanel title={title}>
-        <div className="py-6 text-center space-y-2">
+        <div className="py-6 text-center space-y-3">
           <AmberText variant="secondary" size="sm" uppercase>
             UNABLE TO FETCH DEPARTURES
           </AmberText>
           <p className="font-mono text-xs tracking-wider text-amber-faint">
             CHECK YOUR CONNECTION AND TRY AGAIN
           </p>
+          <button
+            onClick={() => refresh()}
+            className="inline-flex items-center gap-2 px-3 py-1.5 border border-amber text-amber hover:bg-amber hover:text-board-bg transition-colors"
+            aria-label="Retry fetching departures"
+          >
+            <RefreshCw size={12} strokeWidth={1.5} />
+            <span className="font-mono text-[10px] tracking-wider uppercase">
+              RETRY
+            </span>
+          </button>
         </div>
       </BoardPanel>
     );
   }
 
-  /* ---- No departures ---- */
+  /* ---- No departures found ---- */
   if (departures.length === 0) {
     return (
       <BoardPanel title={title}>
         <div className="py-6 text-center">
-          <AmberText variant="secondary" size="sm" uppercase>
-            {toName
-              ? "NO DIRECT TRAINS FOUND"
-              : "NO DEPARTURES SCHEDULED"}
-          </AmberText>
-          {toName && (
-            <p className="font-mono text-xs tracking-wider text-amber-faint mt-2">
-              TRY WITHOUT THE DESTINATION FILTER
-              <br />
-              -- A CHANGE MAY BE REQUIRED
-            </p>
+          {toName ? (
+            <>
+              <AmberText variant="secondary" size="sm" uppercase>
+                NO DIRECT TRAINS FOUND
+              </AmberText>
+              <p className="font-mono text-xs tracking-wider text-amber-faint mt-3 leading-relaxed">
+                NO DIRECT SERVICES FROM
+                <br />
+                {fromName.toUpperCase()} TO {toName.toUpperCase()}
+                <br />
+                IN THE NEXT HOUR.
+                <br />
+                <br />
+                YOUR JOURNEY MAY REQUIRE A CHANGE --
+                <br />
+                CLEAR THE DESTINATION TO SEE
+                <br />
+                ALL DEPARTURES FROM HERE.
+              </p>
+            </>
+          ) : (
+            <AmberText variant="secondary" size="sm" uppercase>
+              NO DEPARTURES SCHEDULED
+            </AmberText>
           )}
         </div>
       </BoardPanel>
     );
   }
 
-  /* ---- Normal render ---- */
+  /* ---- Normal render: wrapped in pull-to-refresh ---- */
   return (
-    <div className="space-y-3">
-      <BoardPanel title={title}>
-        <div role="table" aria-label={`Departures from ${fromName}`}>
-          {departures.map((dep, i) => (
-            <RailArrivalRow
-              key={`${dep.serviceId}-${i}`}
-              departure={dep}
-              onClick={onServiceTap}
-            />
-          ))}
+    <PullToRefresh onRefresh={() => refresh()}>
+      <div className="space-y-3">
+        <BoardPanel title={title}>
+          <div role="table" aria-label={`Departures from ${fromName}`}>
+            {departures.map((dep, i) => (
+              <RailArrivalRow
+                key={`${dep.serviceId}-${i}`}
+                departure={dep}
+                onClick={onServiceTap}
+              />
+            ))}
+          </div>
+        </BoardPanel>
+        <div className="text-center py-1">
+          <AmberText variant="dim" size="xs">
+            AUTO-UPDATING EVERY 30S -- PULL DOWN TO REFRESH
+          </AmberText>
         </div>
-      </BoardPanel>
-      <div className="text-center py-1">
-        <AmberText variant="dim" size="xs">
-          AUTO-UPDATING EVERY 30S
-        </AmberText>
       </div>
-    </div>
+    </PullToRefresh>
   );
 }

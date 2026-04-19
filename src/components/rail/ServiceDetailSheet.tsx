@@ -17,10 +17,11 @@
 
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AmberText from "@/components/shared/AmberText";
+import { shortOperatorName } from "@/lib/rail-operators";
 import type { RailDeparture } from "@/lib/rail-types";
 
 interface ServiceDetailSheetProps {
@@ -68,6 +69,9 @@ export default function ServiceDetailSheet({
   highlightCrs,
   onClose,
 }: ServiceDetailSheetProps) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+
   /* Close on Escape key */
   useEffect(() => {
     if (!departure) return;
@@ -77,6 +81,46 @@ export default function ServiceDetailSheet({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [departure, onClose]);
+
+  /*
+   * Focus trap: when the sheet opens, move keyboard focus to the
+   * close button, and keep Tab cycling within the sheet's interactive
+   * elements. Screen-reader users can't accidentally tab out to the
+   * background page while the modal is open.
+   */
+  useEffect(() => {
+    if (!departure) return;
+
+    /* Remember what had focus before we opened so we can restore it */
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
+    /* Focus the close button on open */
+    closeButtonRef.current?.focus();
+
+    const handleTab = (e: KeyboardEvent) => {
+      if (e.key !== "Tab" || !sheetRef.current) return;
+      const focusable = sheetRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleTab);
+    return () => {
+      document.removeEventListener("keydown", handleTab);
+      /* Restore focus to whatever was focused before the sheet opened */
+      previouslyFocused?.focus?.();
+    };
+  }, [departure]);
 
   /* Don't render at all when closed */
   if (!departure) return null;
@@ -95,6 +139,7 @@ export default function ServiceDetailSheet({
 
       {/* Sheet */}
       <div
+        ref={sheetRef}
         role="dialog"
         aria-modal="true"
         aria-label="Train calling points"
@@ -102,7 +147,13 @@ export default function ServiceDetailSheet({
           "fixed left-0 right-0 bottom-0 z-[9999]",
           "bg-board-bg border-t border-board-border",
           "max-h-[80vh] overflow-y-auto",
-          "pb-[env(safe-area-inset-bottom)]"
+          /*
+           * Bottom padding: 56px (h-14 bottom nav) + 1rem breathing room
+           * + the iOS home-indicator safe area inset. Without this the
+           * final calling point (often the user's destination) ends up
+           * obscured by the fixed bottom navigation bar.
+           */
+          "pb-[calc(56px+1rem+env(safe-area-inset-bottom))]"
         )}
       >
         {/* Drag handle (visual only — tap backdrop or close button to dismiss) */}
@@ -121,6 +172,7 @@ export default function ServiceDetailSheet({
             </div>
           </div>
           <button
+            ref={closeButtonRef}
             onClick={onClose}
             className="shrink-0 p-2 text-amber-faint hover:text-amber transition-colors"
             aria-label="Close calling points"
@@ -141,14 +193,15 @@ export default function ServiceDetailSheet({
 
           {hasCallingPoints && (
             <>
-              {/* Operator + length + platform info */}
+              {/* Operator + length + platform info.
+                  length falsy-guard covers both 0 (unknown) and undefined. */}
               <div className="flex items-center gap-4 py-2 border-b border-board-border mb-1">
                 {departure.operator && (
                   <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
-                    {departure.operator}
+                    {shortOperatorName(departure.operator)}
                   </span>
                 )}
-                {departure.length && (
+                {!!departure.length && departure.length > 0 && (
                   <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
                     {departure.length} COACHES
                   </span>

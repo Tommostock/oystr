@@ -34,6 +34,12 @@ interface RailStationSearchProps {
   label?: string;
   /** Called when the user selects a station */
   onSelect: (station: UKRailStation) => void;
+  /**
+   * Called when the user clicks the clear (X) button.
+   * Use this to null-out the parent's selected-station state so that
+   * clearing the input also cancels any downstream filtering.
+   */
+  onClear?: () => void;
   /** Placeholder text for the input */
   placeholder?: string;
   /** Controlled value — sets the input text from the parent */
@@ -48,6 +54,7 @@ interface RailStationSearchProps {
 export default function RailStationSearch({
   label,
   onSelect,
+  onClear,
   placeholder = "Search UK rail station...",
   value,
   className,
@@ -106,6 +113,10 @@ export default function RailStationSearch({
     setResults([]);
     setIsOpen(false);
     setHighlightedIndex(-1);
+    /* Notify the parent so it can clear its selected-station state —
+       otherwise clearing the input would leave the downstream filter
+       or board still bound to a station the user has dismissed. */
+    onClear?.();
   };
 
   /* Keyboard navigation: arrow keys + enter + escape */

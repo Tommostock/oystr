@@ -183,7 +183,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  /* Clamp numRows to RDM's valid range (1-150), default 10 */
+  /* Clamp the caller-requested row count to 1-150 (default 10) */
   let numRows = 10;
   if (numRowsRaw) {
     const parsed = parseInt(numRowsRaw, 10);
@@ -192,8 +192,18 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  /*
+   * The upstream endpoint returns arrivals + departures mixed.
+   * We filter to departures only (std populated) client-side, so the
+   * upstream numRows needs to be larger than what the caller asked
+   * for — otherwise we end up with fewer departures than requested.
+   * Empirically ~3x yields enough departures on busy London terminals.
+   * Capped at RDM's hard limit of 150.
+   */
+  const upstreamNumRows = Math.min(numRows * 3, 150);
+
   /* Build upstream URL with optional destination filter */
-  const params = new URLSearchParams({ numRows: String(numRows) });
+  const params = new URLSearchParams({ numRows: String(upstreamNumRows) });
   if (filterCrs) {
     params.set("filterCrs", filterCrs.toUpperCase());
     /* "to" = only show trains calling AT the destination after this station */
@@ -237,12 +247,14 @@ export async function GET(request: NextRequest) {
      */
     const departures = services.filter((s) => !!s.std);
 
-    /* Normalise + sort by scheduled time (HH:mm strings sort lexically) */
+    /* Normalise + sort by scheduled time (HH:mm strings sort lexically),
+       then slice down to the caller's originally-requested row count. */
     const normalised: RailDeparture[] = departures
       .map(normaliseService)
       .sort((a, b) =>
         a.scheduledDeparture.localeCompare(b.scheduledDeparture)
-      );
+      )
+      .slice(0, numRows);
 
     return NextResponse.json(normalised);
   } catch (error) {

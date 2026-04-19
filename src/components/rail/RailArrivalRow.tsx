@@ -16,6 +16,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { shortOperatorName } from "@/lib/rail-operators";
 import type { RailDeparture } from "@/lib/rail-types";
 
 interface RailArrivalRowProps {
@@ -60,7 +61,13 @@ export default function RailArrivalRow({
   className,
 }: RailArrivalRowProps) {
   const status = getStatus(departure);
-  const platform = departure.platform?.trim() || "-";
+  /*
+   * Platform is usually null until a few minutes before departure.
+   * "TBA" reads as "to be announced" which is accurate UK rail phrasing
+   * and makes clear the information isn't missing, just not-yet-assigned.
+   */
+  const platform = departure.platform?.trim() || "TBA";
+  const platformIsKnown = !!departure.platform?.trim();
   const clickable = !!onClick && !!departure.serviceId;
 
   const content = (
@@ -75,21 +82,28 @@ export default function RailArrivalRow({
       role="row"
       aria-label={`${departure.destination} at ${departure.scheduledDeparture}, ${status.text.toLowerCase()}`}
     >
-      {/* ---- Platform ---- */}
+      {/* ---- Platform. "TBA" gets smaller, dimmer type so it reads as
+           metadata rather than looking like a wrong/broken value. ---- */}
       <div className="shrink-0 w-12 text-center">
-        <span className="font-board text-xl text-amber amber-glow tracking-wider">
-          {platform}
-        </span>
+        {platformIsKnown ? (
+          <span className="font-board text-xl text-amber amber-glow tracking-wider">
+            {platform}
+          </span>
+        ) : (
+          <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
+            TBA
+          </span>
+        )}
       </div>
 
-      {/* ---- Destination + operator ---- */}
+      {/* ---- Destination + operator (shortened for mobile). ---- */}
       <div className="flex-1 min-w-0">
         <div className="font-board text-xl text-amber amber-glow tracking-wider uppercase truncate">
           {departure.destination || "UNKNOWN"}
         </div>
         {departure.operator && (
-          <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-0.5">
-            {departure.operator}
+          <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-0.5 truncate">
+            {shortOperatorName(departure.operator)}
           </div>
         )}
       </div>
