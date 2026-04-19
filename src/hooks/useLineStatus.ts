@@ -35,14 +35,18 @@ export function useLineStatus() {
     "/api/tfl/status",
     fetcher,
     {
-      /* Re-fetch every 60 seconds */
       refreshInterval: LINE_STATUS_POLL_INTERVAL,
-      /* Don't retry too aggressively on errors */
       errorRetryCount: 3,
-      /* Keep showing old data while fetching new data */
-      revalidateOnFocus: true,
-      /* Deduplicate requests within 30 seconds */
-      dedupingInterval: 30_000,
+      /*
+       * Line status changes slowly (TfL itself only refreshes every
+       * ~60s) so a focus-triggered refetch just burns the rate limit.
+       * Stick with the poll cadence — throttle focus refetches
+       * aggressively as a compromise.
+       */
+      revalidateOnFocus: false,
+      focusThrottleInterval: 60_000,
+      /* Dedupe within 60s so rapid tab switches don't re-hit the API */
+      dedupingInterval: 60_000,
     }
   );
 

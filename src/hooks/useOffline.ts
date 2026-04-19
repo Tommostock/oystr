@@ -2,8 +2,14 @@
  * useOffline.ts — Online/offline detection hook
  *
  * Returns true when the browser is offline, false when online.
- * Listens for the browser's built-in 'online' and 'offline' events
- * so the UI updates immediately when connectivity changes.
+ * Uses useSyncExternalStore subscribed to the browser's built-in
+ * "online" / "offline" events so the UI updates immediately when
+ * connectivity changes.
+ *
+ * Migrated off the older useState+useEffect-reads-navigator.onLine
+ * pattern because it triggered the react-hooks/set-state-in-effect
+ * lint rule (cascading renders on mount). useSyncExternalStore is
+ * the React-team-recommended way to subscribe to browser APIs.
  *
  * Usage:
  *   const isOffline = useOffline();
@@ -12,35 +18,29 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useSyncExternalStore } from "react";
+
+/** Client snapshot — true when navigator says we're offline. */
+function getSnapshot(): boolean {
+  return typeof navigator !== "undefined" && !navigator.onLine;
+}
+
+/** Server snapshot — default to online during SSR (no navigator). */
+function getServerSnapshot(): boolean {
+  return false;
+}
+
+/** Subscribe to the browser's connectivity events. */
+function subscribe(listener: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener("online", listener);
+  window.addEventListener("offline", listener);
+  return () => {
+    window.removeEventListener("online", listener);
+    window.removeEventListener("offline", listener);
+  };
+}
 
 export function useOffline(): boolean {
-  /*
-   * Start with the current online status.
-   * navigator.onLine is a built-in browser property.
-   * We default to false (online) during server-side rendering
-   * since there's no navigator on the server.
-   */
-  const [isOffline, setIsOffline] = useState(false);
-
-  useEffect(() => {
-    /* Set the initial state now that we're in the browser */
-    setIsOffline(!navigator.onLine);
-
-    /* Event handlers for when connectivity changes */
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
-
-    /* Listen for the browser's connectivity events */
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-
-    /* Clean up event listeners when the component unmounts */
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, []);
-
-  return isOffline;
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }

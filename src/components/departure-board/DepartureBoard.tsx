@@ -15,6 +15,7 @@
 
 import { useArrivals } from "@/hooks/useArrivals";
 import { useLineStatus } from "@/hooks/useLineStatus";
+import { useOffline } from "@/hooks/useOffline";
 import { LINE_COLOURS } from "@/lib/constants";
 import type { ArrivalPrediction, LineStatus } from "@/lib/tfl-types";
 import BoardPanel from "@/components/shared/BoardPanel";
@@ -123,9 +124,12 @@ export default function DepartureBoard({
   stationName,
 }: DepartureBoardProps) {
   /* Fetch live arrivals with automatic polling every 30 seconds */
-  const { arrivals, isLoading, error, refresh } = useArrivals(stopId);
+  const { arrivals, isLoading, error, refresh, lastUpdated } =
+    useArrivals(stopId);
   /* Fetch line statuses for the status indicators */
   const { lines: lineStatuses } = useLineStatus();
+  /* Offline flag — drives per-source staleness indicator below */
+  const isOffline = useOffline();
 
   /* ---- Loading state: show skeleton rows instead of blinking text ---- */
   if (isLoading && arrivals.length === 0) {
@@ -206,9 +210,17 @@ export default function DepartureBoard({
           );
         })}
 
+        {/*
+         * Footer status line. When online, shows the normal
+         * "auto-updating" message. When offline with cached data,
+         * flips to "LAST SEEN HH:MM · OFFLINE" so the user knows
+         * the board is stale rather than live.
+         */}
         <div className="text-center py-1">
           <AmberText variant="dim" size="xs">
-            AUTO-UPDATING EVERY 30S -- PULL DOWN TO REFRESH
+            {isOffline && lastUpdated
+              ? `LAST SEEN ${new Date(lastUpdated).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })} -- OFFLINE`
+              : "AUTO-UPDATING EVERY 30S -- PULL DOWN TO REFRESH"}
           </AmberText>
         </div>
       </div>

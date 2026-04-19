@@ -29,6 +29,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { DARK_TILE_URL, LINE_COLOURS } from "@/lib/constants";
 import { isBusStop } from "@/lib/utils";
+import { parseCurrentLocation } from "@/lib/parse-location";
 import StationPopup from "./StationPopup";
 import NearbyDrawer from "./NearbyDrawer";
 
@@ -103,6 +104,32 @@ function createBusIcon(stopLetter?: string): L.DivIcon {
       font-family: monospace; font-size: 12px; font-weight: bold;
       color: #ff9500; letter-spacing: 0.05em;
     ">${stopLetter || "B"}</div>`,
+  });
+}
+
+/**
+ * Create a small pulsing vehicle icon for a live bus / tube.
+ * Sized + coloured to stand out from the station markers.
+ */
+function createVehicleIcon(): L.DivIcon {
+  return L.divIcon({
+    className: "",
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+    html: `<div style="
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: #ff9500;
+      border: 2px solid #0a0a0a;
+      box-shadow: 0 0 8px rgba(255, 149, 0, 0.8);
+      animation: vehicle-pulse 1.5s ease-in-out infinite;
+    "></div>
+    <style>
+      @keyframes vehicle-pulse {
+        0%, 100% { transform: scale(1); box-shadow: 0 0 8px rgba(255, 149, 0, 0.8); }
+        50% { transform: scale(1.15); box-shadow: 0 0 14px rgba(255, 149, 0, 1); }
+      }
+    </style>`,
   });
 }
 
@@ -268,8 +295,22 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
   /* Active route being highlighted on the map */
   const [activeRoute, setActiveRoute] = useState<{
     lineId: string;
-    stops: { lat: number; lon: number; name: string }[];
+    stops: { naptanId: string; lat: number; lon: number; name: string }[];
   } | null>(null);
+  /*
+   * Live vehicles on the active route. Empty when no route is active.
+   * Each vehicle has a resolved {lat, lon} computed from its
+   * `currentLocation` string against the route sequence.
+   */
+  const [vehicles, setVehicles] = useState<
+    {
+      vehicleId: string;
+      lat: number;
+      lon: number;
+      destinationName: string;
+      currentLocation: string;
+    }[]
+  >([]);
   /* Station to fly to (set by drawer tap) */
   const [flyTarget, setFlyTarget] = useState<{
     lat: number;
@@ -375,6 +416,7 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
   const handleToggleRoute = useCallback(async (lineId: string) => {
     if (activeRoute?.lineId === lineId) {
       setActiveRoute(null);
+      setVehicles([]);
       return;
     }
     try {
@@ -387,6 +429,70 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
     } catch {
       /* Silently fail */
     }
+  }, [activeRoute]);
+
+  /*
+   * Live vehicle tracking for the active route.
+   *
+   * Polls /api/tfl/line-arrivals every 30s while a route is active.
+   * Each arrival's `currentLocation` string ("Between X and Y",
+   * "Approaching Y", etc.) is resolved to a {lat, lon} via the
+   * route's ordered stop list. Vehicles that can't be positioned
+   * (unknown stop names, ambiguous text) are dropped rather than
+   * guessed at the wrong location.
+   *
+   * Stops polling when the route is cleared OR the component unmounts.
+   */
+  useEffect(() => {
+    if (!activeRoute) {
+      setVehicles([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function fetchVehicles() {
+      if (!activeRoute) return;
+      try {
+        const resp = await fetch(
+          `/api/tfl/line-arrivals?lineId=${activeRoute.lineId}`
+        );
+        if (!resp.ok) return;
+        const data: {
+          vehicleId: string;
+          destinationName: string;
+          currentLocation: string;
+        }[] = await resp.json();
+
+        const resolved = data
+          .map((v) => {
+            const pos = parseCurrentLocation(
+              v.currentLocation,
+              activeRoute.stops
+            );
+            if (!pos) return null;
+            return {
+              vehicleId: v.vehicleId,
+              lat: pos.lat,
+              lon: pos.lon,
+              destinationName: v.destinationName,
+              currentLocation: v.currentLocation,
+            };
+          })
+          .filter((v): v is NonNullable<typeof v> => v !== null);
+
+        if (!cancelled) setVehicles(resolved);
+      } catch {
+        /* Silently ignore — next poll will retry */
+      }
+    }
+
+    fetchVehicles();
+    const id = window.setInterval(fetchVehicles, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
   }, [activeRoute]);
 
   /* ---- Handle drawer station tap: fly to it and open popup ---- */
@@ -504,6 +610,30 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
                   weight: 1.5,
                 }}
               />
+            ))}
+            {/*
+             * Live vehicle markers. Each bus / tube currently somewhere
+             * on the route, positioned by parsing its currentLocation
+             * string. Pulses gently so the user can tell it's live
+             * data vs the static stop dots.
+             */}
+            {vehicles.map((v) => (
+              <Marker
+                key={`vehicle-${v.vehicleId}`}
+                position={[v.lat, v.lon]}
+                icon={createVehicleIcon()}
+              >
+                <Popup className="oystr-popup" maxWidth={220} minWidth={180}>
+                  <div className="font-mono text-xs tracking-wider text-amber uppercase">
+                    <div className="text-amber amber-glow">
+                      TO {v.destinationName.toUpperCase()}
+                    </div>
+                    <div className="text-amber-faint text-[10px] mt-1">
+                      {v.currentLocation}
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
             ))}
           </>
         )}

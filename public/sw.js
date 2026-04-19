@@ -2,28 +2,33 @@
  * Service Worker for Oystr PWA
  *
  * Caches the app shell (HTML, CSS, JS, fonts, icons) so the app
- * works offline for basic navigation. API responses are NOT cached —
- * live data always comes from the network.
+ * works offline for basic navigation.
  *
  * Cache strategy:
- *   - Navigation (HTML pages): Network-first (always get latest deploy)
- *   - Next.js chunks (_next/): Network-first (always get latest code)
- *   - API calls: Network-only (always fresh data)
- *   - Static assets (icons, fonts): Cache-first (rarely change)
+ *   - Navigation (HTML pages):       Network-first (latest deploy)
+ *   - Next.js chunks (_next/):        Network-first (latest code)
+ *   - /api/tfl/arrivals:              Stale-while-revalidate (offline
+ *                                     fallback to last-known departures)
+ *   - Other /api/:                    Network-only (always fresh)
+ *   - Static assets (icons, fonts):   Cache-first (rarely change)
  *
- * IMPORTANT: This uses network-first for app code so that new deploys
- * are picked up immediately without needing to clear the browser cache.
- * The cache is only used as a fallback when offline.
+ * The arrivals API is treated specially: we cache the last
+ * successful response so that when offline (or mid-request on
+ * a flaky connection) the widget / home screen still renders
+ * something useful instead of a spinner.
  */
 
-const CACHE_NAME = "oystr-v3";
+const CACHE_NAME = "oystr-v4";
 
 /**
  * Files to pre-cache on install.
- * These are the minimum files needed to render the app shell offline.
+ * These are the minimum files needed to render the app shell offline,
+ * including the widget shell so iOS home-screen widget views work
+ * on first-cold-open without a network round-trip.
  */
 const PRECACHE_URLS = [
   "/",
+  "/widget",
   "/manifest.json",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -36,10 +41,15 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      /* skipWaiting forces the new SW to activate immediately,
-       * replacing any old service worker without waiting for
-       * the user to close all tabs */
+      .then((cache) =>
+        /*
+         * Use individual cache.add() calls so a single failure doesn't
+         * abort the whole install. /widget is an aliased route that may
+         * not exist as an exact URL (it's a dynamic /widget/[stopId]),
+         * so tolerate individual miss.
+         */
+        Promise.allSettled(PRECACHE_URLS.map((url) => cache.add(url)))
+      )
       .then(() => self.skipWaiting())
   );
 });
@@ -58,8 +68,6 @@ self.addEventListener("activate", (event) => {
             .map((key) => caches.delete(key))
         )
       )
-      /* clients.claim() makes this SW take control of all open tabs
-       * immediately, so the user doesn't need to refresh */
       .then(() => self.clients.claim())
   );
 });
@@ -74,26 +82,59 @@ self.addEventListener("fetch", (event) => {
   /* Skip non-GET requests (POST, PUT, DELETE etc.) */
   if (request.method !== "GET") return;
 
-  /* Skip API calls — always go to network for fresh data */
+  /*
+   * STALE-WHILE-REVALIDATE for TfL arrivals + rail departures.
+   *
+   * Live arrivals are the single most important data source offline —
+   * when you're on a tube platform with no signal, the widget should
+   * still show the last-known board. We respond from cache immediately
+   * (if anything) AND kick off a network refresh in the background
+   * so the next view gets fresh data.
+   */
+  const isArrivalsEndpoint =
+    url.pathname === "/api/tfl/arrivals" ||
+    url.pathname === "/api/rail/departures";
+
+  if (isArrivalsEndpoint) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then((cache) =>
+        cache.match(request).then((cached) => {
+          const fetchPromise = fetch(request)
+            .then((response) => {
+              if (response.ok) {
+                /* Clone before caching — Response bodies are one-shot. */
+                cache.put(request, response.clone());
+              }
+              return response;
+            })
+            .catch(() => {
+              /* Network failed — the cached response (if any) already
+                 satisfied the event. Nothing more to do. */
+              return null;
+            });
+          /* If we have a cached copy, return it straight away; the
+             fetchPromise continues in the background to refresh. */
+          return cached || fetchPromise || new Response("Offline", { status: 503 });
+        })
+      )
+    );
+    return;
+  }
+
+  /* Skip all other API calls — always go to network for fresh data */
   if (url.pathname.startsWith("/api/")) return;
 
   /*
    * NETWORK-FIRST strategy for Next.js chunks and page navigations.
    *
-   * This is the key change: we TRY the network first so that new
-   * deploys are picked up immediately. If the network fails (offline),
-   * we fall back to the cached version.
-   *
-   * This means:
-   *   - Online: always serves the latest code from Vercel
-   *   - Offline: serves the last cached version as fallback
-   *   - No more needing to clear browser history to see updates!
+   * Try the network first so new deploys are picked up immediately.
+   * Fall back to cache when offline. /widget and /widget/... are
+   * covered by the navigate mode match since they're page routes.
    */
   if (url.pathname.startsWith("/_next/") || request.mode === "navigate") {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          /* Got a fresh response — cache it for offline use */
           if (response.ok) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
@@ -101,11 +142,16 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(() => {
-          /* Network failed — try the cache as fallback */
+          /* Network failed — try the cache. */
           return caches.match(request).then((cached) => {
             if (cached) return cached;
-            /* If navigating and nothing cached, show the home page shell */
+            /* Fall back to the nearest shell:
+                 - Widget routes → cached /widget (if we've been there)
+                 - Anything else → home shell */
             if (request.mode === "navigate") {
+              if (url.pathname.startsWith("/widget/")) {
+                return caches.match("/widget").then((w) => w || caches.match("/"));
+              }
               return caches.match("/");
             }
             return new Response("Offline", { status: 503 });

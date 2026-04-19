@@ -71,7 +71,9 @@ export default function JourneyCard({ journey, index }: JourneyCardProps) {
             </span>
           </div>
 
-          {/* Line colour pills — quick visual of which lines are used */}
+          {/* Line colour pills — quick visual of which lines are used.
+              Each pill draws in left-to-right with a cascading 50ms
+              stagger so the journey "plots itself" when results land. */}
           <div className="flex items-center gap-1 mt-1.5">
             {journey.legs
               .filter((leg) => leg.mode?.id !== "walking")
@@ -83,7 +85,7 @@ export default function JourneyCard({ journey, index }: JourneyCardProps) {
                 return (
                   <div
                     key={i}
-                    className="h-1.5 rounded-full"
+                    className="h-1.5 rounded-full journey-line-draw"
                     style={{
                       backgroundColor: colour,
                       width: `${Math.max(leg.duration * 2, 12)}px`,

@@ -26,6 +26,7 @@ import StationSearch from "@/components/shared/StationSearch";
 import NearMeButton from "@/components/shared/NearMeButton";
 import DepartureBoard from "@/components/departure-board/DepartureBoard";
 import LastTrainBanner from "@/components/departure-board/LastTrainBanner";
+import { usePrefetchSaved } from "@/hooks/usePrefetchSaved";
 import QuickViewWidget from "@/components/departure-board/QuickViewWidget";
 import SaveStationButton from "@/components/departure-board/SaveStationButton";
 import StationAlerts from "@/components/departure-board/StationAlerts";
@@ -71,6 +72,12 @@ function HomeContent() {
   /* About popup state */
   const [showAbout, setShowAbout] = useState(false);
   const aboutRef = useRef<HTMLDivElement>(null);
+
+  /*
+   * Prefetch arrivals for saved stations on app load. Staggered
+   * in the background so tapping a saved station feels instant.
+   */
+  usePrefetchSaved();
 
   /* Close About popup when clicking outside */
   useEffect(() => {

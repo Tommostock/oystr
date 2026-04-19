@@ -17,6 +17,7 @@
 "use client";
 
 import useSWR from "swr";
+import { useEffect, useRef, useState } from "react";
 import { ARRIVALS_POLL_INTERVAL } from "@/lib/constants";
 import type { ArrivalPrediction } from "@/lib/tfl-types";
 
@@ -55,6 +56,21 @@ export function useArrivals(stopId: string | null | undefined) {
     }
   );
 
+  /*
+   * Track the timestamp of the last successful fetch so callers can
+   * render a "LAST SEEN HH:MM" indicator when offline. We use a ref
+   * for the previous-data identity to bump `lastUpdated` only when
+   * a new successful response actually arrives (not on every render).
+   */
+  const prevDataRef = useRef<ArrivalPrediction[] | undefined>(undefined);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  useEffect(() => {
+    if (data && data !== prevDataRef.current) {
+      prevDataRef.current = data;
+      setLastUpdated(Date.now());
+    }
+  }, [data]);
+
   return {
     /** Array of arrival predictions, sorted by time */
     arrivals: data || [],
@@ -64,5 +80,11 @@ export function useArrivals(stopId: string | null | undefined) {
     error,
     /** Call this to manually trigger a refresh */
     refresh: mutate,
+    /**
+     * Unix-ms timestamp of the last successful fetch, or null if no
+     * fetch has ever succeeded. Used by consumers to render
+     * "LAST SEEN HH:MM" staleness indicators when offline.
+     */
+    lastUpdated,
   };
 }

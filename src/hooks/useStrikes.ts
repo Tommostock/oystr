@@ -16,8 +16,13 @@
 import useSWR from "swr";
 import type { StrikeInfo } from "@/lib/tfl-types";
 
-/** Poll every 5 minutes — strike info doesn't change rapidly */
-const STRIKES_POLL_INTERVAL = 300_000;
+/**
+ * Poll every 30 minutes. Strikes are announced / updated once or twice
+ * a day at most — 5 minutes was unnecessarily aggressive and burned
+ * through our TfL rate limit when several tabs were open. 30min is
+ * a good balance between "fresh" and "quiet".
+ */
+const STRIKES_POLL_INTERVAL = 30 * 60_000;
 
 /**
  * Simple fetch wrapper that throws on error.
@@ -38,14 +43,16 @@ export function useStrikes() {
     "/api/tfl/strikes",
     fetcher,
     {
-      /* Re-fetch every 5 minutes */
       refreshInterval: STRIKES_POLL_INTERVAL,
-      /* Don't retry too aggressively on errors */
       errorRetryCount: 3,
-      /* Keep showing old data while fetching new data */
-      revalidateOnFocus: true,
-      /* Deduplicate requests within 60 seconds */
-      dedupingInterval: 60_000,
+      /*
+       * Strikes data doesn't change because the user tabbed away and
+       * back. revalidateOnFocus would cause redundant TfL calls —
+       * we let refreshInterval handle freshness.
+       */
+      revalidateOnFocus: false,
+      /* Dedupe within 15 minutes — page nav won't re-hit the API */
+      dedupingInterval: 15 * 60_000,
     }
   );
 
