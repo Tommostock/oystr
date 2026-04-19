@@ -21,8 +21,12 @@ import type { RailDeparture } from "@/lib/rail-types";
 interface RailArrivalRowProps {
   /** The departure to render */
   departure: RailDeparture;
-  /** Called when the row is tapped — opens the ServiceDetailSheet */
-  onClick?: (serviceId: string) => void;
+  /**
+   * Called when the row is tapped — passes the full departure through
+   * so the parent can open the ServiceDetailSheet with the bundled
+   * calling points already present (no extra fetch required).
+   */
+  onClick?: (departure: RailDeparture) => void;
   /** Additional CSS classes */
   className?: string;
 }
@@ -108,7 +112,7 @@ export default function RailArrivalRow({
   if (clickable) {
     return (
       <button
-        onClick={() => onClick!(departure.serviceId)}
+        onClick={() => onClick!(departure)}
         className="w-full text-left"
         aria-label={`View calling points for ${departure.scheduledDeparture} to ${departure.destination}`}
       >

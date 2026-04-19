@@ -16,16 +16,18 @@
  * ----------------------------------------------------------------------
  * FEATURE FLAG (temporary):
  *
- * Rail Data Marketplace takes up to 3 working days to approve new API
- * accounts. Until the RDM_API_KEY arrives, this page shows a polished
- * "COMING SOON" placeholder instead of the (broken) live UI.
+ * Until your Rail Data Marketplace API key is in .env.local, this page
+ * shows a polished "COMING SOON" placeholder instead of the live UI.
  *
  * TO ENABLE THE FULL UI:
  *   1. Sign up at https://raildata.org.uk
- *   2. Subscribe to "Live Departure Board Service (LDBWS) - Public"
- *   3. Add RDM_API_KEY=... to .env.local (and Vercel env vars)
- *   4. Change RAIL_FEATURE_ENABLED below to `true`
- *   5. Commit + push — that's it.
+ *   2. Subscribe to "Live Arrival and Departure Boards" (Rail Delivery
+ *      Group) — free, usually approved instantly.
+ *   3. On that product's Specification tab, copy the Consumer key.
+ *   4. Add RDM_API_KEY=<that-key> to .env.local and Vercel env vars.
+ *   5. Change RAIL_FEATURE_ENABLED below to `true`.
+ *   6. Commit + push — that's it. Calling points come bundled with the
+ *      main departure fetch, so no second subscription is needed.
  * ----------------------------------------------------------------------
  */
 
@@ -40,7 +42,7 @@ import RailDepartureBoard from "@/components/rail/RailDepartureBoard";
 import SavedRouteCard from "@/components/rail/SavedRouteCard";
 import ServiceDetailSheet from "@/components/rail/ServiceDetailSheet";
 import { useSavedRailJourneys } from "@/hooks/useSavedRailJourneys";
-import type { UKRailStation } from "@/lib/rail-types";
+import type { UKRailStation, RailDeparture } from "@/lib/rail-types";
 import type { SavedRailJourney } from "@/lib/db";
 
 /**
@@ -78,10 +80,15 @@ function RailPageFull() {
   const [fromStation, setFromStation] = useState<StationSelection | null>(null);
   const [toStation, setToStation] = useState<StationSelection | null>(null);
 
-  /* Currently expanded service (opens the ServiceDetailSheet) */
-  const [expandedServiceId, setExpandedServiceId] = useState<string | null>(
-    null
-  );
+  /*
+   * Currently expanded departure (opens the ServiceDetailSheet).
+   * We keep the full departure object in state — not just an ID — so
+   * the sheet can render calling points immediately without a second
+   * API call. The calling points are bundled in the initial board
+   * response thanks to GetArrDepBoardWithDetails.
+   */
+  const [expandedDeparture, setExpandedDeparture] =
+    useState<RailDeparture | null>(null);
 
   /* Hook managing saved routes */
   const { journeys, addJourney, removeJourney } = useSavedRailJourneys();
@@ -233,7 +240,7 @@ function RailPageFull() {
             toCrs={toStation?.crs || null}
             toName={toStation?.name || null}
             maxRows={10}
-            onServiceTap={setExpandedServiceId}
+            onServiceTap={setExpandedDeparture}
           />
         ) : (
           /* Empty state when nothing chosen yet */
@@ -256,9 +263,9 @@ function RailPageFull() {
 
       {/* ---- Service detail bottom sheet ---- */}
       <ServiceDetailSheet
-        serviceId={expandedServiceId}
+        departure={expandedDeparture}
         highlightCrs={toStation?.crs || null}
-        onClose={() => setExpandedServiceId(null)}
+        onClose={() => setExpandedDeparture(null)}
       />
     </div>
   );

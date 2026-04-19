@@ -21,6 +21,7 @@ import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
 import LoadingBoard from "@/components/shared/LoadingBoard";
 import RailArrivalRow from "./RailArrivalRow";
+import type { RailDeparture } from "@/lib/rail-types";
 
 interface RailDepartureBoardProps {
   /** Origin station CRS code */
@@ -33,8 +34,12 @@ interface RailDepartureBoardProps {
   toName?: string | null;
   /** Max rows to request + display (default 10) */
   maxRows?: number;
-  /** Called when a row is tapped */
-  onServiceTap?: (serviceId: string) => void;
+  /**
+   * Called when a row is tapped — receives the full departure so the
+   * parent can open the ServiceDetailSheet using the bundled
+   * calling points (no second API call needed).
+   */
+  onServiceTap?: (departure: RailDeparture) => void;
 }
 
 export default function RailDepartureBoard({
@@ -66,9 +71,9 @@ export default function RailDepartureBoard({
           <p className="font-mono text-xs tracking-wider text-amber-faint">
             RDM API KEY NOT CONFIGURED.
             <br />
-            SIGN UP AT raildata.org.uk AND
+            SUBSCRIBE TO &quot;LIVE ARRIVAL AND
             <br />
-            SET RDM_API_KEY IN .env.local
+            DEPARTURE BOARDS&quot; AT raildata.org.uk
           </p>
         </div>
       </BoardPanel>

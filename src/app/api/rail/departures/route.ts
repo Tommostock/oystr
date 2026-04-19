@@ -2,11 +2,18 @@
  * API Route: /api/rail/departures
  *
  * Proxies live National Rail departure board requests to the Rail Data
- * Marketplace LDBWS (Live Departure Board Service) REST API.
+ * Marketplace "Live Arrival and Departure Boards" REST API using the
+ * GetArrDepBoardWithDetails endpoint.
  *
- * The upstream API returns deeply-nested JSON with XML-ish field names.
- * This route normalises the shape to the flat `RailDeparture[]` format
- * used by the client (see src/lib/rail-types.ts).
+ * Why WithDetails? It returns every train's full calling-point list
+ * inline with the main response. That means the "tap a train to see
+ * its route" feature works off this one response — no second API
+ * round-trip when the user opens a service. It also means the app
+ * only needs ONE RDM subscription instead of two.
+ *
+ * The upstream API returns arrivals + departures mixed into a single
+ * trainServices array. We filter to departures only (entries with a
+ * populated std) and normalise the shape for the client.
  *
  * Query params:
  *   ?crs=KGX              — 3-letter CRS code of the origin station (REQUIRED)
@@ -15,6 +22,7 @@
  *
  * Returns:
  *   Array<RailDeparture>, sorted by scheduled departure time ascending.
+ *   Each RailDeparture.callingPoints is an ordered list of stops.
  *
  * Errors:
  *   503 { error, notConfigured: true }  — when RDM_API_KEY is not set
@@ -24,27 +32,44 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { RDM_API_BASE } from "@/lib/constants";
-import type { RailDeparture } from "@/lib/rail-types";
+import type { CallingPoint, RailDeparture } from "@/lib/rail-types";
 
 /* ========================================
  * UPSTREAM RESPONSE SHAPES
  * These mirror what RDM returns so we can parse it safely.
- * Only the fields we use are typed — everything else is ignored.
+ * Only the fields we use are typed.
  * ======================================== */
+interface RdmCallingPoint {
+  locationName?: string;
+  crs?: string;
+  st?: string; /* Scheduled time at this calling point */
+  et?: string; /* Estimated time — "On time" or HH:mm or "Cancelled" */
+  isCancelled?: boolean;
+}
+
+interface RdmCallingPointList {
+  callingPoint?: RdmCallingPoint[];
+}
+
 interface RdmService {
   serviceID?: string;
   serviceIdGuid?: string;
   operator?: string;
   operatorCode?: string;
   platform?: string | null;
-  std?: string; /* Scheduled time of departure */
-  etd?: string; /* Estimated time of departure — "On time", HH:mm, or "Cancelled" */
+  std?: string; /* Scheduled time of departure — present for departures */
+  etd?: string; /* Estimated time of departure */
+  sta?: string; /* Scheduled time of arrival — present for arrivals */
   destination?: { location?: Array<{ locationName?: string }> };
   origin?: { location?: Array<{ locationName?: string }> };
   isCancelled?: boolean;
   cancelReason?: string;
   delayReason?: string;
   length?: number;
+  /* Subsequent calling points — stops AFTER the current station */
+  subsequentCallingPoints?: {
+    callingPointList?: RdmCallingPointList[];
+  };
 }
 
 interface RdmStationBoard {
@@ -56,28 +81,42 @@ interface RdmStationBoard {
  * NORMALISATION HELPERS
  * ======================================== */
 
-/**
- * Flatten RDM's `destination.location[0].locationName` to a simple string.
- */
 function readLocationName(
   field?: { location?: Array<{ locationName?: string }> }
 ): string {
   return field?.location?.[0]?.locationName || "";
 }
 
+function normaliseCallingPoint(cp: RdmCallingPoint): CallingPoint {
+  const scheduled = cp.st || "";
+  const estimated = cp.et || "";
+  return {
+    crs: (cp.crs || "").toUpperCase(),
+    name: cp.locationName || "",
+    scheduledTime: scheduled,
+    estimatedTime: estimated,
+    cancelled: !!cp.isCancelled || estimated === "Cancelled",
+  };
+}
+
 /**
- * Normalise a single RDM service to our flat shape.
+ * Flatten the nested calling-point structure into a simple ordered array.
+ * Services that split/join in route have multiple callingPointList entries
+ * — we use the first (primary) one which is the typical case.
+ */
+function extractCallingPoints(service: RdmService): CallingPoint[] {
+  const raw =
+    service.subsequentCallingPoints?.callingPointList?.[0]?.callingPoint || [];
+  return raw.map(normaliseCallingPoint);
+}
+
+/**
+ * Normalise a single RDM service to our flat RailDeparture shape.
  */
 function normaliseService(service: RdmService): RailDeparture {
   const scheduled = service.std || "";
   const estimated = service.etd || "";
   const cancelled = !!service.isCancelled || estimated === "Cancelled";
-  /*
-   * "Delayed" in RDM means either:
-   *   - etd is a specific HH:mm different from std (e.g. std="13:30", etd="13:35")
-   *   - etd is the literal string "Delayed"
-   * "On time" etd means no delay.
-   */
   const delayed =
     !cancelled &&
     estimated !== "" &&
@@ -97,6 +136,7 @@ function normaliseService(service: RdmService): RailDeparture {
     delayReason: service.delayReason || undefined,
     cancelReason: service.cancelReason || undefined,
     length: service.length,
+    callingPoints: extractCallingPoints(service),
   };
 }
 
@@ -144,7 +184,12 @@ export async function GET(request: NextRequest) {
     params.set("filterType", "to");
   }
 
-  const url = `${RDM_API_BASE}/GetDepartureBoard/${crs.toUpperCase()}?${params}`;
+  /*
+   * GetArrDepBoardWithDetails returns arrivals + departures + full
+   * calling-point lists for every service in one response. One call,
+   * all the data we need.
+   */
+  const url = `${RDM_API_BASE}/GetArrDepBoardWithDetails/${crs.toUpperCase()}?${params}`;
 
   try {
     const upstream = await fetch(url, {
@@ -166,8 +211,15 @@ export async function GET(request: NextRequest) {
     const data: RdmStationBoard = await upstream.json();
     const services = data.trainServices?.service || [];
 
-    /* Normalise and sort by scheduled time (HH:mm strings sort lexically) */
-    const normalised: RailDeparture[] = services
+    /*
+     * Filter to departures only — services with a scheduled departure
+     * time (std). Pure arrivals (sta but no std) are excluded from our
+     * departure board view.
+     */
+    const departures = services.filter((s) => !!s.std);
+
+    /* Normalise + sort by scheduled time (HH:mm strings sort lexically) */
+    const normalised: RailDeparture[] = departures
       .map(normaliseService)
       .sort((a, b) =>
         a.scheduledDeparture.localeCompare(b.scheduledDeparture)

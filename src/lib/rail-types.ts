@@ -24,9 +24,13 @@ export interface UKRailStation {
 /* ========================================
  * RAIL DEPARTURE (normalised)
  * One train leaving the FROM station.
+ *
+ * Because we use GetArrDepBoardWithDetails upstream, each departure
+ * comes with its full list of calling points already embedded —
+ * no second API round-trip is needed when the user taps a row.
  * ======================================== */
 export interface RailDeparture {
-  /** Unique ID for this specific service — used to fetch calling points */
+  /** Unique ID for this specific service */
   serviceId: string;
   /** Train operating company code (e.g. "LNER", "GWR") */
   operator: string;
@@ -50,6 +54,11 @@ export interface RailDeparture {
   cancelReason?: string;
   /** Length of the train in carriages, if known */
   length?: number;
+  /**
+   * Ordered list of every station the train calls at AFTER the
+   * FROM station. Empty array for trains with no subsequent stops.
+   */
+  callingPoints: CallingPoint[];
 }
 
 /* ========================================

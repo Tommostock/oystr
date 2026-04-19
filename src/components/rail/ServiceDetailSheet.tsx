@@ -6,23 +6,26 @@
  * the FROM station. The user's destination (if they picked one) is
  * highlighted with a brighter amber row.
  *
- * Fetches /api/rail/service?serviceId=X when opened.
+ * Data flow: the RDM "Live Arrival and Departure Boards" product's
+ * GetArrDepBoardWithDetails endpoint bundles calling points into the
+ * initial board response, so this sheet just receives the pre-loaded
+ * RailDeparture object as a prop — no extra network call required.
  *
  * Layout:
- *   STATION NAME              SCHED  EXP  PLATFORM  (marker if user's dest)
+ *   STATION NAME              SCHED  EXP  (marker if user's dest)
  */
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AmberText from "@/components/shared/AmberText";
-import type { RailServiceDetails } from "@/lib/rail-types";
+import type { RailDeparture } from "@/lib/rail-types";
 
 interface ServiceDetailSheetProps {
-  /** Service ID to fetch — null closes the sheet */
-  serviceId: string | null;
+  /** The full departure to show — null closes the sheet */
+  departure: RailDeparture | null;
   /** User's destination CRS (if any) — used to highlight the relevant row */
   highlightCrs?: string | null;
   /** Called when the user dismisses the sheet */
@@ -61,65 +64,25 @@ function formatTime(
 }
 
 export default function ServiceDetailSheet({
-  serviceId,
+  departure,
   highlightCrs,
   onClose,
 }: ServiceDetailSheetProps) {
-  const [details, setDetails] = useState<RailServiceDetails | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  /* Fetch details whenever serviceId changes (and is non-null) */
-  useEffect(() => {
-    if (!serviceId) {
-      setDetails(null);
-      setError(null);
-      return;
-    }
-
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setDetails(null);
-
-    fetch(`/api/rail/service?serviceId=${encodeURIComponent(serviceId)}`)
-      .then(async (resp) => {
-        if (!resp.ok) {
-          throw new Error(`HTTP ${resp.status}`);
-        }
-        return resp.json();
-      })
-      .then((data: RailServiceDetails) => {
-        if (!cancelled) setDetails(data);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err.message || "Failed to load service details");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [serviceId]);
-
   /* Close on Escape key */
   useEffect(() => {
-    if (!serviceId) return;
+    if (!departure) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [serviceId, onClose]);
+  }, [departure, onClose]);
 
-  /* Don't render at all when closed — lets Next.js keep the DOM clean */
-  if (!serviceId) return null;
+  /* Don't render at all when closed */
+  if (!departure) return null;
 
   const highlightUpper = highlightCrs?.toUpperCase();
+  const hasCallingPoints = departure.callingPoints.length > 0;
 
   return (
     <>
@@ -142,7 +105,7 @@ export default function ServiceDetailSheet({
           "pb-[env(safe-area-inset-bottom)]"
         )}
       >
-        {/* Drag handle (visual only — we use tap-to-close for simplicity) */}
+        {/* Drag handle (visual only — tap backdrop or close button to dismiss) */}
         <div className="flex justify-center pt-2 pb-1">
           <div className="w-10 h-1 bg-board-border rounded-full" />
         </div>
@@ -153,11 +116,9 @@ export default function ServiceDetailSheet({
             <AmberText variant="secondary" size="xs" uppercase>
               CALLING AT
             </AmberText>
-            {details && (
-              <div className="font-board text-lg text-amber amber-glow tracking-wider uppercase truncate mt-0.5">
-                {details.scheduledDeparture} {details.destination}
-              </div>
-            )}
+            <div className="font-board text-lg text-amber amber-glow tracking-wider uppercase truncate mt-0.5">
+              {departure.scheduledDeparture} {departure.destination}
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -170,26 +131,7 @@ export default function ServiceDetailSheet({
 
         {/* Body */}
         <div className="px-4 py-3">
-          {loading && (
-            <div className="py-8 text-center">
-              <span className="font-mono text-xs tracking-wider text-amber amber-glow animate-blink">
-                LOADING CALLING POINTS...
-              </span>
-            </div>
-          )}
-
-          {error && !loading && (
-            <div className="py-8 text-center space-y-1">
-              <AmberText variant="secondary" size="sm" uppercase>
-                UNABLE TO LOAD
-              </AmberText>
-              <p className="font-mono text-xs tracking-wider text-amber-faint">
-                CHECK CONNECTION AND TRY AGAIN
-              </p>
-            </div>
-          )}
-
-          {details && details.callingPoints.length === 0 && !loading && (
+          {!hasCallingPoints && (
             <div className="py-6 text-center">
               <AmberText variant="dim" size="sm" uppercase>
                 NO INTERMEDIATE STOPS LISTED
@@ -197,30 +139,30 @@ export default function ServiceDetailSheet({
             </div>
           )}
 
-          {details && details.callingPoints.length > 0 && (
+          {hasCallingPoints && (
             <>
-              {/* Operator + length info */}
+              {/* Operator + length + platform info */}
               <div className="flex items-center gap-4 py-2 border-b border-board-border mb-1">
-                {details.operator && (
+                {departure.operator && (
                   <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
-                    {details.operator}
+                    {departure.operator}
                   </span>
                 )}
-                {details.length && (
+                {departure.length && (
                   <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
-                    {details.length} COACHES
+                    {departure.length} COACHES
                   </span>
                 )}
-                {details.platform && (
+                {departure.platform && (
                   <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase ml-auto">
-                    PLATFORM {details.platform}
+                    PLATFORM {departure.platform}
                   </span>
                 )}
               </div>
 
               {/* Calling points */}
               <div role="list">
-                {details.callingPoints.map((cp, i) => {
+                {departure.callingPoints.map((cp, i) => {
                   const isDest = highlightUpper && cp.crs === highlightUpper;
                   const t = formatTime(
                     cp.scheduledTime,

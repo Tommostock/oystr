@@ -81,12 +81,19 @@ export const TFL_API_BASE = "https://api.tfl.gov.uk";
  * Base URL for the Rail Data Marketplace LDBWS REST API.
  * Used by /api/rail/* routes for live National Rail departures.
  *
- * Requires a free API key from https://raildata.org.uk
- * (subscribe to "Live Departure Board Service - Public").
- * Set the key as RDM_API_KEY in .env.local.
+ * Product: "Live Arrival and Departure Boards" by Rail Delivery Group.
+ * We use the GetArrDepBoardWithDetails endpoint which returns
+ * arrivals + departures + full calling-point lists for every train
+ * in a single response. This means no separate Service Details
+ * subscription is needed for the "tap a train to see its route"
+ * feature — the calling points are bundled inline.
+ *
+ * Requires a free API key from https://raildata.org.uk — sign up,
+ * then subscribe to "Live Arrival and Departure Boards".
+ * Set the consumer key as RDM_API_KEY in .env.local.
  * ======================================== */
 export const RDM_API_BASE =
-  "https://api1.raildata.org.uk/1010-live-departure-board-dep1_2/LDBWS/api/20220120";
+  "https://api1.raildata.org.uk/1010-live-arrival-and-departure-boards-arr-and-dep1_1/LDBWS/api/20220120";
 
 /* ========================================
  * POLLING INTERVALS (in milliseconds)
