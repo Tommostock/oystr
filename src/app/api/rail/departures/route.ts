@@ -36,19 +36,30 @@ import type { CallingPoint, RailDeparture } from "@/lib/rail-types";
 
 /* ========================================
  * UPSTREAM RESPONSE SHAPES
- * These mirror what RDM returns so we can parse it safely.
+ * These mirror what the RDM REST API returns so we can parse it safely.
  * Only the fields we use are typed.
+ *
+ * The REST API has a flatter structure than the original SOAP Darwin API:
+ *   - trainServices is a direct array (not nested under .service)
+ *   - origin/destination are direct arrays (not nested under .location)
+ *   - subsequentCallingPoints is a direct array (not nested under .callingPointList)
  * ======================================== */
 interface RdmCallingPoint {
   locationName?: string;
   crs?: string;
   st?: string; /* Scheduled time at this calling point */
   et?: string; /* Estimated time — "On time" or HH:mm or "Cancelled" */
+  at?: string; /* Actual time (for already-called points) */
   isCancelled?: boolean;
 }
 
-interface RdmCallingPointList {
+interface RdmCallingPointGroup {
   callingPoint?: RdmCallingPoint[];
+}
+
+interface RdmLocation {
+  locationName?: string;
+  crs?: string;
 }
 
 interface RdmService {
@@ -60,36 +71,40 @@ interface RdmService {
   std?: string; /* Scheduled time of departure — present for departures */
   etd?: string; /* Estimated time of departure */
   sta?: string; /* Scheduled time of arrival — present for arrivals */
-  destination?: { location?: Array<{ locationName?: string }> };
-  origin?: { location?: Array<{ locationName?: string }> };
+  destination?: RdmLocation[];
+  origin?: RdmLocation[];
   isCancelled?: boolean;
   cancelReason?: string;
   delayReason?: string;
   length?: number;
-  /* Subsequent calling points — stops AFTER the current station */
-  subsequentCallingPoints?: {
-    callingPointList?: RdmCallingPointList[];
-  };
+  /* Subsequent calling points — stops AFTER the current station.
+     Multiple groups only appear for services that split en route. */
+  subsequentCallingPoints?: RdmCallingPointGroup[];
 }
 
 interface RdmStationBoard {
-  trainServices?: { service?: RdmService[] } | null;
-  busServices?: { service?: RdmService[] } | null;
+  trainServices?: RdmService[] | null;
+  busServices?: RdmService[] | null;
 }
 
 /* ========================================
  * NORMALISATION HELPERS
  * ======================================== */
 
-function readLocationName(
-  field?: { location?: Array<{ locationName?: string }> }
-): string {
-  return field?.location?.[0]?.locationName || "";
+/**
+ * Read the first location's name from an origin/destination array.
+ * Most services have exactly one entry. Multi-entry lists only appear
+ * for through services that split en route.
+ */
+function readLocationName(locations?: RdmLocation[]): string {
+  return locations?.[0]?.locationName || "";
 }
 
 function normaliseCallingPoint(cp: RdmCallingPoint): CallingPoint {
   const scheduled = cp.st || "";
-  const estimated = cp.et || "";
+  /* Prefer "et" (estimated, for future stops); fall back to "at"
+     (actual time, for stops already called at) — useful on arrivals */
+  const estimated = cp.et || cp.at || "";
   return {
     crs: (cp.crs || "").toUpperCase(),
     name: cp.locationName || "",
@@ -100,13 +115,12 @@ function normaliseCallingPoint(cp: RdmCallingPoint): CallingPoint {
 }
 
 /**
- * Flatten the nested calling-point structure into a simple ordered array.
- * Services that split/join in route have multiple callingPointList entries
- * — we use the first (primary) one which is the typical case.
+ * Flatten the nested calling-point groups into a simple ordered array.
+ * Services that split/join mid-route have multiple groups — we use
+ * the first (primary) one which is the typical case.
  */
 function extractCallingPoints(service: RdmService): CallingPoint[] {
-  const raw =
-    service.subsequentCallingPoints?.callingPointList?.[0]?.callingPoint || [];
+  const raw = service.subsequentCallingPoints?.[0]?.callingPoint || [];
   return raw.map(normaliseCallingPoint);
 }
 
@@ -125,7 +139,9 @@ function normaliseService(service: RdmService): RailDeparture {
 
   return {
     serviceId: service.serviceIdGuid || service.serviceID || "",
-    operator: service.operatorCode || service.operator || "",
+    /* Prefer the full operator name (e.g. "London North Eastern Railway")
+       over the short code (e.g. "GR") — friendlier on the board display. */
+    operator: service.operator || service.operatorCode || "",
     platform: service.platform ?? null,
     scheduledDeparture: scheduled,
     estimatedDeparture: estimated,
@@ -209,7 +225,10 @@ export async function GET(request: NextRequest) {
     }
 
     const data: RdmStationBoard = await upstream.json();
-    const services = data.trainServices?.service || [];
+    /* trainServices is a flat array in the REST API response */
+    const services = Array.isArray(data.trainServices)
+      ? data.trainServices
+      : [];
 
     /*
      * Filter to departures only — services with a scheduled departure

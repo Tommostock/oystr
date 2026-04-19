@@ -46,10 +46,11 @@ import type { UKRailStation, RailDeparture } from "@/lib/rail-types";
 import type { SavedRailJourney } from "@/lib/db";
 
 /**
- * Feature flag: flip to `true` once your RDM_API_KEY is active.
- * See the comment block at the top of this file for details.
+ * Feature flag: flip to `false` to hide the live UI behind the
+ * Coming Soon placeholder again. See the comment block at the top
+ * of this file for setup details.
  */
-const RAIL_FEATURE_ENABLED = false;
+const RAIL_FEATURE_ENABLED = true;
 
 /* Local-only minimal station shape used in page state */
 interface StationSelection {
