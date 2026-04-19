@@ -204,7 +204,7 @@ export default function AskOystr({
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isLoading}
-            placeholder="Ask anything about London transport..."
+            placeholder="Ask about London transport..."
             className={cn(
               "w-full bg-transparent",
               "border-b border-amber-faint focus:border-amber",

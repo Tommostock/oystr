@@ -33,10 +33,12 @@
 
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Star, ArrowLeftRight, TrainFront, Mail, Check } from "lucide-react";
+import { mutate } from "swr";
 import AmberText from "@/components/shared/AmberText";
 import BoardPanel from "@/components/shared/BoardPanel";
+import PullToRefresh from "@/components/shared/PullToRefresh";
 import RailStationSearch from "@/components/rail/RailStationSearch";
 import RailDepartureBoard from "@/components/rail/RailDepartureBoard";
 import SavedRouteCard from "@/components/rail/SavedRouteCard";
@@ -134,6 +136,22 @@ function RailPageFull() {
     setFromStation({ crs: terminal.crs, name: terminal.name });
   };
 
+  /**
+   * Page-level pull-to-refresh handler. Uses SWR's global mutate to
+   * invalidate every /api/rail/departures key — that covers the main
+   * board AND every saved-route card, each of which has its own SWR
+   * key based on its from/to CRS pair. Pulling from the top of the
+   * page therefore refreshes everything the user can see.
+   */
+  const handlePullRefresh = useCallback(async () => {
+    await mutate(
+      (key) =>
+        typeof key === "string" && key.startsWith("/api/rail/departures"),
+      undefined,
+      { revalidate: true }
+    );
+  }, []);
+
   /** Swap FROM and TO — handy for return journeys */
   const handleSwap = () => {
     const tmpFrom = fromStation;
@@ -185,16 +203,22 @@ function RailPageFull() {
       : false;
 
   return (
-    <div className="p-4 space-y-4">
-      {/* ---- Page Header ---- */}
-      <div className="text-center pt-4 pb-2">
-        <AmberText as="h1" size="lg" uppercase className="dot-matrix">
-          National Rail
-        </AmberText>
-        <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-1">
-          LONG-DISTANCE LIVE DEPARTURES
+    /*
+     * Page-level PullToRefresh so pulling down from anywhere on the
+     * Rail tab (not just the departure board area) triggers a refresh
+     * of all rail-related SWR data.
+     */
+    <PullToRefresh onRefresh={handlePullRefresh}>
+      <div className="p-4 space-y-4">
+        {/* ---- Page Header ---- */}
+        <div className="text-center pt-4 pb-2">
+          <AmberText as="h1" size="lg" uppercase className="dot-matrix">
+            National Rail
+          </AmberText>
+          <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-1">
+            LONG-DISTANCE LIVE DEPARTURES
+          </div>
         </div>
-      </div>
 
       {/* ---- Saved Routes ---- */}
       {journeys.length > 0 && (
@@ -353,13 +377,14 @@ function RailPageFull() {
         )}
       </div>
 
-      {/* ---- Service detail bottom sheet ---- */}
-      <ServiceDetailSheet
-        departure={expandedDeparture}
-        highlightCrs={toStation?.crs || null}
-        onClose={() => setExpandedDeparture(null)}
-      />
-    </div>
+        {/* ---- Service detail bottom sheet ---- */}
+        <ServiceDetailSheet
+          departure={expandedDeparture}
+          highlightCrs={toStation?.crs || null}
+          onClose={() => setExpandedDeparture(null)}
+        />
+      </div>
+    </PullToRefresh>
   );
 }
 

@@ -38,12 +38,18 @@ interface ArrivalRowProps {
 
 /**
  * Convert seconds to a human-readable time string.
- * - 0-30 seconds = "DUE" (train/bus is arriving now)
- * - 31-90 seconds = "1 MIN"
- * - 91+ seconds = "X MIN" (rounded down to nearest minute)
+ * - 0-30 seconds          = "DUE" (train/bus is arriving now)
+ * - 31-59 seconds          = ">1 MIN" (less than a minute away)
+ * - 60+ seconds            = "X MIN" (Math.floor — "1 MIN" means 60-119s, etc.)
+ *
+ * Previously the 31-59s range rendered as "0 MIN" because
+ * Math.floor(40/60) == 0. The >1 MIN label is dot-matrix style for
+ * "sub-minute but not quite arriving", matching what appears on UK
+ * station boards.
  */
 function formatTime(seconds: number): string {
   if (seconds <= 30) return "DUE";
+  if (seconds < 60) return ">1 MIN";
   const minutes = Math.floor(seconds / 60);
   return `${minutes} MIN`;
 }

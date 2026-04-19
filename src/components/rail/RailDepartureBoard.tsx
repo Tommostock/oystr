@@ -23,7 +23,6 @@ import { useRailDepartures } from "@/hooks/useRailDepartures";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
 import LoadingBoard from "@/components/shared/LoadingBoard";
-import PullToRefresh from "@/components/shared/PullToRefresh";
 import RailArrivalRow from "./RailArrivalRow";
 import type { RailDeparture } from "@/lib/rail-types";
 
@@ -60,6 +59,12 @@ export default function RailDepartureBoard({
       toCrs,
       numRows: maxRows,
     });
+  /*
+   * Note: pull-to-refresh is now handled at the page level via SWR's
+   * global mutate (so pulling from the top of the whole Rail page
+   * refreshes everything). This component no longer needs its own
+   * PullToRefresh wrapper.
+   */
 
   const title = toName
     ? `${fromName.toUpperCase()} --> ${toName.toUpperCase()}`
@@ -155,27 +160,25 @@ export default function RailDepartureBoard({
     );
   }
 
-  /* ---- Normal render: wrapped in pull-to-refresh ---- */
+  /* ---- Normal render (pull-to-refresh lives at the page level) ---- */
   return (
-    <PullToRefresh onRefresh={() => refresh()}>
-      <div className="space-y-3">
-        <BoardPanel title={title}>
-          <div role="table" aria-label={`Departures from ${fromName}`}>
-            {departures.map((dep, i) => (
-              <RailArrivalRow
-                key={`${dep.serviceId}-${i}`}
-                departure={dep}
-                onClick={onServiceTap}
-              />
-            ))}
-          </div>
-        </BoardPanel>
-        <div className="text-center py-1">
-          <AmberText variant="dim" size="xs">
-            AUTO-UPDATING EVERY 30S -- PULL DOWN TO REFRESH
-          </AmberText>
+    <div className="space-y-3">
+      <BoardPanel title={title}>
+        <div role="table" aria-label={`Departures from ${fromName}`}>
+          {departures.map((dep, i) => (
+            <RailArrivalRow
+              key={`${dep.serviceId}-${i}`}
+              departure={dep}
+              onClick={onServiceTap}
+            />
+          ))}
         </div>
+      </BoardPanel>
+      <div className="text-center py-1">
+        <AmberText variant="dim" size="xs">
+          AUTO-UPDATING EVERY 30S -- PULL DOWN TO REFRESH
+        </AmberText>
       </div>
-    </PullToRefresh>
+    </div>
   );
 }

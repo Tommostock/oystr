@@ -14,8 +14,17 @@
 
 "use client";
 
-import { useState, useCallback } from "react";
-import { ArrowDownUp, Home, X } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import {
+  ArrowDownUp,
+  Home,
+  X,
+  Star,
+  Check,
+  RefreshCw,
+  Clock,
+  Trash2,
+} from "lucide-react";
 import StationSearch from "@/components/shared/StationSearch";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
@@ -24,6 +33,8 @@ import JourneyCard from "@/components/journey/JourneyCard";
 import TimeSelector from "@/components/journey/TimeSelector";
 import AskOystr from "@/components/journey/AskOystr";
 import { useHomeStation } from "@/hooks/useHomeStation";
+import { useSavedJourneys } from "@/hooks/useSavedJourneys";
+import { useRecentJourneys } from "@/hooks/useRecentJourneys";
 import type { Journey } from "@/lib/tfl-types";
 import { cn } from "@/lib/utils";
 
@@ -54,6 +65,39 @@ export default function JourneyPage() {
 
   /* Home station from localStorage */
   const { homeStation, setHomeStation, clearHomeStation } = useHomeStation();
+
+  /* Saved journeys (Dexie) and recent-searches list (localStorage) */
+  const {
+    journeys: savedJourneys,
+    saveJourney,
+    removeJourney,
+    isSaved,
+  } = useSavedJourneys();
+  const { recents, addRecent } = useRecentJourneys();
+
+  /* Transient visual confirmation after saving the current journey */
+  const [justSaved, setJustSaved] = useState(false);
+  useEffect(() => {
+    if (!justSaved) return;
+    const t = setTimeout(() => setJustSaved(false), 1500);
+    return () => clearTimeout(t);
+  }, [justSaved]);
+
+  /* Tracks whether the current FROM/TO pair is already in saved journeys */
+  const [currentIsSaved, setCurrentIsSaved] = useState(false);
+  useEffect(() => {
+    if (!fromStation || !toStation) {
+      setCurrentIsSaved(false);
+      return;
+    }
+    let cancelled = false;
+    isSaved(fromStation.naptanId, toStation.naptanId).then((v) => {
+      if (!cancelled) setCurrentIsSaved(v);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fromStation, toStation, isSaved, savedJourneys]);
 
   /**
    * Plan a journey between the two selected stations.
@@ -107,6 +151,21 @@ export default function JourneyPage() {
 
       const data = await response.json();
       setJourneys(data.journeys || []);
+
+      /* Record this search in the recent-journeys list so the user
+         can jump back to it next time without re-typing. */
+      if (data.journeys && data.journeys.length > 0 && fromStation && toStation) {
+        addRecent({
+          fromNaptanId: fromStation.naptanId,
+          fromName: fromStation.name,
+          fromLat: fromStation.lat,
+          fromLon: fromStation.lon,
+          toNaptanId: toStation.naptanId,
+          toName: toStation.name,
+          toLat: toStation.lat,
+          toLon: toStation.lon,
+        });
+      }
     } catch (err) {
       console.error("Journey planning error:", err);
       setError("COULD NOT PLAN JOURNEY -- TRY AGAIN");
@@ -114,7 +173,73 @@ export default function JourneyPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [fromStation, toStation, timeIs, dateTime]);
+  }, [fromStation, toStation, timeIs, dateTime, addRecent]);
+
+  /**
+   * Fill the FROM input with the user's home station (no GPS required).
+   * Complements the existing "DIRECTIONS HOME" button which uses GPS
+   * to pick the nearest station. This is for the opposite direction —
+   * "leaving from home" — which doesn't need GPS.
+   */
+  const handleFillFromHome = useCallback(() => {
+    if (!homeStation) return;
+    setFromStation({
+      naptanId: homeStation.naptanId,
+      name: homeStation.name,
+      lat: homeStation.lat,
+      lon: homeStation.lon,
+    });
+  }, [homeStation]);
+
+  /**
+   * Open a saved or recent journey — populates both FROM and TO.
+   * Intentionally doesn't auto-plan so the user can still tweak time.
+   */
+  const openSavedPair = useCallback(
+    (entry: {
+      fromNaptanId: string;
+      fromName: string;
+      fromLat: number;
+      fromLon: number;
+      toNaptanId: string;
+      toName: string;
+      toLat: number;
+      toLon: number;
+    }) => {
+      setFromStation({
+        naptanId: entry.fromNaptanId,
+        name: entry.fromName,
+        lat: entry.fromLat,
+        lon: entry.fromLon,
+      });
+      setToStation({
+        naptanId: entry.toNaptanId,
+        name: entry.toName,
+        lat: entry.toLat,
+        lon: entry.toLon,
+      });
+      setJourneys([]);
+      setHasSearched(false);
+      setError(null);
+    },
+    []
+  );
+
+  /** Save the current FROM/TO pair to saved journeys. */
+  const handleSaveCurrentJourney = useCallback(async () => {
+    if (!fromStation || !toStation) return;
+    await saveJourney({
+      fromNaptanId: fromStation.naptanId,
+      fromName: fromStation.name,
+      fromLat: fromStation.lat,
+      fromLon: fromStation.lon,
+      toNaptanId: toStation.naptanId,
+      toName: toStation.name,
+      toLat: toStation.lat,
+      toLon: toStation.lon,
+    });
+    setJustSaved(true);
+  }, [fromStation, toStation, saveJourney]);
 
   /**
    * Swap the From and To stations.
@@ -266,7 +391,82 @@ export default function JourneyPage() {
         }}
       />
 
-      {/* ---- Directions Home ---- */}
+      {/* ---- Saved journeys (one-tap restore) ---- */}
+      {savedJourneys.length > 0 && (
+        <div className="space-y-2">
+          <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase px-1">
+            SAVED JOURNEYS
+          </div>
+          {savedJourneys.map((j) => (
+            <div
+              key={j.id}
+              onClick={() => openSavedPair(j)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  openSavedPair(j);
+                }
+              }}
+              tabIndex={0}
+              role="button"
+              aria-label={`Open ${j.fromName} to ${j.toName}`}
+              className="border border-board-border bg-surface p-3 cursor-pointer hover:border-amber-faint focus:border-amber-faint focus:outline-none transition-colors flex items-center gap-2"
+            >
+              <Star
+                size={12}
+                strokeWidth={1.5}
+                fill="currentColor"
+                className="text-amber shrink-0"
+              />
+              <span className="flex-1 min-w-0 font-mono text-xs tracking-wider text-amber uppercase truncate">
+                {j.fromName} -&gt; {j.toName}
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeJourney(j.id);
+                }}
+                className="shrink-0 p-1.5 text-amber-faint hover:text-red-500 transition-colors"
+                aria-label={`Remove ${j.fromName} to ${j.toName}`}
+              >
+                <Trash2 size={12} strokeWidth={1.5} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ---- Recent journeys (localStorage, capped at 3) ---- */}
+      {recents.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5 px-1">
+            <Clock
+              size={10}
+              strokeWidth={1.5}
+              className="text-amber-faint shrink-0"
+            />
+            <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
+              RECENT
+            </span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {recents.map((r, i) => (
+              <button
+                key={`${r.fromNaptanId}-${r.toNaptanId}-${i}`}
+                onClick={() => openSavedPair(r)}
+                className="border border-board-border bg-surface/60 px-3 py-2 text-left hover:border-amber-faint transition-colors"
+                aria-label={`Re-run ${r.fromName} to ${r.toName}`}
+              >
+                <span className="font-mono text-xs tracking-wider text-amber-faint uppercase truncate block">
+                  {r.fromName} -&gt; {r.toName}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ---- Directions Home / Home station setup ---- */}
       {homeStation ? (
         <div className="flex gap-2">
           <button
@@ -283,6 +483,16 @@ export default function JourneyPage() {
           >
             <Home size={16} strokeWidth={1.5} />
             <span>{isLocating ? "LOCATING..." : "DIRECTIONS HOME"}</span>
+          </button>
+          {/* FROM HOME fills the FROM input without needing GPS — pairs
+              nicely with "DIRECTIONS HOME" which does the opposite. */}
+          <button
+            onClick={handleFillFromHome}
+            className="px-3 py-3 bg-surface border border-board-border text-amber-faint hover:text-amber hover:border-amber-faint transition-colors font-mono text-xs tracking-wider uppercase"
+            aria-label={`Use ${homeStation.name} as departure`}
+            title={`Use ${homeStation.name} as departure`}
+          >
+            FROM HOME
           </button>
           <button
             onClick={clearHomeStation}
@@ -400,13 +610,24 @@ export default function JourneyPage() {
         </BoardPanel>
       )}
 
-      {/* ---- Error State ---- */}
+      {/* ---- Error State — with a RETRY button ---- */}
       {error && !isLoading && (
         <BoardPanel>
-          <div className="py-4 text-center">
+          <div className="py-4 text-center space-y-3">
             <AmberText variant="dim" size="sm" className="dot-matrix">
               {error}
             </AmberText>
+            <button
+              onClick={planJourney}
+              disabled={!fromStation || !toStation}
+              className="inline-flex items-center gap-2 px-3 py-1.5 border border-amber text-amber hover:bg-amber hover:text-board-bg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              aria-label="Retry planning journey"
+            >
+              <RefreshCw size={12} strokeWidth={1.5} />
+              <span className="font-mono text-[10px] tracking-wider uppercase">
+                RETRY
+              </span>
+            </button>
           </div>
         </BoardPanel>
       )}
@@ -427,9 +648,47 @@ export default function JourneyPage() {
       {/* ---- Journey Results ---- */}
       {!isLoading && journeys.length > 0 && (
         <div className="space-y-3">
-          <AmberText variant="dim" size="xs" className="uppercase">
-            {journeys.length} ROUTE{journeys.length !== 1 ? "S" : ""} FOUND
-          </AmberText>
+          <div className="flex items-center justify-between">
+            <AmberText variant="dim" size="xs" className="uppercase">
+              {journeys.length} ROUTE{journeys.length !== 1 ? "S" : ""} FOUND
+            </AmberText>
+            {/* Save-journey button, shown once results land so the user
+                has a natural "I use this often" moment to click it. */}
+            {fromStation && toStation && (
+              <button
+                onClick={handleSaveCurrentJourney}
+                disabled={currentIsSaved && !justSaved}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-2.5 py-1 border font-mono text-[10px] tracking-wider uppercase transition-all duration-200",
+                  justSaved
+                    ? "border-amber bg-amber text-board-bg amber-glow"
+                    : currentIsSaved
+                      ? "border-amber text-amber"
+                      : "border-amber-faint text-amber-faint hover:border-amber hover:text-amber"
+                )}
+                aria-label={
+                  currentIsSaved ? "Journey saved" : "Save this journey"
+                }
+              >
+                {justSaved ? (
+                  <>
+                    <Check size={11} strokeWidth={2} />
+                    SAVED!
+                  </>
+                ) : currentIsSaved ? (
+                  <>
+                    <Star size={11} strokeWidth={1.5} fill="currentColor" />
+                    SAVED
+                  </>
+                ) : (
+                  <>
+                    <Star size={11} strokeWidth={1.5} />
+                    SAVE JOURNEY
+                  </>
+                )}
+              </button>
+            )}
+          </div>
 
           {journeys.map((journey, index) => (
             <JourneyCard key={index} journey={journey} index={index} />

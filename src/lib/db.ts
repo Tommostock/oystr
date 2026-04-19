@@ -45,6 +45,33 @@ export interface CachedTimetable {
   cachedAt: number;
 }
 
+/**
+ * A saved TfL journey (FROM -> TO station pair) on the Plan tab.
+ * Stored in the pre-existing `savedJourneys` Dexie table (v1+).
+ */
+export interface SavedJourney {
+  /** Unique key — always "${fromNaptanId}-${toNaptanId}" (idempotent saves) */
+  id: string;
+  /** Origin station naptan ID */
+  fromNaptanId: string;
+  /** Origin station display name */
+  fromName: string;
+  /** Origin lat (used to preserve location info when navigating back) */
+  fromLat: number;
+  /** Origin lon */
+  fromLon: number;
+  /** Destination naptan ID */
+  toNaptanId: string;
+  /** Destination display name */
+  toName: string;
+  /** Destination lat */
+  toLat: number;
+  /** Destination lon */
+  toLon: number;
+  /** Unix timestamp */
+  savedAt: number;
+}
+
 /** A saved National Rail journey (long-distance intercity route) */
 export interface SavedRailJourney {
   /** Unique key — always "${fromCrs}-${toCrs}" so saving twice is idempotent */
@@ -68,6 +95,11 @@ class OystrDatabase extends Dexie {
   favourites!: Table<FavouriteStation>;
   timetables!: Table<CachedTimetable>;
   savedRailJourneys!: Table<SavedRailJourney>;
+  /*
+   * The savedJourneys table has existed in the schema since v1 but
+   * wasn't typed or used until Plan-tab saved journeys shipped.
+   */
+  savedJourneys!: Table<SavedJourney>;
 
   constructor() {
     super("oystr");

@@ -59,19 +59,6 @@ interface SelectedStation {
 }
 
 /**
- * Get a greeting based on the current time of day.
- * Used in the app header for a personal touch.
- */
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 5) return "Good Night";
-  if (hour < 12) return "Good Morning";
-  if (hour < 17) return "Good Afternoon";
-  if (hour < 21) return "Good Evening";
-  return "Good Night";
-}
-
-/**
  * Inner component that reads URL search params.
  * Wrapped in Suspense because useSearchParams requires it in Next.js 15.
  */
@@ -274,9 +261,17 @@ function HomeContent() {
           >
             Oystr
           </AmberText>
-          {/* Greeting or subtitle depending on state */}
+          {/*
+           * Unified subtitle across all app tabs: a short consistent
+           * descriptor rather than a time-based greeting. Previously
+           * the greeting ("Good Morning" / "Good Afternoon") made the
+           * home header stylistically different from every other tab
+           * (which uses a purpose subtitle — e.g. Rail shows
+           * "LONG-DISTANCE LIVE DEPARTURES"). The greeting was a nice
+           * flourish but inconsistent; we prefer the consistency here.
+           */}
           <span className="font-mono text-[9px] tracking-[0.25em] text-amber-faint uppercase mt-0.5">
-            {selectedStation ? "Your London Transport Companion" : getGreeting()}
+            {selectedStation ? "Your London Transport Companion" : "London Transport"}
           </span>
         </div>
 
@@ -423,10 +418,13 @@ function HomeContent() {
               </div>
               <SaveStationButton station={selectedStation} />
             </div>
-            {/* Station address (compact, below the name) */}
+            {/* Station address (compact, below the name).
+                TfL returns the address as "Part1,Part2,Part3" with
+                no spaces after commas — we normalise to "Part1, Part2"
+                for readability. */}
             {selectedStation.address && (
               <p className="font-mono text-[10px] tracking-wider text-amber-faint leading-tight">
-                {selectedStation.address}
+                {selectedStation.address.replace(/,(\S)/g, ", $1")}
               </p>
             )}
             {/* Station name origin fact (only if available) */}

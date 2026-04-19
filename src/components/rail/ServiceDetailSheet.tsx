@@ -137,7 +137,20 @@ export default function ServiceDetailSheet({
         aria-hidden="true"
       />
 
-      {/* Sheet */}
+      {/*
+       * Sheet container.
+       *
+       * Uses flex-col so the header stays pinned to the top while the
+       * body scrolls independently. Previously the whole sheet was a
+       * single overflow-y-auto block which meant scrolling long routes
+       * could hide the title/close button. Now:
+       *   - drag handle   : shrink-0 (never scrolls)
+       *   - header        : shrink-0 (sticky)
+       *   - body          : flex-1 + overflow-y-auto (scrolls)
+       *
+       * Height is taller than before (90vh instead of 80vh) so long
+       * Scottish/Cornish services with 15+ stops have more real estate.
+       */}
       <div
         ref={sheetRef}
         role="dialog"
@@ -146,23 +159,19 @@ export default function ServiceDetailSheet({
         className={cn(
           "fixed left-0 right-0 bottom-0 z-[9999]",
           "bg-board-bg border-t border-board-border",
-          "max-h-[80vh] overflow-y-auto",
-          /*
-           * Bottom padding: 56px (h-14 bottom nav) + 1rem breathing room
-           * + the iOS home-indicator safe area inset. Without this the
-           * final calling point (often the user's destination) ends up
-           * obscured by the fixed bottom navigation bar.
-           */
-          "pb-[calc(56px+1rem+env(safe-area-inset-bottom))]"
+          "flex flex-col",
+          /* Respect safe area + leave ~1rem above sheet-top for context */
+          "max-h-[calc(100dvh-1rem)] min-h-[40vh]",
+          "pb-[env(safe-area-inset-bottom)]"
         )}
       >
         {/* Drag handle (visual only — tap backdrop or close button to dismiss) */}
-        <div className="flex justify-center pt-2 pb-1">
+        <div className="flex justify-center pt-2 pb-1 shrink-0">
           <div className="w-10 h-1 bg-board-border rounded-full" />
         </div>
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-board-border">
+        {/* Header — pinned to top */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-board-border shrink-0">
           <div className="flex-1 min-w-0">
             <AmberText variant="secondary" size="xs" uppercase>
               CALLING AT
@@ -181,8 +190,19 @@ export default function ServiceDetailSheet({
           </button>
         </div>
 
-        {/* Body */}
-        <div className="px-4 py-3">
+        {/*
+         * Scrollable body.
+         *
+         * Dedicated scroll container so long lists scroll cleanly
+         * without the header drifting off-screen. overscroll-contain
+         * prevents scroll chaining to the page underneath on mobile.
+         * Extra bottom padding (56px nav + breathing room) ensures the
+         * last row isn't obscured by the fixed nav bar beneath.
+         */}
+        <div
+          className="flex-1 overflow-y-auto overscroll-contain px-4 py-3 pb-[calc(56px+1rem)]"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
           {!hasCallingPoints && (
             <div className="py-6 text-center">
               <AmberText variant="dim" size="sm" uppercase>

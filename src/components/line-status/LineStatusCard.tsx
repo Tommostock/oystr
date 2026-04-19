@@ -5,25 +5,17 @@
  * Tappable to expand and see the disruption reason.
  *
  * Visual design:
- *   - Small coloured bar on the left (the official line colour)
+ *   - Optional pin button on the left (filled star when pinned)
+ *   - Small coloured bar showing the official line colour
  *   - Line name in amber text
  *   - Status text: green for "Good Service", amber/red for disruptions
  *   - Expandable detail section for disruption reasons
- *
- * Usage:
- *   <LineStatusCard
- *     lineId="central"
- *     lineName="Central"
- *     colour="#E32017"
- *     status="Good Service"
- *     reason=""
- *   />
  */
 
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface LineStatusCardProps {
@@ -39,32 +31,30 @@ interface LineStatusCardProps {
   severity: number;
   /** Reason for disruption (empty string when good service) */
   reason: string;
+  /** Whether this line is currently pinned by the user */
+  isPinned?: boolean;
+  /** Called when the user toggles the pin — swallows the row-tap event */
+  onTogglePin?: (lineId: string) => void;
 }
 
 /**
  * Get the CSS class for status text based on severity level.
- *
- * TfL severity levels:
- *   10 = Good Service (green)
- *   9  = Minor Delays (amber)
- *   6  = Severe Delays (red)
- *   5  = Part Closure (red)
- *   4  = Planned Closure (amber)
- *   1  = Service Closed (red)
- *   0  = Special Service (amber)
  */
 function getStatusColour(severity: number): string {
-  if (severity === 10) return "text-green-500"; /* Good Service */
-  if (severity >= 7) return "text-amber"; /* Minor issues */
-  return "text-red-500"; /* Severe issues */
+  if (severity === 10) return "text-green-500";
+  if (severity >= 7) return "text-amber";
+  return "text-red-500";
 }
 
 export default function LineStatusCard({
+  lineId,
   lineName,
   colour,
   status,
   severity,
   reason,
+  isPinned = false,
+  onTogglePin,
 }: LineStatusCardProps) {
   /* Whether the disruption detail is expanded */
   const [isExpanded, setIsExpanded] = useState(false);
@@ -72,12 +62,17 @@ export default function LineStatusCard({
   /* Only show the expand button if there's a disruption reason to show */
   const hasDetail = reason && reason.length > 0;
 
+  const handlePinClick = (e: React.MouseEvent) => {
+    /* Pin tap must NOT bubble up to the row click that would otherwise
+       toggle the expansion. */
+    e.stopPropagation();
+    onTogglePin?.(lineId);
+  };
+
   return (
     <div
       className={cn(
-        /* Card container */
         "border border-board-border bg-surface",
-        /* Hover effect only if expandable */
         hasDetail && "cursor-pointer hover:border-amber-faint",
         "transition-colors duration-200"
       )}
@@ -86,8 +81,29 @@ export default function LineStatusCard({
       aria-expanded={hasDetail ? isExpanded : undefined}
       aria-label={`${lineName}: ${status}`}
     >
-      {/* ---- Main Row: colour bar + name + status ---- */}
-      <div className="flex items-center gap-3 p-3">
+      {/* ---- Main Row: pin + colour bar + name + status + chevron ---- */}
+      <div className="flex items-center gap-2 p-3">
+        {/* Pin toggle. Filled star when pinned, outline when not. */}
+        {onTogglePin && (
+          <button
+            onClick={handlePinClick}
+            className={cn(
+              "shrink-0 p-1 transition-colors",
+              isPinned
+                ? "text-amber amber-glow"
+                : "text-amber-faint/60 hover:text-amber-faint"
+            )}
+            aria-label={isPinned ? `Unpin ${lineName}` : `Pin ${lineName} to top`}
+            title={isPinned ? "Unpin" : "Pin to top"}
+          >
+            <Star
+              size={14}
+              strokeWidth={1.5}
+              fill={isPinned ? "currentColor" : "none"}
+            />
+          </button>
+        )}
+
         {/* Line colour indicator bar */}
         <div
           className="w-1.5 h-8 rounded-full shrink-0"

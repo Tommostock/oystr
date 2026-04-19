@@ -57,6 +57,58 @@ function formatDateRange(fromDate: string, toDate: string): string {
 }
 
 /**
+ * Parse the TfL strike description into a structured form.
+ *
+ * Strike descriptions are long paragraphs that typically contain
+ * several "from HHMM <Weekday> <DD> until HHMM <Weekday> <DD> <Month>"
+ * date ranges separated by commas. We extract these as a bullet list
+ * so they're scannable, and show any surrounding text as intro/outro
+ * paragraphs.
+ */
+function parseStrikeDescription(description: string): {
+  intro: string;
+  dateRanges: string[];
+  outro: string;
+} {
+  if (!description) return { intro: "", dateRanges: [], outro: "" };
+
+  /*
+   * Pattern matches: "from 1200 Tuesday 21 until 1159 Wednesday 22 April"
+   * - "from" followed by 4 digits (time)
+   * - a weekday (word chars)
+   * - a day number
+   * - "until" followed by time, weekday, day, month
+   * Case-insensitive to be safe.
+   */
+  const rangePattern =
+    /from\s+\d{3,4}\s+\w+\s+\d{1,2}\s+until\s+\d{3,4}\s+\w+\s+\d{1,2}(?:\s+\w+)?/gi;
+
+  const matches: { text: string; index: number; length: number }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = rangePattern.exec(description)) !== null) {
+    matches.push({ text: m[0], index: m.index, length: m[0].length });
+  }
+
+  if (matches.length === 0) {
+    return { intro: description, dateRanges: [], outro: "" };
+  }
+
+  const firstIdx = matches[0].index;
+  const lastEnd = matches[matches.length - 1].index + matches[matches.length - 1].length;
+
+  /* Trim trailing ":" / "," / whitespace off intro, and leading ".," off outro */
+  const intro = description.substring(0, firstIdx).replace(/[:,\s]+$/, "").trim();
+  const outro = description.substring(lastEnd).replace(/^[.,\s]+/, "").trim();
+
+  /* Capitalise each range's leading "from" for consistency at bullet start */
+  const dateRanges = matches.map((x) =>
+    x.text.replace(/^from/i, "From")
+  );
+
+  return { intro, dateRanges, outro };
+}
+
+/**
  * Get countdown text relative to today.
  */
 function getCountdownLabel(fromDate: string, toDate: string): {
@@ -150,10 +202,45 @@ function StrikeEntry({ strike }: { strike: StrikeInfo }) {
         </div>
       )}
 
-      {/* Description */}
-      <p className="font-mono text-sm tracking-wider text-amber amber-glow leading-relaxed">
-        {strike.description}
-      </p>
+      {/* Description — the paragraph is parsed into intro text, a
+          bulleted list of date ranges, and any outro text. This makes
+          multi-date strikes scannable instead of wall-of-text. */}
+      {(() => {
+        const parsed = parseStrikeDescription(strike.description);
+        const hasBullets = parsed.dateRanges.length > 0;
+        if (!hasBullets) {
+          return (
+            <p className="font-mono text-sm tracking-wider text-amber amber-glow leading-relaxed">
+              {strike.description}
+            </p>
+          );
+        }
+        return (
+          <div className="space-y-2">
+            {parsed.intro && (
+              <p className="font-mono text-sm tracking-wider text-amber amber-glow leading-relaxed">
+                {parsed.intro}
+              </p>
+            )}
+            <ul className="space-y-1.5 pl-1" role="list">
+              {parsed.dateRanges.map((range, i) => (
+                <li
+                  key={i}
+                  className="flex gap-2 font-mono text-sm tracking-wider text-amber amber-glow leading-relaxed"
+                >
+                  <span className="text-amber-faint shrink-0">&gt;</span>
+                  <span>{range}</span>
+                </li>
+              ))}
+            </ul>
+            {parsed.outro && (
+              <p className="font-mono text-sm tracking-wider text-amber amber-glow leading-relaxed">
+                {parsed.outro}
+              </p>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

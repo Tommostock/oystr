@@ -8,119 +8,103 @@
  * Disrupted lines show amber/red text and can be tapped
  * to expand and see the disruption reason.
  *
- * Auto-refreshes every 60 seconds.
+ * Users can pin favourite lines so they float to the top.
+ *
+ * Auto-refreshes every 60 seconds; pull-to-refresh supported.
  * Styled like a dot-matrix information board at station entrances.
  */
 
 "use client";
 
+import { useEffect, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { useLineStatus } from "@/hooks/useLineStatus";
+import { usePinnedLines } from "@/hooks/usePinnedLines";
 import { LINE_COLOURS, LINE_NAMES } from "@/lib/constants";
 import type { LineStatus } from "@/lib/tfl-types";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
 import LoadingBoard from "@/components/shared/LoadingBoard";
+import PullToRefresh from "@/components/shared/PullToRefresh";
 import LineStatusCard from "@/components/line-status/LineStatusCard";
 import StrikesPanel from "@/components/status/StrikesPanel";
 
 /**
- * Sort lines by severity, then alphabetically within each group.
- *
- * TfL severity values (lower = worse):
- *   0  = "Special Service"
- *   1  = "Closed"
- *   2  = "Suspended"
- *   3  = "Part Suspended"
- *   4  = "Planned Closure"
- *   5  = "Part Closure"
- *   6  = "Severe Delays"
- *   7  = "Reduced Service"
- *   8  = "Bus Service"
- *   9  = "Minor Delays"
- *   10 = "Good Service"
- *   11 = "Part Closed"
- *   12 = "Exit Only"
- *   13 = "No Step Free Access"
- *   14 = "Change of Frequency"
- *   15 = "Diverted"
- *   16 = "Not Running"
- *   17 = "Issues Reported"
- *   18 = "No Issues"
- *   19 = "Information"
- *   20 = "Service Closed"
- *
- * Display order (worst disruptions first):
- *   1. Closed / Suspended / Not Running     (severity 1, 2, 16, 20)
- *   2. Part Suspended / Part Closed         (severity 3, 5, 11)
- *   3. Severe Delays / Reduced Service      (severity 6, 7)
- *   4. Minor Delays                         (severity 9)
- *   5. Other non-good statuses              (everything else != 10)
- *   6. Good Service                         (severity 10)
- *
- * Within each group, lines are sorted alphabetically by name.
+ * TfL severity → preferred display-order priority.
+ * Lower number = higher up the list.
+ * See the old implementation comment for full severity reference.
  */
 function getSortPriority(severity: number): number {
   switch (severity) {
-    case 1:   // Closed
-    case 2:   // Suspended
-    case 16:  // Not Running
-    case 20:  // Service Closed
-      return 0;
-    case 3:   // Part Suspended
-    case 5:   // Part Closure
-    case 11:  // Part Closed
-      return 1;
-    case 6:   // Severe Delays
-    case 7:   // Reduced Service
-      return 2;
-    case 9:   // Minor Delays
-      return 3;
-    case 10:  // Good Service
-      return 5;
-    default:  // Everything else (special service, planned closure, etc.)
-      return 4;
+    case 1: case 2: case 16: case 20: return 0;  /* Closed / Suspended / Not running */
+    case 3: case 5: case 11: return 1;           /* Part closures */
+    case 6: case 7: return 2;                    /* Severe delays / reduced service */
+    case 9: return 3;                            /* Minor delays */
+    case 10: return 5;                           /* Good Service (bottom) */
+    default: return 4;                           /* Anything else */
   }
 }
 
-function sortLines(lines: LineStatus[]): LineStatus[] {
+function sortLines(lines: LineStatus[], pinnedIds: string[]): LineStatus[] {
   return [...lines].sort((a, b) => {
+    /* Pinned lines always win over unpinned — they float to the top
+       regardless of severity. Pin order is preserved (first-pinned first). */
+    const aPinned = pinnedIds.indexOf(a.id);
+    const bPinned = pinnedIds.indexOf(b.id);
+    if (aPinned !== -1 && bPinned === -1) return -1;
+    if (aPinned === -1 && bPinned !== -1) return 1;
+    if (aPinned !== -1 && bPinned !== -1) return aPinned - bPinned;
+
     const aSeverity = a.lineStatuses?.[0]?.statusSeverity ?? 10;
     const bSeverity = b.lineStatuses?.[0]?.statusSeverity ?? 10;
     const aPriority = getSortPriority(aSeverity);
     const bPriority = getSortPriority(bSeverity);
-
-    /* Sort by severity group first (worst at top) */
     if (aPriority !== bPriority) return aPriority - bPriority;
 
-    /* Within the same group, sort alphabetically by line name */
     const aName = LINE_NAMES[a.id] || a.name;
     const bName = LINE_NAMES[b.id] || b.name;
     return aName.localeCompare(bName);
   });
 }
 
-/**
- * Count how many lines have good service vs disruptions.
- */
+/** Count lines by good vs disrupted. */
 function getStatusSummary(lines: LineStatus[]) {
   let goodService = 0;
   let disrupted = 0;
-
   for (const line of lines) {
     const severity = line.lineStatuses?.[0]?.statusSeverity ?? 10;
-    if (severity === 10) {
-      goodService++;
-    } else {
-      disrupted++;
-    }
+    if (severity === 10) goodService++;
+    else disrupted++;
   }
-
   return { goodService, disrupted };
 }
 
+/**
+ * Format a timestamp like "14:32" (local time, 24h).
+ * Returns empty string for null/undefined so callers can fall back.
+ */
+function formatHHMM(date: Date | null): string {
+  if (!date) return "";
+  return date.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
 export default function StatusPage() {
-  /* Fetch live line status with automatic polling every 60 seconds */
-  const { lines, isLoading, error } = useLineStatus();
+  const { lines, isLoading, error, refresh } = useLineStatus();
+  const { pinnedIds, isPinned, togglePin } = usePinnedLines();
+
+  /*
+   * Track the timestamp of the last successful line-status fetch.
+   * We piggy-back on SWR by updating whenever `lines` changes from a
+   * non-empty fetch. Avoids needing a custom hook extension.
+   */
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  useEffect(() => {
+    if (lines.length > 0) setLastUpdated(new Date());
+  }, [lines]);
 
   /* ---- Loading state ---- */
   if (isLoading && lines.length === 0) {
@@ -138,7 +122,7 @@ export default function StatusPage() {
     );
   }
 
-  /* ---- Error state ---- */
+  /* ---- Error state with RETRY button ---- */
   if (error && lines.length === 0) {
     return (
       <div className="p-4 space-y-4">
@@ -148,81 +132,101 @@ export default function StatusPage() {
           </AmberText>
         </div>
         <BoardPanel>
-          <div className="py-6 text-center">
+          <div className="py-6 text-center space-y-3">
             <AmberText variant="dim" size="sm" className="dot-matrix">
               TFL DATA UNAVAILABLE
             </AmberText>
+            <p className="font-mono text-xs tracking-wider text-amber-faint">
+              CHECK YOUR CONNECTION AND TRY AGAIN
+            </p>
+            <button
+              onClick={() => refresh()}
+              className="inline-flex items-center gap-2 px-3 py-1.5 border border-amber text-amber hover:bg-amber hover:text-board-bg transition-colors"
+              aria-label="Retry fetching line status"
+            >
+              <RefreshCw size={12} strokeWidth={1.5} />
+              <span className="font-mono text-[10px] tracking-wider uppercase">
+                RETRY
+              </span>
+            </button>
           </div>
         </BoardPanel>
       </div>
     );
   }
 
-  /* Sort lines into our preferred display order */
-  const sortedLines = sortLines(lines);
+  const sortedLines = sortLines(lines, pinnedIds);
   const { goodService, disrupted } = getStatusSummary(lines);
 
   return (
-    <div className="p-4 space-y-4">
-      {/* ---- Page Header ---- */}
-      <div className="text-center pt-4 pb-2">
-        <AmberText as="h1" size="lg" uppercase className="dot-matrix">
-          Line Status
-        </AmberText>
-      </div>
-
-      {/* ---- Status Summary ---- */}
-      <BoardPanel>
-        <div className="flex justify-between items-center py-1">
-          <AmberText variant="dim" size="xs">
-            {lines.length} LINES
+    <PullToRefresh onRefresh={() => refresh()}>
+      <div className="p-4 space-y-4">
+        {/* ---- Page Header ---- */}
+        <div className="text-center pt-4 pb-2">
+          <AmberText as="h1" size="lg" uppercase className="dot-matrix">
+            Line Status
           </AmberText>
-          <div className="flex gap-4">
-            <span className="font-mono text-xs tracking-wider text-green-500">
-              {goodService} OK
-            </span>
-            {disrupted > 0 && (
-              <span className="font-mono text-xs tracking-wider text-red-500">
-                {disrupted} DISRUPTED
-              </span>
-            )}
-          </div>
         </div>
-      </BoardPanel>
 
-      {/* ---- Strikes / Industrial Action ---- */}
-      <StrikesPanel />
+        {/* ---- Status Summary + timestamp ---- */}
+        <BoardPanel>
+          <div className="flex justify-between items-center py-1">
+            <AmberText variant="dim" size="xs">
+              {lines.length} LINES
+            </AmberText>
+            <div className="flex gap-4">
+              <span className="font-mono text-xs tracking-wider text-green-500">
+                {goodService} OK
+              </span>
+              {disrupted > 0 && (
+                <span className="font-mono text-xs tracking-wider text-red-500">
+                  {disrupted} DISRUPTED
+                </span>
+              )}
+            </div>
+          </div>
+          {lastUpdated && (
+            <div className="mt-1.5 pt-1.5 border-t border-board-border">
+              <AmberText variant="dim" size="xs">
+                AS OF {formatHHMM(lastUpdated)} -- AUTO-UPDATES EVERY 60S
+              </AmberText>
+            </div>
+          )}
+        </BoardPanel>
 
-      {/* ---- Line Status Cards ---- */}
-      <div className="space-y-2">
-        {sortedLines.map((line) => {
-          /* Get the first (primary) status for this line */
-          const primaryStatus = line.lineStatuses?.[0];
-          const status =
-            primaryStatus?.statusSeverityDescription || "Unknown";
-          const severity = primaryStatus?.statusSeverity ?? 10;
-          const reason = primaryStatus?.reason || "";
+        {/* ---- Strikes / Industrial Action ---- */}
+        <StrikesPanel />
 
-          return (
-            <LineStatusCard
-              key={line.id}
-              lineId={line.id}
-              lineName={LINE_NAMES[line.id] || line.name}
-              colour={LINE_COLOURS[line.id] || "#FF9500"}
-              status={status}
-              severity={severity}
-              reason={reason}
-            />
-          );
-        })}
+        {/* ---- Line Status Cards ---- */}
+        <div className="space-y-2">
+          {sortedLines.map((line) => {
+            const primaryStatus = line.lineStatuses?.[0];
+            const status = primaryStatus?.statusSeverityDescription || "Unknown";
+            const severity = primaryStatus?.statusSeverity ?? 10;
+            const reason = primaryStatus?.reason || "";
+
+            return (
+              <LineStatusCard
+                key={line.id}
+                lineId={line.id}
+                lineName={LINE_NAMES[line.id] || line.name}
+                colour={LINE_COLOURS[line.id] || "#FF9500"}
+                status={status}
+                severity={severity}
+                reason={reason}
+                isPinned={isPinned(line.id)}
+                onTogglePin={togglePin}
+              />
+            );
+          })}
+        </div>
+
+        <div className="text-center py-1">
+          <AmberText variant="dim" size="xs">
+            PULL DOWN TO REFRESH
+          </AmberText>
+        </div>
       </div>
-
-      {/* ---- Last updated indicator ---- */}
-      <div className="text-center py-1">
-        <AmberText variant="dim" size="xs">
-          AUTO-UPDATING EVERY 60S
-        </AmberText>
-      </div>
-    </div>
+    </PullToRefresh>
   );
 }
