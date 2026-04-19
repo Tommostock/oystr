@@ -14,6 +14,19 @@
  * approach that causes React's react-hooks/set-state-in-effect lint
  * rule to fire (cascading renders on mount).
  *
+ * ---- CRITICAL CORRECTNESS NOTE ----
+ *
+ * useSyncExternalStore requires getSnapshot() to return the SAME
+ * reference as long as the underlying value hasn't changed — if
+ * snapshot returns a newly-parsed object each call, React detects
+ * "change" every tick and re-renders forever until the page crashes.
+ *
+ * We cache parsed values in a module-level map keyed by the storage
+ * key, comparing the raw string against the previous raw string.
+ * Same raw string → return the same parsed reference. Raw string
+ * changed (or cleared) → parse fresh, update cache, return new
+ * reference. This satisfies useSyncExternalStore's invariant.
+ *
  * Usage:
  *   const [value, setValue] = useLocalStorage("oystr-foo", defaultValue);
  */
@@ -32,8 +45,6 @@ type Listener = () => void;
 const listeners = new Map<string, Set<Listener>>();
 
 function subscribe(key: string, listener: Listener): () => void {
-  /* Subscribe to both same-tab updates (custom event) and
-     cross-tab updates (browser storage event). */
   let keyListeners = listeners.get(key);
   if (!keyListeners) {
     keyListeners = new Set();
@@ -78,7 +89,8 @@ function readRaw(key: string): string | null {
 
 /**
  * Write a value to localStorage and notify subscribers.
- * Pass `null` to remove the key.
+ * Pass `null` to remove the key. Invalidates the snapshot cache
+ * so the next getSnapshot() re-parses.
  */
 function writeRaw(key: string, value: string | null): void {
   if (typeof window === "undefined") return;
@@ -91,7 +103,54 @@ function writeRaw(key: string, value: string | null): void {
   } catch {
     /* ignore quota / private-mode errors */
   }
+  /* Invalidate the cache for this key so subscribers parse fresh. */
+  snapshotCache.delete(key);
   notify(key);
+}
+
+/*
+ * Snapshot cache — module-level Map keyed by storage key. Holds the
+ * last-seen raw string + its parsed object so that getSnapshot() can
+ * return the SAME reference for reads that haven't changed. Without
+ * this cache, useSyncExternalStore would see a new parsed object
+ * every tick and trigger infinite re-renders.
+ */
+const snapshotCache = new Map<
+  string,
+  { raw: string | null; parsed: unknown }
+>();
+
+/**
+ * Read-and-memoise the parsed value for a key. Returns the cached
+ * reference when the raw localStorage string is unchanged; only
+ * re-parses when the underlying string actually differs.
+ */
+function getCachedSnapshot<T>(key: string, defaultValue: T): T {
+  const raw = readRaw(key);
+  const cached = snapshotCache.get(key);
+
+  /*
+   * Fast path: raw string hasn't changed since last parse — return
+   * the same object identity. This is what keeps useSyncExternalStore
+   * stable between render passes.
+   */
+  if (cached && cached.raw === raw) {
+    return cached.parsed as T;
+  }
+
+  /* Slow path: first read OR the raw value changed. Parse fresh. */
+  let parsed: T;
+  if (raw === null) {
+    parsed = defaultValue;
+  } else {
+    try {
+      parsed = JSON.parse(raw) as T;
+    } catch {
+      parsed = defaultValue;
+    }
+  }
+  snapshotCache.set(key, { raw, parsed });
+  return parsed;
 }
 
 /**
@@ -99,7 +158,9 @@ function writeRaw(key: string, value: string | null): void {
  *
  * - `key` is the storage key.
  * - `defaultValue` is returned during SSR and when the key is unset
- *   or can't be parsed. Must be serialisable by JSON.stringify.
+ *   or can't be parsed. Must be serialisable by JSON.stringify, and
+ *   ideally a module-level stable reference (so React's memoisation
+ *   plays nicely).
  * - Returned setter accepts either a value or a function receiving
  *   the current value (matches React's useState API).
  */
@@ -107,44 +168,18 @@ export function useLocalStorage<T>(
   key: string,
   defaultValue: T
 ): [T, (next: T | ((prev: T) => T)) => void] {
-  /*
-   * useSyncExternalStore handles subscription + SSR safety. The
-   * client snapshot is the parsed JSON; the server snapshot is the
-   * defaultValue so the first render matches between server and
-   * client (avoids hydration errors).
-   *
-   * We wrap the client snapshot in a try/catch since localStorage
-   * may be disabled or contain malformed JSON.
-   */
   const value = useSyncExternalStore<T>(
     (listener) => subscribe(key, listener),
-    () => {
-      const raw = readRaw(key);
-      if (raw === null) return defaultValue;
-      try {
-        return JSON.parse(raw) as T;
-      } catch {
-        return defaultValue;
-      }
-    },
+    () => getCachedSnapshot(key, defaultValue),
+    /* Server snapshot — default during SSR. Must be stable. */
     () => defaultValue
   );
 
   const setValue = useCallback(
     (next: T | ((prev: T) => T)) => {
-      const prev = (() => {
-        const raw = readRaw(key);
-        if (raw === null) return defaultValue;
-        try {
-          return JSON.parse(raw) as T;
-        } catch {
-          return defaultValue;
-        }
-      })();
+      const prev = getCachedSnapshot(key, defaultValue);
       const resolved =
-        typeof next === "function"
-          ? (next as (p: T) => T)(prev)
-          : next;
+        typeof next === "function" ? (next as (p: T) => T)(prev) : next;
       writeRaw(key, JSON.stringify(resolved));
     },
     [key, defaultValue]
