@@ -60,18 +60,15 @@ interface StationSelection {
   name: string;
 }
 
-/*
- * Quick-pick chips for London terminals. Tom travels from Kings Cross,
- * Euston, and Paddington the most; St Pancras and Waterloo are the next
- * most common. One tap populates the FROM input.
- */
+/* Quick-pick chips — one tap populates the FROM input. */
 const LONDON_TERMINAL_CHIPS: { crs: string; label: string; name: string }[] = [
   { crs: "KGX", label: "KGX", name: "London Kings Cross" },
-  { crs: "EUS", label: "EUS", name: "London Euston" },
-  { crs: "PAD", label: "PAD", name: "London Paddington" },
-  { crs: "STP", label: "STP", name: "London St Pancras International" },
-  { crs: "WAT", label: "WAT", name: "London Waterloo" },
   { crs: "LST", label: "LST", name: "London Liverpool Street" },
+  { crs: "PAD", label: "PAD", name: "London Paddington" },
+  { crs: "LDS", label: "LDS", name: "Leeds" },
+  { crs: "EDB", label: "EDB", name: "Edinburgh" },
+  { crs: "BRI", label: "BRI", name: "Bristol Temple Meads" },
+  { crs: "MAN", label: "MAN", name: "Manchester Piccadilly" },
 ];
 
 /* ========================================
