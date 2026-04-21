@@ -14,6 +14,7 @@
 import { useEffect, useMemo } from "react";
 import { Trash2, ArrowRight, Armchair, Pencil } from "lucide-react";
 import { cn, cleanStationName } from "@/lib/utils";
+import { shortOperatorName } from "@/lib/rail-operators";
 import { useTrackedRailService } from "@/hooks/useTrackedRailService";
 import type { TrackedRailJourney } from "@/lib/db";
 import type { RailDeparture, CallingPoint } from "@/lib/rail-types";
@@ -247,7 +248,7 @@ export default function TrackedJourneyCard({
           : "border-amber-faint hover:border-amber focus:border-amber"
       )}
     >
-      {/* Top row: TRACKING label + travel-date chip + remove button */}
+      {/* Top row: TRACKING label + travel-date chip + operator + remove button */}
       <div className="flex items-center gap-2 mb-1.5">
         <span className="font-mono text-[10px] tracking-wider text-amber uppercase">
           {hasDeparted ? "ON BOARD" : "TRACKING"}
@@ -255,6 +256,11 @@ export default function TrackedJourneyCard({
         <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
           {formatTravelDate(journey.travelDate)}
         </span>
+        {liveDeparture?.operator && (
+          <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
+            · {shortOperatorName(liveDeparture.operator)}
+          </span>
+        )}
         <button
           onClick={handleRemove}
           className="ml-auto shrink-0 p-1 text-amber-faint hover:text-red-500 transition-colors"
