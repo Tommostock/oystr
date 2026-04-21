@@ -625,7 +625,7 @@ function RailPageFull() {
         </div>
       </BoardPanel>
 
-      {/* ---- Plan a future journey (collapsible) ---- */}
+      {/* ---- Track journey (collapsible form) ---- */}
       <PlanJourneyPanel
         quickChips={QUICK_STATION_CHIPS}
         onPlan={handlePlanJourney}

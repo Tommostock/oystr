@@ -1,15 +1,13 @@
 /**
- * PlanJourneyPanel.tsx — Plan and track a future-dated rail journey
+ * PlanJourneyPanel.tsx — "TRACK JOURNEY" panel for tracking a specific service
  *
- * A collapsible panel on the Rail tab for journeys you're getting
- * days (or hours) in advance. Stores the planned journey in the
- * trackedRailJourneys table, where the TrackedJourneyCard picks it
- * up — rendering scheduled-only until travel day, then switching to
- * live mode automatically via the live departures hook.
+ * A collapsible panel on the Rail tab for pinning any specific service
+ * — whether you're already on it, about to board, or planning one days
+ * ahead. Stores the tracked journey in the trackedRailJourneys table,
+ * where the TrackedJourneyCard picks it up and shows live status.
  *
- * Minimal required fields: FROM, TO, travel date, scheduled departure.
- * Optional: scheduled arrival (improves auto-clear accuracy ahead of
- * travel day), seat reservation (coach + seat number).
+ * Required: FROM, TO, travel date, scheduled departure.
+ * Optional: seat reservation (coach + seat number).
  */
 
 "use client";
@@ -114,22 +112,22 @@ export default function PlanJourneyPanel({
       <button
         onClick={() => setExpanded(true)}
         className="w-full flex items-center justify-center gap-2 py-2.5 border border-board-border text-amber-faint hover:border-amber-faint hover:text-amber transition-colors font-mono text-[11px] tracking-wider uppercase"
-        aria-label="Open plan a future journey form"
+        aria-label="Open track a journey form"
       >
         <CalendarPlus size={14} strokeWidth={1.5} />
-        <span>PLAN A FUTURE JOURNEY</span>
+        <span>TRACK JOURNEY</span>
         <ChevronDown size={12} strokeWidth={1.5} className="opacity-70" />
       </button>
     );
   }
 
   return (
-    <BoardPanel title="PLAN A JOURNEY">
+    <BoardPanel title="TRACK JOURNEY">
       <div className="space-y-3">
         <p className="font-mono text-[10px] tracking-wider text-amber-faint uppercase leading-relaxed">
-          PIN A SERVICE FOR A FUTURE DATE. LIVE STATUS
+          PIN A SERVICE FOR TODAY OR A FUTURE DATE.
           <br />
-          APPEARS AUTOMATICALLY ON TRAVEL DAY.
+          LIVE STATUS APPEARS AUTOMATICALLY ON TRAVEL DAY.
         </p>
 
         {/* Quick chips for FROM */}

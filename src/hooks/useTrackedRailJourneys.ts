@@ -79,11 +79,24 @@ async function clearExpired(): Promise<void> {
 export function useTrackedRailJourneys() {
   /*
    * useLiveQuery keeps the rendered list in sync with IndexedDB.
-   * We order by trackedAt ASC so the oldest is first — useful when
-   * evicting at the cap.
+   * Sorted so the "most current" journey floats to the top — today's
+   * services (in scheduled-time order) first, then future dates in
+   * chronological order. That puts an in-progress train above a
+   * planned-for-next-week trip, which is what the user expects.
+   *
+   * orderBy only supports a single index, so we read all and sort
+   * in JS on the compound (travelDate, scheduledDeparture) key.
    */
   const journeys = useLiveQuery<TrackedRailJourney[], TrackedRailJourney[]>(
-    () => db.trackedRailJourneys.orderBy("trackedAt").toArray(),
+    async () => {
+      const all = await db.trackedRailJourneys.toArray();
+      return all.sort((a, b) => {
+        if (a.travelDate !== b.travelDate) {
+          return a.travelDate.localeCompare(b.travelDate);
+        }
+        return a.scheduledDeparture.localeCompare(b.scheduledDeparture);
+      });
+    },
     [],
     []
   );
