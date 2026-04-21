@@ -89,6 +89,26 @@ export interface SavedRailJourney {
 }
 
 /**
+ * A saved National Rail STATION (not a route). Mirrors the tube
+ * FavouriteStation concept: the user pinned a single station so it
+ * shows up as a card on Depart and they can jump straight to its
+ * live departure board on /rail/station/[crs].
+ *
+ * Deliberately separate from SavedRailJourney so the two concepts
+ * ("I often go from A to B" vs "show me everything from X") stay
+ * independent — a user might save Leeds as a station AND save
+ * KGX -> LDS as a route.
+ */
+export interface SavedRailStation {
+  /** 3-letter CRS code, uppercase. Used as the primary key. */
+  crs: string;
+  /** Display name (e.g. "Leeds", "London Kings Cross") */
+  name: string;
+  /** Unix timestamp when the user saved this station */
+  addedAt: number;
+}
+
+/**
  * A specific rail service the user is actively travelling on (or plans
  * to travel on). Unlike SavedRailJourney (a generic route), a
  * TrackedRailJourney is tied to a single date + scheduled departure —
@@ -148,6 +168,7 @@ class OystrDatabase extends Dexie {
   favourites!: Table<FavouriteStation>;
   timetables!: Table<CachedTimetable>;
   savedRailJourneys!: Table<SavedRailJourney>;
+  savedRailStations!: Table<SavedRailStation>;
   trackedRailJourneys!: Table<TrackedRailJourney>;
   /*
    * The savedJourneys table has existed in the schema since v1 but
@@ -213,6 +234,23 @@ class OystrDatabase extends Dexie {
       savedJourneys: "id, savedAt",
       stations: "naptanId, name, *lines",
       savedRailJourneys: "id, fromCrs, toCrs, addedAt",
+      trackedRailJourneys: "id, travelDate, trackedAt",
+    });
+
+    /*
+     * Schema version 5: adds standalone National Rail station
+     * favourites. Parallel to the tube `favourites` table but keyed
+     * by CRS code rather than TfL naptanId. Enables the "save this
+     * rail station" button on /rail/station/[crs].
+     */
+    this.version(5).stores({
+      favourites: "naptanId, name, addedAt",
+      timetables: "id, lineId, stationId, cachedAt",
+      lineStatuses: "lineId, cachedAt",
+      savedJourneys: "id, savedAt",
+      stations: "naptanId, name, *lines",
+      savedRailJourneys: "id, fromCrs, toCrs, addedAt",
+      savedRailStations: "crs, name, addedAt",
       trackedRailJourneys: "id, travelDate, trackedAt",
     });
   }

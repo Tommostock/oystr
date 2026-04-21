@@ -71,16 +71,13 @@ function HomeContent() {
   const router = useRouter();
 
   /*
-   * National Rail stations selected via search don't have a TfL
-   * arrivals board — they live on the Rail tab. Route the user there
-   * with the CRS pre-filled so their chosen station loads as FROM.
+   * National Rail stations from search don't have a TfL arrivals
+   * board — they open a focused station page (/rail/station/[crs])
+   * styled to match the tube station view: big name header, save
+   * button, and live rail departures below.
    */
   const handleRailStationSelect = (station: { crs: string; name: string }) => {
-    const qs = new URLSearchParams({
-      fromCrs: station.crs,
-      fromName: station.name,
-    });
-    router.push(`/rail?${qs.toString()}`);
+    router.push(`/rail/station/${encodeURIComponent(station.crs)}`);
   };
 
   /* About popup state */

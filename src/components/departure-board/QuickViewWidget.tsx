@@ -18,12 +18,13 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, TrainFront } from "lucide-react";
 import { useFavourites } from "@/hooks/useFavourites";
 import { useSavedRailJourneys } from "@/hooks/useSavedRailJourneys";
+import { useSavedRailStations } from "@/hooks/useSavedRailStations";
 import { useRailDepartures } from "@/hooks/useRailDepartures";
 import { useArrivals } from "@/hooks/useArrivals";
 import { LINE_COLOURS } from "@/lib/constants";
 import { cn, cleanStationName, isBusStop } from "@/lib/utils";
 import { useCountdown } from "@/hooks/useCountdown";
-import { db, type SavedRailJourney } from "@/lib/db";
+import { db, type SavedRailJourney, type SavedRailStation } from "@/lib/db";
 
 interface QuickViewWidgetProps {
   /** Called when a station card is tapped */
@@ -228,6 +229,103 @@ function QuickRailCard({
 }
 
 /**
+ * Saved National Rail STATION card — shows the station name + CRS
+ * code with its next 2 live departures (no TO filter — just the
+ * station's raw board). Tapping opens /rail/station/[crs] so the
+ * user can see the full board and tap through to calling points.
+ */
+function QuickRailStationCard({
+  station,
+  onOpen,
+}: {
+  station: SavedRailStation;
+  onOpen: (s: SavedRailStation) => void;
+}) {
+  const { departures, isLoading, notConfigured } = useRailDepartures({
+    fromCrs: station.crs,
+    numRows: 2,
+  });
+  const nextTwo = departures.slice(0, 2);
+
+  return (
+    <button
+      onClick={() => onOpen(station)}
+      className={cn(
+        "w-full text-left border border-board-border bg-surface",
+        "p-3 transition-colors duration-200",
+        "hover:border-amber-faint cursor-pointer"
+      )}
+      aria-label={`Open ${station.name} rail station`}
+    >
+      <div className="flex items-center gap-1.5 mb-2 min-w-0">
+        <TrainFront
+          size={12}
+          strokeWidth={1.5}
+          className="shrink-0 text-amber"
+        />
+        <span className="font-mono text-xs tracking-wider text-amber uppercase truncate flex-1">
+          {cleanStationName(station.name)}
+        </span>
+        <span className="shrink-0 font-mono text-[10px] tracking-wider text-amber-faint border border-board-border px-1">
+          {station.crs}
+        </span>
+      </div>
+
+      {notConfigured ? (
+        <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
+          RAIL UNAVAILABLE
+        </div>
+      ) : isLoading && nextTwo.length === 0 ? (
+        <div className="font-mono text-xs tracking-wider text-amber-faint animate-pulse">
+          LOADING...
+        </div>
+      ) : nextTwo.length === 0 ? (
+        <div className="font-mono text-xs tracking-wider text-amber-faint">
+          NO DEPARTURES
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {nextTwo.map((dep, i) => {
+            const status = dep.cancelled
+              ? { label: "CXL", colour: "#ff3b30" }
+              : dep.estimatedDeparture === "On time"
+                ? { label: "ON TIME", colour: "#34c759" }
+                : dep.delayed && dep.estimatedDeparture
+                  ? {
+                      label: `EXP ${dep.estimatedDeparture}`,
+                      colour: "#ff9500",
+                    }
+                  : {
+                      label: (dep.estimatedDeparture || "").toUpperCase(),
+                      colour: "#ff9500",
+                    };
+            return (
+              <div
+                key={`${dep.serviceId}-${i}`}
+                className="flex items-center gap-1.5 text-xs font-mono tracking-wider"
+              >
+                <span className="text-amber shrink-0">
+                  {dep.scheduledDeparture}
+                </span>
+                <span className="text-amber-faint truncate flex-1 uppercase">
+                  {cleanStationName(dep.destination)}
+                </span>
+                <span
+                  className="shrink-0 text-[10px]"
+                  style={{ color: status.colour }}
+                >
+                  {status.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </button>
+  );
+}
+
+/**
  * Compact arrival row for the quick-view widget.
  */
 function QuickArrivalRow({
@@ -279,6 +377,7 @@ export default function QuickViewWidget({
 }: QuickViewWidgetProps) {
   const { favourites } = useFavourites();
   const { journeys: railJourneys } = useSavedRailJourneys();
+  const { stations: railStations } = useSavedRailStations();
   const router = useRouter();
 
   /*
@@ -408,7 +507,15 @@ export default function QuickViewWidget({
     router.push(`/rail?${qs.toString()}`);
   };
 
-  const hasAnySaved = favourites.length > 0 || railJourneys.length > 0;
+  /* Open a saved rail station's focused page. */
+  const handleRailStationOpen = (s: SavedRailStation) => {
+    router.push(`/rail/station/${encodeURIComponent(s.crs)}`);
+  };
+
+  const hasAnySaved =
+    favourites.length > 0 ||
+    railJourneys.length > 0 ||
+    railStations.length > 0;
   if (!hasAnySaved) return null;
 
   const sortedFavourites = [...favourites].sort((a, b) =>
@@ -435,6 +542,13 @@ export default function QuickViewWidget({
                 name: station.name,
               })
             }
+          />
+        ))}
+        {railStations.map((station) => (
+          <QuickRailStationCard
+            key={`rail-station-${station.crs}`}
+            station={station}
+            onOpen={handleRailStationOpen}
           />
         ))}
         {railJourneys.map((journey) => (
