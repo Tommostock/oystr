@@ -631,7 +631,21 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
               popupopen: () => setFollowing(false),
             }}
           >
-            <Popup className="oystr-popup" maxWidth={280} minWidth={240}>
+            <Popup
+              className="oystr-popup"
+              maxWidth={280}
+              minWidth={240}
+              /*
+               * Leaflet's default autoPan re-runs on every map view
+               * change — including GPS-driven re-centres from
+               * watchPosition — so the map was visibly ping-ponging
+               * between the user location and the popup. Disabling
+               * autoPan keeps the popup anchored to the marker; if
+               * it lands off-screen the user can pan the map
+               * themselves (a far tamer UX than the bounce).
+               */
+              autoPan={false}
+            >
               <StationPopup
                 station={station}
                 onShowRoute={handleToggleRoute}
@@ -682,7 +696,12 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
                   popupopen: () => setFollowing(false),
                 }}
               >
-                <Popup className="oystr-popup" maxWidth={220} minWidth={180}>
+                <Popup
+                  className="oystr-popup"
+                  maxWidth={220}
+                  minWidth={180}
+                  autoPan={false}
+                >
                   <div className="font-mono text-xs tracking-wider text-amber uppercase">
                     <div className="text-amber amber-glow">
                       TO {v.destinationName.toUpperCase()}
