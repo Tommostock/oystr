@@ -117,8 +117,24 @@ export default function BottomNav() {
                   }}
                 />
               )}
-              {/* Tab icon — slightly smaller so 6 tabs fit on 390px iPhone */}
-              <IconComponent size={18} strokeWidth={1.5} />
+              {/*
+               * Tab icon — slightly smaller so 6 tabs fit on 390px iPhone.
+               *
+               * The TrainFront glyph gets a 1px leftward nudge: at 18px
+               * size with a 1.5px stroke the SVG rasterises off-centre
+               * (sub-pixel rendering of an odd-width stroke over a
+               * 0.75x-scaled viewBox), which makes the active Rail
+               * icon appear to sit to the right of the "RAIL" label
+               * underneath it. The path itself is symmetric — this
+               * is purely an optical correction.
+               */}
+              <IconComponent
+                size={18}
+                strokeWidth={1.5}
+                className={cn(
+                  tab.icon === "train-front" && "-translate-x-[1px]"
+                )}
+              />
               {/*
                * Tab label — block + w-full + text-center guarantees the
                * text is visually centred within the full tab width,
