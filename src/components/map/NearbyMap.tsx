@@ -88,9 +88,12 @@ function createStationIcon(colour: string): L.DivIcon {
 
 /**
  * Create a distinct marker for National Rail stations.
- * Solid amber square with an outlined "RAIL" sigil so users can tell
- * at a glance that tapping this one opens the dedicated rail station
- * page rather than the TfL arrivals popup.
+ *
+ * Uses the exact Lucide TrainFront SVG that the Rail nav tab renders,
+ * so users get visual continuity — the icon they see pinned in the
+ * bottom nav is the same one that marks rail terminals on the map.
+ * Rendered black-on-amber so it pops at small sizes against the dark
+ * map tiles.
  */
 function createRailIcon(): L.DivIcon {
   return L.divIcon({
@@ -104,14 +107,13 @@ function createRailIcon(): L.DivIcon {
       box-shadow: 0 0 10px rgba(255, 149, 0, 0.55);
       display: flex; align-items: center; justify-content: center;
       border-radius: 4px;
-    "><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    "><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M8 3.1V7a4 4 0 0 0 8 0V3.1"/>
       <path d="m9 15-1-1"/>
       <path d="m15 15 1-1"/>
-      <path d="M5 13a2 2 0 0 0 2-2V7a5 5 0 0 1 10 0v4a2 2 0 0 0 2 2"/>
-      <path d="M7 19h10"/>
-      <rect x="3" y="13" width="18" height="8" rx="2"/>
-      <path d="M7 17v0M17 17v0"/>
+      <path d="M9 19c-2.3 0-4.3-1.9-4.3-4.3v-5a4.3 4.3 0 0 1 4.3-4.3h6a4.3 4.3 0 0 1 4.3 4.3v5c0 2.3-1.9 4.3-4.3 4.3Z"/>
+      <path d="m8 22 2-3"/>
+      <path d="m16 22-2-3"/>
     </svg></div>`,
   });
 }
@@ -617,6 +619,17 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
             ref={(ref) => {
               if (ref) markerRefs.current.set(station.naptanId, ref);
             }}
+            /*
+             * Stop following the user the moment any popup opens.
+             * Otherwise the next GPS update re-centres the map on the
+             * user's location and fights with Leaflet's own popup
+             * auto-pan, producing a visible "bounce" between the blue
+             * dot and the station popup. Tapping the re-centre button
+             * resumes following.
+             */
+            eventHandlers={{
+              popupopen: () => setFollowing(false),
+            }}
           >
             <Popup className="oystr-popup" maxWidth={280} minWidth={240}>
               <StationPopup
@@ -665,6 +678,9 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
                 key={`vehicle-${v.vehicleId}`}
                 position={[v.lat, v.lon]}
                 icon={createVehicleIcon()}
+                eventHandlers={{
+                  popupopen: () => setFollowing(false),
+                }}
               >
                 <Popup className="oystr-popup" maxWidth={220} minWidth={180}>
                   <div className="font-mono text-xs tracking-wider text-amber uppercase">
