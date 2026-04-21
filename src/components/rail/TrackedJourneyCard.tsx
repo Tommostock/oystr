@@ -11,8 +11,8 @@
 
 "use client";
 
-import { useMemo } from "react";
-import { Trash2, ArrowRight } from "lucide-react";
+import { useEffect, useMemo } from "react";
+import { Trash2, ArrowRight, Armchair, Pencil } from "lucide-react";
 import { cn, cleanStationName } from "@/lib/utils";
 import { useRailDepartures } from "@/hooks/useRailDepartures";
 import type { TrackedRailJourney } from "@/lib/db";
@@ -24,6 +24,18 @@ interface TrackedJourneyCardProps {
       RailDeparture (or null if live data isn't available yet/ever). */
   onOpen: (journey: TrackedRailJourney, live: RailDeparture | null) => void;
   onRemove: (id: string) => void;
+  /** Called when the user taps EDIT SEAT / + SEAT */
+  onEditSeat: (id: string) => void;
+  /**
+   * Called when live data first resolves a more accurate destination
+   * ETA than what was stored when the user tracked. Used to correct
+   * the auto-clear timing for journeys planned days in advance.
+   */
+  onEtaResolved?: (
+    id: string,
+    destinationEta: string,
+    serviceId?: string
+  ) => void;
 }
 
 /** Local YYYY-MM-DD for "today". Avoids the UTC shift from toISOString(). */
@@ -91,6 +103,8 @@ export default function TrackedJourneyCard({
   journey,
   onOpen,
   onRemove,
+  onEditSeat,
+  onEtaResolved,
 }: TrackedJourneyCardProps) {
   const today = localDateString();
   const isToday = journey.travelDate === today;
@@ -157,10 +171,40 @@ export default function TrackedJourneyCard({
     );
   }, [liveDeparture, journey.toCrs]);
 
+  /*
+   * Once live data resolves the destination's actual scheduled time,
+   * sync that back to Dexie. Matters for journeys planned days in
+   * advance where the user didn't know the arrival time — keeping the
+   * stored destinationEta accurate means auto-clear kicks in 10 min
+   * after the real arrival instead of at end-of-day.
+   */
+  const liveDestinationScheduled = destCallingPoint?.scheduledTime ?? null;
+  const liveServiceId = liveDeparture?.serviceId ?? undefined;
+  useEffect(() => {
+    if (!onEtaResolved) return;
+    if (!liveDestinationScheduled) return;
+    /* Skip if the stored value already matches what live data says. */
+    if (liveDestinationScheduled === journey.destinationEta) return;
+    onEtaResolved(journey.id, liveDestinationScheduled, liveServiceId);
+  }, [
+    journey.id,
+    journey.destinationEta,
+    liveDestinationScheduled,
+    liveServiceId,
+    onEtaResolved,
+  ]);
+
   const handleRemove = (e: React.MouseEvent) => {
     e.stopPropagation();
     onRemove(journey.id);
   };
+
+  const handleEditSeat = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEditSeat(journey.id);
+  };
+
+  const hasSeat = !!(journey.seatCoach || journey.seatNumber);
 
   return (
     <div
@@ -236,6 +280,44 @@ export default function TrackedJourneyCard({
             PL {liveDeparture.platform}
           </span>
         )}
+      </div>
+
+      {/*
+       * Seat reservation pill — always visible (so the user can add
+       * one even before travel day). When no seat is saved, reads
+       * "+ SEAT" as an affordance to tap to enter one.
+       */}
+      <div className="mt-1.5">
+        <button
+          onClick={handleEditSeat}
+          aria-label={
+            hasSeat ? "Edit seat reservation" : "Add seat reservation"
+          }
+          className={cn(
+            "inline-flex items-center gap-1.5 px-2 py-1 border transition-colors",
+            "font-mono text-[10px] tracking-wider uppercase",
+            hasSeat
+              ? "border-amber text-amber hover:bg-amber/10"
+              : "border-board-border text-amber-faint hover:border-amber-faint hover:text-amber"
+          )}
+        >
+          {hasSeat ? (
+            <>
+              <Armchair size={11} strokeWidth={1.5} />
+              <span>
+                {journey.seatCoach && `COACH ${journey.seatCoach}`}
+                {journey.seatCoach && journey.seatNumber && " · "}
+                {journey.seatNumber && `SEAT ${journey.seatNumber}`}
+              </span>
+              <Pencil size={10} strokeWidth={1.5} className="opacity-70" />
+            </>
+          ) : (
+            <>
+              <Armchair size={11} strokeWidth={1.5} />
+              <span>+ SEAT</span>
+            </>
+          )}
+        </button>
       </div>
 
       {/* Live detail rows — only when live data is available. */}

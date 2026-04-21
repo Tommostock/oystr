@@ -43,6 +43,8 @@ import RailStationSearch from "@/components/rail/RailStationSearch";
 import RailDepartureBoard from "@/components/rail/RailDepartureBoard";
 import ServiceDetailSheet from "@/components/rail/ServiceDetailSheet";
 import TrackedJourneyCard from "@/components/rail/TrackedJourneyCard";
+import PlanJourneyPanel from "@/components/rail/PlanJourneyPanel";
+import SeatEditor from "@/components/rail/SeatEditor";
 import { useSavedRailJourneys } from "@/hooks/useSavedRailJourneys";
 import { useTrackedRailJourneys } from "@/hooks/useTrackedRailJourneys";
 import { cleanStationName } from "@/lib/utils";
@@ -141,7 +143,11 @@ function RailPageFull() {
     journeys: trackedJourneys,
     trackJourney,
     removeJourney: removeTrackedJourney,
+    updateJourney: updateTrackedJourney,
   } = useTrackedRailJourneys();
+
+  /* Which tracked journey is currently having its seat edited (null when closed). */
+  const [editingSeatId, setEditingSeatId] = useState<string | null>(null);
 
   /* Ref to the departures panel for smooth-scroll on saved-route tap */
   const departuresRef = useRef<HTMLDivElement>(null);
@@ -282,6 +288,68 @@ function RailPageFull() {
   );
 
   /*
+   * Save handler for the PlanJourneyPanel (future-dated journeys).
+   * Uses "23:59" as a fallback destinationEta when the user doesn't
+   * supply an arrival time — keeps the card pinned until end-of-day.
+   * Once live data arrives on travel day, the card calls back to us
+   * via handleEtaResolved to overwrite this with the real ETA.
+   */
+  const handlePlanJourney = useCallback(
+    async (input: {
+      fromCrs: string;
+      fromName: string;
+      toCrs: string;
+      toName: string;
+      travelDate: string;
+      scheduledDeparture: string;
+      plannedArrival: string;
+      seatCoach: string;
+      seatNumber: string;
+    }) => {
+      await trackJourney({
+        fromCrs: input.fromCrs,
+        fromName: input.fromName,
+        toCrs: input.toCrs,
+        toName: input.toName,
+        travelDate: input.travelDate,
+        scheduledDeparture: input.scheduledDeparture,
+        destinationEta: input.plannedArrival || "23:59",
+        seatCoach: input.seatCoach,
+        seatNumber: input.seatNumber,
+      });
+    },
+    [trackJourney]
+  );
+
+  /* Seat save handler used by the SeatEditor modal. */
+  const handleSaveSeat = useCallback(
+    async (id: string, coach: string, seat: string) => {
+      await updateTrackedJourney(id, {
+        seatCoach: coach,
+        seatNumber: seat,
+      });
+    },
+    [updateTrackedJourney]
+  );
+
+  /*
+   * Called by TrackedJourneyCard when live data resolves a more
+   * accurate destination ETA than the one stored (e.g. on travel
+   * day for a journey planned days ahead). We write it back so
+   * auto-clear fires at the right moment.
+   */
+  const handleEtaResolved = useCallback(
+    async (id: string, destinationEta: string, serviceId?: string) => {
+      await updateTrackedJourney(id, { destinationEta, serviceId });
+    },
+    [updateTrackedJourney]
+  );
+
+  const editingJourney = editingSeatId
+    ? trackedJourneys.find((j) => j.id === editingSeatId) ?? null
+    : null;
+
+  /*
    * Is the currently-expanded service already in the tracked list?
    * Used to grey out the TRACK button and show "TRACKING" instead.
    */
@@ -355,6 +423,8 @@ function RailPageFull() {
                 journey={t}
                 onOpen={handleTrackedOpen}
                 onRemove={removeTrackedJourney}
+                onEditSeat={(id) => setEditingSeatId(id)}
+                onEtaResolved={handleEtaResolved}
               />
             ))}
           </div>
@@ -556,6 +626,12 @@ function RailPageFull() {
         </div>
       </BoardPanel>
 
+      {/* ---- Plan a future journey (collapsible) ---- */}
+      <PlanJourneyPanel
+        quickChips={QUICK_STATION_CHIPS}
+        onPlan={handlePlanJourney}
+      />
+
       {/* ---- Departures board (only when FROM is set) ---- */}
       <div ref={departuresRef}>
         {fromStation ? (
@@ -599,6 +675,18 @@ function RailPageFull() {
             setExpandedDeparture(null);
             setExpandedContext(null);
           }}
+        />
+
+        {/* ---- Seat reservation editor ---- */}
+        <SeatEditor
+          open={!!editingJourney}
+          initialCoach={editingJourney?.seatCoach}
+          initialSeat={editingJourney?.seatNumber}
+          onSave={(coach, seat) => {
+            if (!editingJourney) return;
+            return handleSaveSeat(editingJourney.id, coach, seat);
+          }}
+          onClose={() => setEditingSeatId(null)}
         />
       </div>
     </PullToRefresh>

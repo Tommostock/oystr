@@ -113,6 +113,8 @@ export function useTrackedRailJourneys() {
     scheduledDeparture: string;
     destinationEta: string;
     serviceId?: string;
+    seatCoach?: string;
+    seatNumber?: string;
   }): Promise<TrackedRailJourney> {
     const id = buildTrackedId(input);
     const now = Date.now();
@@ -138,6 +140,8 @@ export function useTrackedRailJourneys() {
       scheduledDeparture: input.scheduledDeparture,
       destinationEta: input.destinationEta,
       serviceId: input.serviceId,
+      seatCoach: input.seatCoach?.trim() || undefined,
+      seatNumber: input.seatNumber?.trim() || undefined,
       trackedAt: now,
     };
     await db.trackedRailJourneys.put(record);
@@ -153,11 +157,41 @@ export function useTrackedRailJourneys() {
     return !!row;
   }
 
+  /**
+   * Patch specific fields on an existing tracked journey.
+   * Used for:
+   *   - editing seat info after the fact
+   *   - refreshing the stored destinationEta once live data arrives
+   *     on the travel day (so auto-clear becomes accurate)
+   */
+  async function updateJourney(
+    id: string,
+    patch: Partial<
+      Pick<
+        TrackedRailJourney,
+        "destinationEta" | "seatCoach" | "seatNumber" | "serviceId"
+      >
+    >
+  ): Promise<void> {
+    const current = await db.trackedRailJourneys.get(id);
+    if (!current) return;
+    /* Normalise empty strings to undefined for optional string fields. */
+    const normalised: Partial<TrackedRailJourney> = { ...patch };
+    if ("seatCoach" in patch) {
+      normalised.seatCoach = patch.seatCoach?.trim() || undefined;
+    }
+    if ("seatNumber" in patch) {
+      normalised.seatNumber = patch.seatNumber?.trim() || undefined;
+    }
+    await db.trackedRailJourneys.update(id, normalised);
+  }
+
   return {
     /** Tracked journeys, oldest first (display order left-to-right). */
     journeys: journeys || [],
     trackJourney,
     removeJourney,
+    updateJourney,
     isTracked,
     buildTrackedId,
   };

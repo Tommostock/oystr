@@ -116,6 +116,12 @@ export interface TrackedRailJourney {
    * Scheduled/estimated arrival at the user's destination in HH:mm at
    * the moment the journey was tracked. Used purely for auto-clear:
    * the card itself re-fetches live data on travel day.
+   *
+   * For future-dated journeys that the user plans manually without
+   * providing an arrival time, this defaults to "23:59" so the
+   * journey stays pinned until end-of-travel-day. Once live data
+   * resolves the true arrival time on the travel day, we overwrite
+   * this field so auto-clear becomes accurate.
    */
   destinationEta: string;
   /**
@@ -124,6 +130,13 @@ export interface TrackedRailJourney {
    * we match by from/to/scheduledDeparture instead.
    */
   serviceId?: string;
+  /**
+   * Coach letter/number for a booked seat reservation (e.g. "B", "12").
+   * Optional — users can track without entering seat info.
+   */
+  seatCoach?: string;
+  /** Seat number within the coach (e.g. "42", "3A"). */
+  seatNumber?: string;
   /** Unix timestamp when the user tracked this journey */
   trackedAt: number;
 }
