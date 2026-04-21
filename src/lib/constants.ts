@@ -149,9 +149,9 @@ export const RAIL_DEPARTURES_POLL_INTERVAL = 30_000; // 30 seconds
  * closer to journey planning than to live London status.
  * ======================================== */
 export const NAV_TABS = [
-  { href: "/", label: "Depart", icon: "train" },
+  { href: "/", label: "Terminal", icon: "train" },
   { href: "/nearby", label: "Nearby", icon: "map-pin" },
-  { href: "/journey", label: "Plan", icon: "route" },
+  { href: "/journey", label: "Tube", icon: "route" },
   { href: "/rail", label: "Rail", icon: "train-front" },
   { href: "/status", label: "Status", icon: "activity" },
   { href: "/flights", label: "Flights", icon: "plane" },

@@ -31,13 +31,18 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    /* Build the TfL API URL for nearby stops — includes bus stops */
+    /*
+     * Build the TfL API URL for nearby stops. Includes bus stops and
+     * National Rail stations; national-rail mode surfaces non-TfL rail
+     * terminals (e.g. Leeds, Manchester Piccadilly) so the Nearby map
+     * can show them alongside tube/DLR/Overground.
+     */
     const params = new URLSearchParams({
       lat,
       lon,
       radius,
       stopTypes: "NaptanMetroStation,NaptanRailStation,NaptanPublicBusCoachTram",
-      modes: "tube,dlr,overground,elizabeth-line,bus",
+      modes: "tube,dlr,overground,elizabeth-line,bus,national-rail",
     });
 
     if (process.env.TFL_APP_KEY) {

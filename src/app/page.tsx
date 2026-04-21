@@ -42,6 +42,17 @@ import StrikeAlert from "@/components/shared/StrikeAlert";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
 
+/**
+ * Time-of-day greeting for the page header.
+ * 5–11 = morning, 12–16 = afternoon, otherwise evening.
+ */
+function timeGreeting(): string {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 12) return "Good Morning";
+  if (h < 17) return "Good Afternoon";
+  return "Good Evening";
+}
+
 /** Shape of a selected station (from the search results) */
 interface SelectedStation {
   naptanId: string;
@@ -281,16 +292,12 @@ function HomeContent() {
             Oystr
           </AmberText>
           {/*
-           * Unified subtitle across all app tabs: a short consistent
-           * descriptor rather than a time-based greeting. Previously
-           * the greeting ("Good Morning" / "Good Afternoon") made the
-           * home header stylistically different from every other tab
-           * (which uses a purpose subtitle — e.g. Rail shows
-           * "LONG-DISTANCE LIVE DEPARTURES"). The greeting was a nice
-           * flourish but inconsistent; we prefer the consistency here.
+           * Time-of-day greeting subtitle — friendlier than a static
+           * descriptor and matches the at-a-glance dot-matrix feel of
+           * the rest of the board.
            */}
           <span className="font-mono text-[9px] tracking-[0.25em] text-amber-faint uppercase mt-0.5">
-            {selectedStation ? "Your London Transport Companion" : "London Transport"}
+            {timeGreeting()}
           </span>
         </div>
 

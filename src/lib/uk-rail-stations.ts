@@ -167,6 +167,37 @@ export function getStationName(crs: string): string {
   return crsToNameMap[crs.toUpperCase()] || crs;
 }
 
+/**
+ * Resolve a station name (as returned by TfL or any other source) to
+ * its CRS code. Tolerates common name suffix noise like "Rail Station"
+ * and "(London)". Used when mapping a TfL national-rail nearby result
+ * into a deep link to /rail/station/[crs].
+ *
+ * Returns null when no confident match is found — callers should
+ * fall back to the TfL naptanId-based link in that case.
+ */
+export function findCrsByName(name: string): string | null {
+  if (!name) return null;
+  const clean = name
+    .replace(/\s*Rail Station$/i, "")
+    .replace(/\s*\(London\)/i, "")
+    .trim()
+    .toLowerCase();
+  if (!clean) return null;
+  for (const station of UK_RAIL_STATIONS) {
+    if (station.name.toLowerCase() === clean) return station.crs;
+  }
+  /* Second pass: starts-with match for names like "London Kings Cross"
+     vs TfL's "Kings Cross" (handling the "London " prefix). */
+  for (const station of UK_RAIL_STATIONS) {
+    const stationName = station.name.toLowerCase();
+    if (stationName.endsWith(clean) || clean.endsWith(stationName)) {
+      return station.crs;
+    }
+  }
+  return null;
+}
+
 /* ========================================
  * SEARCH
  * Filter stations by name or CRS code match.

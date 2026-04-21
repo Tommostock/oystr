@@ -135,6 +135,9 @@ export default function StatusPage() {
           <AmberText as="h1" size="lg" uppercase className="dot-matrix">
             Line Status
           </AmberText>
+          <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-1">
+            LONDON TUBE NETWORK STATUS
+          </div>
         </div>
         <BoardPanel>
           <LoadingBoard message="FETCHING LINE STATUS..." />
@@ -151,6 +154,9 @@ export default function StatusPage() {
           <AmberText as="h1" size="lg" uppercase className="dot-matrix">
             Line Status
           </AmberText>
+          <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-1">
+            LONDON TUBE NETWORK STATUS
+          </div>
         </div>
         <BoardPanel>
           <div className="py-6 text-center space-y-3">
@@ -187,6 +193,9 @@ export default function StatusPage() {
           <AmberText as="h1" size="lg" uppercase className="dot-matrix">
             Line Status
           </AmberText>
+          <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-1">
+            LONDON TUBE NETWORK STATUS
+          </div>
         </div>
 
         {/* ---- Status Summary + timestamp ---- */}

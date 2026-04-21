@@ -369,8 +369,11 @@ export default function JourneyPage() {
       {/* ---- Page Header ---- */}
       <div className="text-center pt-4 pb-2">
         <AmberText as="h1" size="lg" uppercase className="dot-matrix">
-          Journey Planner
+          Tube
         </AmberText>
+        <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-1">
+          LONDON TRANSPORT
+        </div>
       </div>
 
       {/*

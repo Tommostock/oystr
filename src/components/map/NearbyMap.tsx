@@ -87,6 +87,36 @@ function createStationIcon(colour: string): L.DivIcon {
 }
 
 /**
+ * Create a distinct marker for National Rail stations.
+ * Solid amber square with an outlined "RAIL" sigil so users can tell
+ * at a glance that tapping this one opens the dedicated rail station
+ * page rather than the TfL arrivals popup.
+ */
+function createRailIcon(): L.DivIcon {
+  return L.divIcon({
+    className: "",
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -16],
+    html: `<div style="
+      width: 28px; height: 28px;
+      background: #ff9500; border: 1.5px solid #ff9500;
+      box-shadow: 0 0 10px rgba(255, 149, 0, 0.55);
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 4px;
+    "><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 3.1V7a4 4 0 0 0 8 0V3.1"/>
+      <path d="m9 15-1-1"/>
+      <path d="m15 15 1-1"/>
+      <path d="M5 13a2 2 0 0 0 2-2V7a5 5 0 0 1 10 0v4a2 2 0 0 0 2 2"/>
+      <path d="M7 19h10"/>
+      <rect x="3" y="13" width="18" height="8" rx="2"/>
+      <path d="M7 17v0M17 17v0"/>
+    </svg></div>`,
+  });
+}
+
+/**
  * Create a squared amber marker icon for bus stops.
  * Matches the stop letter badges used in the departure board UI.
  */
@@ -266,7 +296,15 @@ const MODE_FILTERS = [
   { id: "bus", label: "BUS" },
   { id: "dlr", label: "DLR" },
   { id: "overground", label: "OVRG" },
+  { id: "national-rail", label: "RAIL" },
 ];
+
+/** True when this station's primary role is National Rail. */
+function isNationalRail(station: { naptanId: string; modes: string[] }): boolean {
+  /* NaptanRailStation IDs start with 9100 when coming from TfL. */
+  if (station.naptanId?.startsWith("9100")) return true;
+  return station.modes?.includes("national-rail") ?? false;
+}
 
 /* ========================================
  * MAIN COMPONENT
@@ -517,18 +555,21 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
   /*
    * Filter stations by active modes.
    * Elizabeth line is consolidated into Tube — treat "elizabeth-line"
-   * as matching when "tube" filter is active.
+   * as matching when "tube" filter is active. National Rail uses both
+   * an explicit mode and a 9100-prefix naptanId, so the rail filter
+   * also matches stations whose naptanId indicates a rail terminal.
    */
-  const filteredStations = activeModes.size === 0
-    ? stations
-    : stations.filter((s) =>
-        s.modes.some((m) => {
-          if (activeModes.has(m)) return true;
-          /* elizabeth-line matches tube filter */
-          if (m === "elizabeth-line" && activeModes.has("tube")) return true;
+  const filteredStations =
+    activeModes.size === 0
+      ? stations
+      : stations.filter((s) => {
+          if (s.modes.some((m) => activeModes.has(m))) return true;
+          if (activeModes.has("tube") && s.modes.includes("elizabeth-line"))
+            return true;
+          if (activeModes.has("national-rail") && isNationalRail(s))
+            return true;
           return false;
-        })
-      );
+        });
 
   return (
     <div className="relative w-full h-full">
@@ -569,7 +610,9 @@ export default function NearbyMap({ initialPosition }: NearbyMapProps) {
             icon={
               isBus(station)
                 ? createBusIcon(station.stopLetter)
-                : createStationIcon(getStationColour(station))
+                : isNationalRail(station)
+                  ? createRailIcon()
+                  : createStationIcon(getStationColour(station))
             }
             ref={(ref) => {
               if (ref) markerRefs.current.set(station.naptanId, ref);

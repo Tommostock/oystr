@@ -13,7 +13,9 @@
 import { useEffect, useState } from "react";
 import { LINE_COLOURS } from "@/lib/constants";
 import { useFavourites } from "@/hooks/useFavourites";
+import { useSavedRailStations } from "@/hooks/useSavedRailStations";
 import { isBusStop } from "@/lib/utils";
+import { findCrsByName } from "@/lib/uk-rail-stations";
 
 interface Arrival {
   lineId: string;
@@ -60,17 +62,44 @@ export default function StationPopup({ station, onShowRoute, activeRouteId }: St
   const [arrivals, setArrivals] = useState<Arrival[]>([]);
   const [loading, setLoading] = useState(true);
   const { toggleFavourite, isFavourite } = useFavourites();
+  const { toggleStation: toggleRailStation, isSaved: isRailSaved } =
+    useSavedRailStations();
   const [saved, setSaved] = useState(false);
 
   const isBus = isBusStop(station.naptanId, station.modes);
+  /*
+   * National Rail stations deep-link to /rail/station/[crs] instead of
+   * the TfL departures page, because TfL's arrivals API doesn't cover
+   * non-London rail stations. We resolve CRS from the station name.
+   */
+  const isRail =
+    station.naptanId?.startsWith("9100") ||
+    (station.modes?.includes("national-rail") ?? false);
+  const railCrs = isRail ? findCrsByName(station.name) : null;
+  const boardHref = railCrs
+    ? `/rail/station/${encodeURIComponent(railCrs)}`
+    : `/?stopId=${station.naptanId}&name=${encodeURIComponent(station.name)}`;
+  const boardLabel = railCrs ? "VIEW RAIL BOARD" : "VIEW FULL BOARD";
 
-  /* Check if station is already saved */
+  /* Check if station is already saved — rail stations live in a
+     separate table (savedRailStations) keyed by CRS, so route the
+     lookup via that hook when we have a CRS match. */
   useEffect(() => {
-    isFavourite(station.naptanId).then(setSaved);
-  }, [station.naptanId, isFavourite]);
+    if (railCrs) {
+      isRailSaved(railCrs).then(setSaved);
+    } else {
+      isFavourite(station.naptanId).then(setSaved);
+    }
+  }, [station.naptanId, railCrs, isFavourite, isRailSaved]);
 
-  /* Fetch arrivals when popup opens */
+  /* Fetch arrivals when popup opens (skipped for National Rail —
+     TfL doesn't expose arrivals for non-London rail stations; the
+     dedicated rail board is one tap away via the VIEW RAIL BOARD link). */
   useEffect(() => {
+    if (isRail) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
 
     async function fetchArrivals() {
@@ -102,7 +131,7 @@ export default function StationPopup({ station, onShowRoute, activeRouteId }: St
     return () => {
       cancelled = true;
     };
-  }, [station.naptanId, station.allNaptanIds]);
+  }, [station.naptanId, station.allNaptanIds, isRail]);
 
   /**
    * Format time to station for display.
@@ -173,7 +202,7 @@ export default function StationPopup({ station, onShowRoute, activeRouteId }: St
             color: "#664400",
           }}
         >
-          NO ARRIVALS
+          {isRail ? "NATIONAL RAIL" : "NO ARRIVALS"}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -307,7 +336,7 @@ export default function StationPopup({ station, onShowRoute, activeRouteId }: St
         }}
       >
         <a
-          href={`/?stopId=${station.naptanId}&name=${encodeURIComponent(station.name)}`}
+          href={boardHref}
           style={{
             flex: 1,
             fontSize: "10px",
@@ -317,10 +346,18 @@ export default function StationPopup({ station, onShowRoute, activeRouteId }: St
             textDecoration: "none",
           }}
         >
-          VIEW FULL BOARD
+          {boardLabel}
         </a>
         <button
           onClick={async () => {
+            if (railCrs) {
+              const nowSaved = await toggleRailStation({
+                crs: railCrs,
+                name: station.name,
+              });
+              setSaved(nowSaved);
+              return;
+            }
             const nowSaved = await toggleFavourite({
               naptanId: station.naptanId,
               name: station.name,
