@@ -42,8 +42,6 @@ interface PlanJourneyPanelProps {
     toName: string;
     travelDate: string;
     scheduledDeparture: string;
-    /** HH:mm; empty string means "no arrival given" */
-    plannedArrival: string;
     seatCoach: string;
     seatNumber: string;
   }) => Promise<void>;
@@ -60,7 +58,6 @@ export default function PlanJourneyPanel({
   const [to, setTo] = useState<{ crs: string; name: string } | null>(null);
   const [travelDate, setTravelDate] = useState<string>(todayLocalIso());
   const [scheduledDeparture, setScheduledDeparture] = useState<string>("");
-  const [plannedArrival, setPlannedArrival] = useState<string>("");
   const [seatCoach, setSeatCoach] = useState<string>("");
   const [seatNumber, setSeatNumber] = useState<string>("");
   const [justPlanned, setJustPlanned] = useState<boolean>(false);
@@ -78,7 +75,6 @@ export default function PlanJourneyPanel({
     setTo(null);
     setTravelDate(todayLocalIso());
     setScheduledDeparture("");
-    setPlannedArrival("");
     setSeatCoach("");
     setSeatNumber("");
   };
@@ -94,7 +90,6 @@ export default function PlanJourneyPanel({
         toName: to.name,
         travelDate,
         scheduledDeparture,
-        plannedArrival,
         seatCoach,
         seatNumber,
       });
@@ -250,30 +245,6 @@ export default function PlanJourneyPanel({
               )}
             />
           </div>
-        </div>
-
-        <div>
-          <label
-            htmlFor="plan-arr"
-            className="block font-mono text-[10px] tracking-wider text-amber-faint mb-1 uppercase"
-          >
-            Arrives (optional)
-          </label>
-          <input
-            id="plan-arr"
-            type="time"
-            value={plannedArrival}
-            onChange={(e) => setPlannedArrival(e.target.value)}
-            className={cn(
-              "w-full bg-transparent border-b border-amber-faint",
-              "px-1 py-1.5 font-board text-base text-amber amber-glow",
-              "tracking-wider uppercase",
-              "focus:outline-none focus:border-amber"
-            )}
-          />
-          <p className="mt-1 font-mono text-[9px] tracking-wider text-amber-faint uppercase opacity-70">
-            Improves when the card auto-clears. Overwritten by live data on travel day.
-          </p>
         </div>
 
         {/* Seat reservation (optional) */}

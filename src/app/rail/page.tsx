@@ -289,10 +289,10 @@ function RailPageFull() {
 
   /*
    * Save handler for the PlanJourneyPanel (future-dated journeys).
-   * Uses "23:59" as a fallback destinationEta when the user doesn't
-   * supply an arrival time — keeps the card pinned until end-of-day.
-   * Once live data arrives on travel day, the card calls back to us
-   * via handleEtaResolved to overwrite this with the real ETA.
+   * destinationEta defaults to "23:59" so the card stays pinned until
+   * end-of-travel-day; once live data arrives on travel day, the card
+   * calls back via handleEtaResolved to overwrite this with the real
+   * arrival time so auto-clear fires at the right moment.
    */
   const handlePlanJourney = useCallback(
     async (input: {
@@ -302,7 +302,6 @@ function RailPageFull() {
       toName: string;
       travelDate: string;
       scheduledDeparture: string;
-      plannedArrival: string;
       seatCoach: string;
       seatNumber: string;
     }) => {
@@ -313,7 +312,7 @@ function RailPageFull() {
         toName: input.toName,
         travelDate: input.travelDate,
         scheduledDeparture: input.scheduledDeparture,
-        destinationEta: input.plannedArrival || "23:59",
+        destinationEta: "23:59",
         seatCoach: input.seatCoach,
         seatNumber: input.seatNumber,
       });
