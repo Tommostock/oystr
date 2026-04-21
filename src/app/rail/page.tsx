@@ -42,10 +42,12 @@ import PullToRefresh from "@/components/shared/PullToRefresh";
 import RailStationSearch from "@/components/rail/RailStationSearch";
 import RailDepartureBoard from "@/components/rail/RailDepartureBoard";
 import ServiceDetailSheet from "@/components/rail/ServiceDetailSheet";
+import TrackedJourneyCard from "@/components/rail/TrackedJourneyCard";
 import { useSavedRailJourneys } from "@/hooks/useSavedRailJourneys";
+import { useTrackedRailJourneys } from "@/hooks/useTrackedRailJourneys";
 import { cleanStationName } from "@/lib/utils";
 import type { UKRailStation, RailDeparture } from "@/lib/rail-types";
-import type { SavedRailJourney } from "@/lib/db";
+import type { SavedRailJourney, TrackedRailJourney } from "@/lib/db";
 
 /**
  * Feature flag: flip to `false` to hide the live UI behind the
@@ -104,9 +106,20 @@ function RailPageFull() {
    * the sheet can render calling points immediately without a second
    * API call. The calling points are bundled in the initial board
    * response thanks to GetArrDepBoardWithDetails.
+   *
+   * expandedContext carries the from/to the popup should show. When
+   * the popup is opened from the main board the context matches the
+   * page's fromStation/toStation — but when opened from a tracked
+   * journey card, it comes from that card's saved route instead.
    */
   const [expandedDeparture, setExpandedDeparture] =
     useState<RailDeparture | null>(null);
+  const [expandedContext, setExpandedContext] = useState<{
+    fromCrs: string;
+    fromName: string;
+    toCrs: string | null;
+    toName: string | null;
+  } | null>(null);
 
   /*
    * Transient feedback after a save. Flipping this to true for ~1.5s
@@ -118,6 +131,17 @@ function RailPageFull() {
 
   /* Hook managing saved routes */
   const { journeys, addJourney, removeJourney } = useSavedRailJourneys();
+
+  /*
+   * Hook managing tracked journeys (the service you're actively on
+   * or plan to get). Pinned above saved routes; auto-clears once
+   * the destination arrival time has passed.
+   */
+  const {
+    journeys: trackedJourneys,
+    trackJourney,
+    removeJourney: removeTrackedJourney,
+  } = useTrackedRailJourneys();
 
   /* Ref to the departures panel for smooth-scroll on saved-route tap */
   const departuresRef = useRef<HTMLDivElement>(null);
@@ -188,6 +212,94 @@ function RailPageFull() {
   };
 
   /*
+   * Tap on a service row in the main departure board. Opens the
+   * calling-points popup with the page's current from/to as context.
+   */
+  const handleServiceTap = useCallback(
+    (dep: RailDeparture) => {
+      if (!fromStation) return;
+      setExpandedDeparture(dep);
+      setExpandedContext({
+        fromCrs: fromStation.crs,
+        fromName: fromStation.name,
+        toCrs: toStation?.crs || null,
+        toName: toStation?.name || null,
+      });
+    },
+    [fromStation, toStation]
+  );
+
+  /*
+   * Tap on a tracked-journey card. Opens the same calling-points
+   * popup using the tracked journey's from/to as context (not the
+   * page's fromStation/toStation, which may differ).
+   */
+  const handleTrackedOpen = useCallback(
+    (tracked: TrackedRailJourney, live: RailDeparture | null) => {
+      if (!live) return;
+      setExpandedDeparture(live);
+      setExpandedContext({
+        fromCrs: tracked.fromCrs,
+        fromName: tracked.fromName,
+        toCrs: tracked.toCrs,
+        toName: tracked.toName,
+      });
+    },
+    []
+  );
+
+  /*
+   * TRACK JOURNEY handler for the popup. Captures the service's
+   * scheduled time + the destination ETA so the tracked card has
+   * everything it needs — including the expiry for auto-clear.
+   */
+  const handleTrackJourney = useCallback(
+    async (ctx: {
+      departure: RailDeparture;
+      fromCrs: string;
+      fromName: string;
+      toCrs: string;
+      toName: string;
+      destinationEta: string;
+    }) => {
+      /* Today's local date in YYYY-MM-DD so it matches the card's comparison. */
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, "0");
+      const d = String(now.getDate()).padStart(2, "0");
+      await trackJourney({
+        fromCrs: ctx.fromCrs,
+        fromName: ctx.fromName,
+        toCrs: ctx.toCrs,
+        toName: ctx.toName,
+        travelDate: `${y}-${m}-${d}`,
+        scheduledDeparture: ctx.departure.scheduledDeparture,
+        destinationEta: ctx.destinationEta,
+        serviceId: ctx.departure.serviceId,
+      });
+    },
+    [trackJourney]
+  );
+
+  /*
+   * Is the currently-expanded service already in the tracked list?
+   * Used to grey out the TRACK button and show "TRACKING" instead.
+   */
+  const expandedFromUpper = expandedContext?.fromCrs?.toUpperCase();
+  const expandedToUpper = expandedContext?.toCrs?.toUpperCase();
+  const expandedScheduled = expandedDeparture?.scheduledDeparture;
+  const expandedIsTracked =
+    !!expandedScheduled &&
+    !!expandedFromUpper &&
+    !!expandedToUpper &&
+    trackedJourneys.some(
+      (j) =>
+        j.fromCrs === expandedFromUpper &&
+        j.toCrs === expandedToUpper &&
+        j.scheduledDeparture === expandedScheduled
+    );
+
+  /*
    * Auto-clear the justSaved flash after 1.5s. Using an effect rather
    * than inline setTimeout keeps the timeout tied to component
    * lifecycle — if the user navigates away mid-flash, nothing leaks.
@@ -225,6 +337,29 @@ function RailPageFull() {
             LONG-DISTANCE LIVE DEPARTURES
           </div>
         </div>
+
+      {/*
+       * Tracked journeys — active / upcoming services the user has
+       * pinned. Rendered above saved routes so the "I'm on this
+       * train" tile is the first thing the user sees.
+       */}
+      {trackedJourneys.length > 0 && (
+        <div className="space-y-1.5">
+          <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase px-1">
+            MY JOURNEY
+          </div>
+          <div className="space-y-2">
+            {trackedJourneys.map((t) => (
+              <TrackedJourneyCard
+                key={t.id}
+                journey={t}
+                onOpen={handleTrackedOpen}
+                onRemove={removeTrackedJourney}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/*
        * Saved Routes — horizontal scroll strip (mirrors the Plan tab's
@@ -430,11 +565,11 @@ function RailPageFull() {
             toCrs={toStation?.crs || null}
             toName={toStation?.name || null}
             maxRows={10}
-            onServiceTap={setExpandedDeparture}
+            onServiceTap={handleServiceTap}
           />
         ) : (
-          /* Empty state when nothing chosen yet */
-          journeys.length === 0 && (
+          /* Empty state only when the page has nothing else to show */
+          journeys.length === 0 && trackedJourneys.length === 0 && (
             <BoardPanel>
               <div className="py-8 text-center space-y-3">
                 <AmberText variant="dim" size="sm" uppercase>
@@ -454,10 +589,16 @@ function RailPageFull() {
         {/* ---- Service detail popup ---- */}
         <ServiceDetailSheet
           departure={expandedDeparture}
-          highlightCrs={toStation?.crs || null}
-          fromName={fromStation?.name || null}
-          fromCrs={fromStation?.crs || null}
-          onClose={() => setExpandedDeparture(null)}
+          highlightCrs={expandedContext?.toCrs || null}
+          highlightName={expandedContext?.toName || null}
+          fromName={expandedContext?.fromName || null}
+          fromCrs={expandedContext?.fromCrs || null}
+          onTrack={handleTrackJourney}
+          alreadyTracked={expandedIsTracked}
+          onClose={() => {
+            setExpandedDeparture(null);
+            setExpandedContext(null);
+          }}
         />
       </div>
     </PullToRefresh>

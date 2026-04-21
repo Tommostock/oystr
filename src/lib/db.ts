@@ -88,6 +88,46 @@ export interface SavedRailJourney {
   addedAt: number;
 }
 
+/**
+ * A specific rail service the user is actively travelling on (or plans
+ * to travel on). Unlike SavedRailJourney (a generic route), a
+ * TrackedRailJourney is tied to a single date + scheduled departure —
+ * essentially "I'm on the 08:40 KGX-LDS on 21 April".
+ *
+ * Auto-clears ~10 minutes after scheduled arrival at the user's
+ * destination (see useTrackedRailJourneys).
+ */
+export interface TrackedRailJourney {
+  /** Unique key — "${fromCrs}-${toCrs}-${travelDate}-${scheduledDeparture}" */
+  id: string;
+  /** Origin station CRS code (e.g. "KGX") */
+  fromCrs: string;
+  /** Origin station display name */
+  fromName: string;
+  /** Destination station CRS code (e.g. "LDS") */
+  toCrs: string;
+  /** Destination station display name */
+  toName: string;
+  /** Date of travel in YYYY-MM-DD (local/UK time) */
+  travelDate: string;
+  /** Scheduled departure from origin in HH:mm */
+  scheduledDeparture: string;
+  /**
+   * Scheduled/estimated arrival at the user's destination in HH:mm at
+   * the moment the journey was tracked. Used purely for auto-clear:
+   * the card itself re-fetches live data on travel day.
+   */
+  destinationEta: string;
+  /**
+   * RDM service ID at the time of tracking. Service IDs rotate daily,
+   * so this is only reliable on the travel date itself; on other days
+   * we match by from/to/scheduledDeparture instead.
+   */
+  serviceId?: string;
+  /** Unix timestamp when the user tracked this journey */
+  trackedAt: number;
+}
+
 /* ========================================
  * DATABASE CLASS
  * ======================================== */
@@ -95,6 +135,7 @@ class OystrDatabase extends Dexie {
   favourites!: Table<FavouriteStation>;
   timetables!: Table<CachedTimetable>;
   savedRailJourneys!: Table<SavedRailJourney>;
+  trackedRailJourneys!: Table<TrackedRailJourney>;
   /*
    * The savedJourneys table has existed in the schema since v1 but
    * wasn't typed or used until Plan-tab saved journeys shipped.
@@ -144,6 +185,22 @@ class OystrDatabase extends Dexie {
       savedJourneys: "id, savedAt",
       stations: "naptanId, name, *lines",
       savedRailJourneys: "id, fromCrs, toCrs, addedAt",
+    });
+
+    /*
+     * Schema version 4: adds active-journey tracking.
+     * trackedRailJourneys stores specific services the user is on or
+     * plans to get (scoped to a date + scheduled departure time).
+     * Auto-cleared after the destination arrival time elapses.
+     */
+    this.version(4).stores({
+      favourites: "naptanId, name, addedAt",
+      timetables: "id, lineId, stationId, cachedAt",
+      lineStatuses: "lineId, cachedAt",
+      savedJourneys: "id, savedAt",
+      stations: "naptanId, name, *lines",
+      savedRailJourneys: "id, fromCrs, toCrs, addedAt",
+      trackedRailJourneys: "id, travelDate, trackedAt",
     });
   }
 }

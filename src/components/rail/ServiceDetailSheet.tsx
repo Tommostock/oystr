@@ -17,8 +17,8 @@
 
 "use client";
 
-import { useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { X, Check, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AmberText from "@/components/shared/AmberText";
 import { shortOperatorName } from "@/lib/rail-operators";
@@ -29,6 +29,8 @@ interface ServiceDetailSheetProps {
   departure: RailDeparture | null;
   /** User's destination CRS (if any) — used to highlight the relevant row */
   highlightCrs?: string | null;
+  /** Display name of the user's destination (e.g. "Leeds"). */
+  highlightName?: string | null;
   /**
    * Name + CRS of the FROM station the board is currently showing.
    * Used to prepend a synthetic "origin" row so the popup shows the
@@ -36,6 +38,20 @@ interface ServiceDetailSheetProps {
    */
   fromName?: string | null;
   fromCrs?: string | null;
+  /**
+   * Called when the user taps TRACK JOURNEY. Parent handles Dexie
+   * writes + toast. Button is hidden if undefined.
+   */
+  onTrack?: (ctx: {
+    departure: RailDeparture;
+    fromCrs: string;
+    fromName: string;
+    toCrs: string;
+    toName: string;
+    destinationEta: string;
+  }) => void;
+  /** True if this exact service is already being tracked — disables TRACK. */
+  alreadyTracked?: boolean;
   /** Called when the user dismisses the sheet */
   onClose: () => void;
 }
@@ -74,10 +90,24 @@ function formatTime(
 export default function ServiceDetailSheet({
   departure,
   highlightCrs,
+  highlightName,
   fromName,
   fromCrs,
+  onTrack,
+  alreadyTracked,
   onClose,
 }: ServiceDetailSheetProps) {
+  /*
+   * Transient flash after tapping TRACK JOURNEY. Mirrors the Save
+   * Route pattern on the rail page so the two affordances feel
+   * consistent.
+   */
+  const [justTracked, setJustTracked] = useState(false);
+  useEffect(() => {
+    if (!justTracked) return;
+    const id = setTimeout(() => setJustTracked(false), 1500);
+    return () => clearTimeout(id);
+  }, [justTracked]);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
 
@@ -160,6 +190,41 @@ export default function ServiceDetailSheet({
     : departure.callingPoints;
 
   const hasRows = rows.length > 0;
+
+  /*
+   * TRACK JOURNEY is only meaningful when we know FROM, TO, and can
+   * read the destination's ETA from the calling points — otherwise
+   * we'd have no expiry time for the auto-clear logic.
+   */
+  const destCallingPoint = highlightUpper
+    ? departure.callingPoints.find((cp) => cp.crs === highlightUpper)
+    : null;
+  const canTrack =
+    !!onTrack &&
+    !!fromCrs &&
+    !!fromName &&
+    !!highlightCrs &&
+    !!highlightName &&
+    !!destCallingPoint;
+
+  const handleTrack = () => {
+    if (!canTrack || !destCallingPoint) return;
+    /* Prefer the estimated ETA when it's a real time; otherwise the scheduled one. */
+    const eta =
+      destCallingPoint.estimatedTime &&
+      destCallingPoint.estimatedTime !== "On time"
+        ? destCallingPoint.estimatedTime
+        : destCallingPoint.scheduledTime;
+    onTrack!({
+      departure,
+      fromCrs: fromCrs!,
+      fromName: fromName!,
+      toCrs: highlightCrs!,
+      toName: highlightName!,
+      destinationEta: eta,
+    });
+    setJustTracked(true);
+  };
 
   return (
     <>
@@ -322,6 +387,55 @@ export default function ServiceDetailSheet({
             </div>
           )}
         </div>
+
+        {/*
+         * Footer — TRACK JOURNEY button. Only rendered when the parent
+         * passes an onTrack handler AND we have the info needed to
+         * compute an expiry time (user must have a destination set
+         * and that destination must appear in the calling points).
+         */}
+        {onTrack && (
+          <div className="shrink-0 border-t border-board-border p-3">
+            <button
+              onClick={handleTrack}
+              disabled={!canTrack || alreadyTracked}
+              aria-label={
+                alreadyTracked
+                  ? "Journey already being tracked"
+                  : "Track this journey"
+              }
+              className={cn(
+                "w-full flex items-center justify-center gap-2 py-2.5",
+                "font-mono text-xs tracking-widest uppercase transition-colors duration-200",
+                "border disabled:cursor-not-allowed",
+                justTracked
+                  ? "bg-amber text-board-bg border-amber amber-glow"
+                  : alreadyTracked
+                    ? "bg-surface border-amber text-amber"
+                    : "bg-surface border-amber text-amber hover:bg-amber/10 amber-glow disabled:opacity-40 disabled:border-board-border disabled:text-amber-faint"
+              )}
+            >
+              {justTracked ? (
+                <>
+                  <Check size={14} strokeWidth={2} />
+                  <span>TRACKED!</span>
+                </>
+              ) : alreadyTracked ? (
+                <>
+                  <Check size={14} strokeWidth={1.5} />
+                  <span>TRACKING</span>
+                </>
+              ) : (
+                <>
+                  <MapPin size={14} strokeWidth={1.5} />
+                  <span>
+                    {canTrack ? "TRACK JOURNEY" : "SET DESTINATION TO TRACK"}
+                  </span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
         </div>
       </div>
     </>
