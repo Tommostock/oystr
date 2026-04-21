@@ -15,16 +15,15 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, TrainFront } from "lucide-react";
+import { TrainFront } from "lucide-react";
 import { useFavourites } from "@/hooks/useFavourites";
-import { useSavedRailJourneys } from "@/hooks/useSavedRailJourneys";
 import { useSavedRailStations } from "@/hooks/useSavedRailStations";
 import { useRailDepartures } from "@/hooks/useRailDepartures";
 import { useArrivals } from "@/hooks/useArrivals";
 import { LINE_COLOURS } from "@/lib/constants";
 import { cn, cleanStationName, isBusStop } from "@/lib/utils";
 import { useCountdown } from "@/hooks/useCountdown";
-import { db, type SavedRailJourney, type SavedRailStation } from "@/lib/db";
+import { db, type SavedRailStation } from "@/lib/db";
 
 interface QuickViewWidgetProps {
   /** Called when a station card is tapped */
@@ -122,106 +121,6 @@ function QuickViewCard({
               routeNumber={arrival.modeName === "bus" ? arrival.lineName : undefined}
             />
           ))}
-        </div>
-      )}
-    </button>
-  );
-}
-
-/**
- * Saved National Rail route card. Mirrors QuickViewCard visually
- * but shows the next 2 live departures for the saved FROM -> TO
- * route. Tapping routes to the Rail tab via query params so the
- * full board loads there with the chosen FROM/TO pre-selected.
- */
-function QuickRailCard({
-  journey,
-  onOpen,
-}: {
-  journey: SavedRailJourney;
-  onOpen: (j: SavedRailJourney) => void;
-}) {
-  const { departures, isLoading, notConfigured } = useRailDepartures({
-    fromCrs: journey.fromCrs,
-    toCrs: journey.toCrs,
-    numRows: 2,
-  });
-  const nextTwo = departures.slice(0, 2);
-
-  return (
-    <button
-      onClick={() => onOpen(journey)}
-      className={cn(
-        "w-full text-left border border-board-border bg-surface",
-        "p-3 transition-colors duration-200",
-        "hover:border-amber-faint cursor-pointer"
-      )}
-      aria-label={`Open ${journey.fromName} to ${journey.toName} on Rail tab`}
-    >
-      {/* Route header with rail icon */}
-      <div className="flex items-center gap-1.5 mb-2 min-w-0">
-        <TrainFront
-          size={12}
-          strokeWidth={1.5}
-          className="shrink-0 text-amber"
-        />
-        <span className="font-mono text-xs tracking-wider text-amber uppercase truncate">
-          {cleanStationName(journey.fromName)}
-        </span>
-        <ArrowRight
-          size={10}
-          strokeWidth={1.5}
-          className="shrink-0 text-amber-faint"
-        />
-        <span className="font-mono text-xs tracking-wider text-amber uppercase truncate">
-          {cleanStationName(journey.toName)}
-        </span>
-      </div>
-
-      {/* Next departures or loading / error state */}
-      {notConfigured ? (
-        <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
-          RAIL UNAVAILABLE
-        </div>
-      ) : isLoading && nextTwo.length === 0 ? (
-        <div className="font-mono text-xs tracking-wider text-amber-faint animate-pulse">
-          LOADING...
-        </div>
-      ) : nextTwo.length === 0 ? (
-        <div className="font-mono text-xs tracking-wider text-amber-faint">
-          NO DIRECT TRAINS
-        </div>
-      ) : (
-        <div className="space-y-1">
-          {nextTwo.map((dep, i) => {
-            const status = dep.cancelled
-              ? { label: "CXL", colour: "#ff3b30" }
-              : dep.estimatedDeparture === "On time"
-                ? { label: "ON TIME", colour: "#34c759" }
-                : dep.delayed && dep.estimatedDeparture
-                  ? {
-                      label: `EXP ${dep.estimatedDeparture}`,
-                      colour: "#ff9500",
-                    }
-                  : {
-                      label: (dep.estimatedDeparture || "").toUpperCase(),
-                      colour: "#ff9500",
-                    };
-            return (
-              <div
-                key={`${dep.serviceId}-${i}`}
-                className="flex items-baseline gap-1.5 text-xs font-mono tracking-wider"
-              >
-                <span className="text-amber">{dep.scheduledDeparture}</span>
-                <span
-                  className="text-[10px] truncate"
-                  style={{ color: status.colour }}
-                >
-                  {status.label}
-                </span>
-              </div>
-            );
-          })}
         </div>
       )}
     </button>
@@ -376,7 +275,6 @@ export default function QuickViewWidget({
   onStationSelect,
 }: QuickViewWidgetProps) {
   const { favourites } = useFavourites();
-  const { journeys: railJourneys } = useSavedRailJourneys();
   const { stations: railStations } = useSavedRailStations();
   const router = useRouter();
 
@@ -496,26 +394,12 @@ export default function QuickViewWidget({
     enrichStations();
   }, [favourites]);
 
-  /* Open a saved rail route on the Rail tab with from/to pre-selected. */
-  const handleRailOpen = (j: SavedRailJourney) => {
-    const qs = new URLSearchParams({
-      fromCrs: j.fromCrs,
-      fromName: j.fromName,
-      toCrs: j.toCrs,
-      toName: j.toName,
-    });
-    router.push(`/rail?${qs.toString()}`);
-  };
-
   /* Open a saved rail station's focused page. */
   const handleRailStationOpen = (s: SavedRailStation) => {
     router.push(`/rail/station/${encodeURIComponent(s.crs)}`);
   };
 
-  const hasAnySaved =
-    favourites.length > 0 ||
-    railJourneys.length > 0 ||
-    railStations.length > 0;
+  const hasAnySaved = favourites.length > 0 || railStations.length > 0;
   if (!hasAnySaved) return null;
 
   const sortedFavourites = [...favourites].sort((a, b) =>
@@ -549,13 +433,6 @@ export default function QuickViewWidget({
             key={`rail-station-${station.crs}`}
             station={station}
             onOpen={handleRailStationOpen}
-          />
-        ))}
-        {railJourneys.map((journey) => (
-          <QuickRailCard
-            key={journey.id}
-            journey={journey}
-            onOpen={handleRailOpen}
           />
         ))}
       </div>
