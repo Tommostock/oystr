@@ -1,14 +1,14 @@
 /**
- * ServiceDetailSheet.tsx — Bottom sheet showing calling points for a service
+ * ServiceDetailSheet.tsx — Centered popup showing calling points for a service
  *
- * When the user taps a row on the rail departure board, this sheet slides
- * up from the bottom and shows every station the train calls at after
- * the FROM station. The user's destination (if they picked one) is
- * highlighted with a brighter amber row.
+ * When the user taps a row on the rail departure board, this popup opens
+ * over the page and shows the full journey: the origin station first,
+ * then every subsequent calling point. The user's destination (if they
+ * picked one) is highlighted with a brighter amber row.
  *
  * Data flow: the RDM "Live Arrival and Departure Boards" product's
  * GetArrDepBoardWithDetails endpoint bundles calling points into the
- * initial board response, so this sheet just receives the pre-loaded
+ * initial board response, so this popup just receives the pre-loaded
  * RailDeparture object as a prop — no extra network call required.
  *
  * Layout:
@@ -18,12 +18,11 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import Link from "next/link";
-import { X, Route } from "lucide-react";
+import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AmberText from "@/components/shared/AmberText";
 import { shortOperatorName } from "@/lib/rail-operators";
-import type { RailDeparture } from "@/lib/rail-types";
+import type { RailDeparture, CallingPoint } from "@/lib/rail-types";
 
 interface ServiceDetailSheetProps {
   /** The full departure to show — null closes the sheet */
@@ -31,11 +30,12 @@ interface ServiceDetailSheetProps {
   /** User's destination CRS (if any) — used to highlight the relevant row */
   highlightCrs?: string | null;
   /**
-   * Name of the FROM station the board is currently showing. Used by the
-   * PLAN JOURNEY button to pre-populate the Plan tab with the user's
-   * departure station.
+   * Name + CRS of the FROM station the board is currently showing.
+   * Used to prepend a synthetic "origin" row so the popup shows the
+   * full journey — origin first, then every subsequent calling point.
    */
   fromName?: string | null;
+  fromCrs?: string | null;
   /** Called when the user dismisses the sheet */
   onClose: () => void;
 }
@@ -75,6 +75,7 @@ export default function ServiceDetailSheet({
   departure,
   highlightCrs,
   fromName,
+  fromCrs,
   onClose,
 }: ServiceDetailSheetProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -134,21 +135,31 @@ export default function ServiceDetailSheet({
   if (!departure) return null;
 
   const highlightUpper = highlightCrs?.toUpperCase();
-  const hasCallingPoints = departure.callingPoints.length > 0;
 
   /*
-   * Plan-journey deep link — pre-populates the Plan tab with the user's
-   * rail departure station as FROM and the train's final destination as
-   * TO. Station names round-trip through URL params and the journey
-   * page resolves them to TfL naptan IDs on mount.
+   * Prepend a synthetic "origin" row so the user sees their boarding
+   * station at the top of the list (e.g. KINGS CROSS before the first
+   * calling point). The origin's time/status come straight from the
+   * departure itself.
+   *
+   * We build a single `rows` array so the render loop handles origin
+   * and calling points uniformly — same styling, same highlight logic.
    */
-  const planHref = (() => {
-    const params = new URLSearchParams();
-    if (fromName) params.set("from", fromName);
-    if (departure.destination) params.set("to", departure.destination);
-    const qs = params.toString();
-    return qs ? `/journey?${qs}` : "/journey";
-  })();
+  const originRow: CallingPoint | null = fromName
+    ? {
+        crs: (fromCrs || "").toUpperCase(),
+        name: fromName,
+        scheduledTime: departure.scheduledDeparture,
+        estimatedTime: departure.estimatedDeparture,
+        cancelled: departure.cancelled,
+      }
+    : null;
+
+  const rows: CallingPoint[] = originRow
+    ? [originRow, ...departure.callingPoints]
+    : departure.callingPoints;
+
+  const hasRows = rows.length > 0;
 
   return (
     <>
@@ -179,10 +190,16 @@ export default function ServiceDetailSheet({
           aria-modal="true"
           aria-label="Train calling points"
           className={cn(
-            "relative w-full max-w-md",
+            /*
+             * Compact centered popup. max-w-sm + mx-auto keeps comfortable
+             * horizontal margins on iPhone screens. Intentionally
+             * auto-height — the internal scroll body is capped to
+             * ~6 rows, so the popup sizes to content up to that cap
+             * and the user scrolls within it for more stops.
+             */
+            "relative w-full max-w-sm",
             "bg-board-bg border border-board-border",
-            "flex flex-col",
-            "max-h-[calc(100dvh-5rem)]"
+            "flex flex-col"
           )}
         >
         {/* Header — pinned to top of popup */}
@@ -205,20 +222,42 @@ export default function ServiceDetailSheet({
           </button>
         </div>
 
+        {/* Operator + length + platform info — pinned just under the header. */}
+        {(departure.operator || !!departure.length || departure.platform) && (
+          <div className="flex items-center gap-4 px-4 py-2 border-b border-board-border shrink-0">
+            {departure.operator && (
+              <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
+                {shortOperatorName(departure.operator)}
+              </span>
+            )}
+            {!!departure.length && departure.length > 0 && (
+              <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
+                {departure.length} COACHES
+              </span>
+            )}
+            {departure.platform && (
+              <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase ml-auto">
+                PLATFORM {departure.platform}
+              </span>
+            )}
+          </div>
+        )}
+
         {/*
          * Scrollable body.
          *
-         * Dedicated scroll container so long lists scroll cleanly
-         * without the header drifting off-screen. overscroll-contain
-         * prevents scroll chaining to the page underneath on mobile,
-         * so dragging within the popup never scrolls the rail page
-         * behind or accidentally dismisses the modal.
+         * Capped to roughly six calling-point rows (~22rem) so the
+         * popup stays compact within iPhone margins — if the service
+         * calls at more than six stations the user scrolls within the
+         * popup to see the rest. overscroll-contain prevents scroll
+         * chaining to the page underneath, so dragging never scrolls
+         * the rail page behind or dismisses the modal.
          */}
         <div
-          className="flex-1 overflow-y-auto overscroll-contain px-4 py-3"
+          className="overflow-y-auto overscroll-contain px-4 py-1 max-h-[22rem]"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
-          {!hasCallingPoints && (
+          {!hasRows && (
             <div className="py-6 text-center">
               <AmberText variant="dim" size="sm" uppercase>
                 NO INTERMEDIATE STOPS LISTED
@@ -226,110 +265,62 @@ export default function ServiceDetailSheet({
             </div>
           )}
 
-          {hasCallingPoints && (
-            <>
-              {/* Operator + length + platform info.
-                  length falsy-guard covers both 0 (unknown) and undefined. */}
-              <div className="flex items-center gap-4 py-2 border-b border-board-border mb-1">
-                {departure.operator && (
-                  <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
-                    {shortOperatorName(departure.operator)}
-                  </span>
-                )}
-                {!!departure.length && departure.length > 0 && (
-                  <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
-                    {departure.length} COACHES
-                  </span>
-                )}
-                {departure.platform && (
-                  <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase ml-auto">
-                    PLATFORM {departure.platform}
-                  </span>
-                )}
-              </div>
-
-              {/* Calling points */}
-              <div role="list">
-                {departure.callingPoints.map((cp, i) => {
-                  const isDest = highlightUpper && cp.crs === highlightUpper;
-                  const t = formatTime(
-                    cp.scheduledTime,
-                    cp.estimatedTime,
-                    cp.cancelled
-                  );
-                  return (
-                    <div
-                      key={`${cp.crs}-${i}`}
-                      role="listitem"
-                      className={cn(
-                        "flex items-center gap-3 py-2 border-b border-board-border/50 last:border-b-0",
-                        isDest && "bg-amber/10 -mx-4 px-4"
+          {hasRows && (
+            <div role="list">
+              {rows.map((cp, i) => {
+                const isDest = highlightUpper && cp.crs === highlightUpper;
+                const t = formatTime(
+                  cp.scheduledTime,
+                  cp.estimatedTime,
+                  cp.cancelled
+                );
+                return (
+                  <div
+                    key={`${cp.crs}-${i}`}
+                    role="listitem"
+                    className={cn(
+                      "flex items-center gap-3 py-2 border-b border-board-border/50 last:border-b-0",
+                      isDest && "bg-amber/10 -mx-4 px-4"
+                    )}
+                  >
+                    {/* Station name */}
+                    <div className="flex-1 min-w-0">
+                      <div
+                        className={cn(
+                          "font-mono text-sm tracking-wider uppercase truncate",
+                          isDest
+                            ? "text-amber amber-glow font-semibold"
+                            : "text-amber"
+                        )}
+                      >
+                        {cp.name}
+                      </div>
+                      {isDest && (
+                        <div className="font-mono text-[10px] tracking-wider text-amber amber-glow uppercase mt-0.5">
+                          YOUR DESTINATION
+                        </div>
                       )}
-                    >
-                      {/* Station name */}
-                      <div className="flex-1 min-w-0">
-                        <div
-                          className={cn(
-                            "font-mono text-sm tracking-wider uppercase truncate",
-                            isDest
-                              ? "text-amber amber-glow font-semibold"
-                              : "text-amber"
-                          )}
-                        >
-                          {cp.name}
-                        </div>
-                        {isDest && (
-                          <div className="font-mono text-[10px] tracking-wider text-amber amber-glow uppercase mt-0.5">
-                            YOUR DESTINATION
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Times */}
-                      <div className="shrink-0 text-right">
-                        <div className="font-board text-base text-amber amber-glow tracking-wider">
-                          {t.sched || "--:--"}
-                        </div>
-                        {t.status && (
-                          <div
-                            className="font-mono text-[10px] tracking-wider uppercase"
-                            style={{ color: t.colour }}
-                          >
-                            {t.status}
-                          </div>
-                        )}
-                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
 
-        {/*
-         * Footer — PLAN JOURNEY deep link into the Plan tab, pre-
-         * populated with the user's rail origin as FROM and this
-         * train's final destination as TO. Same amber-outline style
-         * as the main PLAN JOURNEY button on the Plan tab so the
-         * action reads consistently across the app.
-         */}
-        <div className="shrink-0 border-t border-board-border p-3">
-          <Link
-            href={planHref}
-            onClick={onClose}
-            className={cn(
-              "w-full flex items-center justify-center gap-2 py-2.5",
-              "bg-surface border border-amber",
-              "font-mono text-xs tracking-widest text-amber uppercase",
-              "hover:bg-amber/10 transition-colors duration-200",
-              "amber-glow"
-            )}
-            aria-label="Plan a journey to this destination"
-          >
-            <Route size={14} strokeWidth={1.5} />
-            <span>PLAN JOURNEY</span>
-          </Link>
+                    {/* Times */}
+                    <div className="shrink-0 text-right">
+                      <div className="font-board text-base text-amber amber-glow tracking-wider">
+                        {t.sched || "--:--"}
+                      </div>
+                      {t.status && (
+                        <div
+                          className="font-mono text-[10px] tracking-wider uppercase"
+                          style={{ color: t.colour }}
+                        >
+                          {t.status}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
         </div>
       </div>

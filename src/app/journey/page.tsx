@@ -14,7 +14,7 @@
 
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   ArrowDownUp,
   Home,
@@ -63,70 +63,6 @@ export default function JourneyPage() {
 
   /* Home station from localStorage */
   const { homeStation, setHomeStation, clearHomeStation } = useHomeStation();
-
-  /*
-   * Deep-link pre-fill from ?from=<name>&to=<name> query params.
-   *
-   * Used by the Rail tab's "PLAN JOURNEY" button so a user can jump
-   * from a rail service into the Plan tab with their stations already
-   * populated. We resolve each name to a TfL StationInfo via the
-   * existing search API, then fill fromStation / toStation.
-   *
-   * We run this exactly once on mount — a ref guards against re-runs
-   * if React re-renders before setState lands.
-   */
-  const didPrefillFromQuery = useRef(false);
-  useEffect(() => {
-    if (didPrefillFromQuery.current) return;
-    if (typeof window === "undefined") return;
-
-    const params = new URLSearchParams(window.location.search);
-    const fromName = params.get("from");
-    const toName = params.get("to");
-    if (!fromName && !toName) return;
-    didPrefillFromQuery.current = true;
-
-    /* Resolve a station name to the first matching TfL StationInfo. */
-    const resolveName = async (name: string): Promise<StationInfo | null> => {
-      try {
-        const resp = await fetch(
-          `/api/tfl/search?query=${encodeURIComponent(name)}`
-        );
-        if (!resp.ok) return null;
-        const list = (await resp.json()) as Array<{
-          naptanId: string;
-          name: string;
-          lat: number;
-          lon: number;
-          modes?: string[];
-        }>;
-        /* Prefer the first non-bus match so "London Kings Cross" lands on
-           the rail/tube hub, not a nearby bus stop. */
-        const pick =
-          list.find(
-            (s) => !(s.modes && s.modes.length > 0 && s.modes.every((m) => m === "bus"))
-          ) || list[0];
-        if (!pick) return null;
-        return {
-          naptanId: pick.naptanId,
-          name: pick.name,
-          lat: pick.lat,
-          lon: pick.lon,
-        };
-      } catch {
-        return null;
-      }
-    };
-
-    (async () => {
-      const [fromInfo, toInfo] = await Promise.all([
-        fromName ? resolveName(fromName) : Promise.resolve(null),
-        toName ? resolveName(toName) : Promise.resolve(null),
-      ]);
-      if (fromInfo) setFromStation(fromInfo);
-      if (toInfo) setToStation(toInfo);
-    })();
-  }, []);
 
   /* Saved journeys (Dexie) and recent-searches list (localStorage) */
   const {

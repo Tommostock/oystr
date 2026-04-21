@@ -456,6 +456,7 @@ function RailPageFull() {
           departure={expandedDeparture}
           highlightCrs={toStation?.crs || null}
           fromName={fromStation?.name || null}
+          fromCrs={fromStation?.crs || null}
           onClose={() => setExpandedDeparture(null)}
         />
       </div>
