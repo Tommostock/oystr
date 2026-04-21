@@ -18,7 +18,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import Link from "next/link";
+import { X, Route } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AmberText from "@/components/shared/AmberText";
 import { shortOperatorName } from "@/lib/rail-operators";
@@ -29,6 +30,12 @@ interface ServiceDetailSheetProps {
   departure: RailDeparture | null;
   /** User's destination CRS (if any) — used to highlight the relevant row */
   highlightCrs?: string | null;
+  /**
+   * Name of the FROM station the board is currently showing. Used by the
+   * PLAN JOURNEY button to pre-populate the Plan tab with the user's
+   * departure station.
+   */
+  fromName?: string | null;
   /** Called when the user dismisses the sheet */
   onClose: () => void;
 }
@@ -67,6 +74,7 @@ function formatTime(
 export default function ServiceDetailSheet({
   departure,
   highlightCrs,
+  fromName,
   onClose,
 }: ServiceDetailSheetProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -128,49 +136,56 @@ export default function ServiceDetailSheet({
   const highlightUpper = highlightCrs?.toUpperCase();
   const hasCallingPoints = departure.callingPoints.length > 0;
 
+  /*
+   * Plan-journey deep link — pre-populates the Plan tab with the user's
+   * rail departure station as FROM and the train's final destination as
+   * TO. Station names round-trip through URL params and the journey
+   * page resolves them to TfL naptan IDs on mount.
+   */
+  const planHref = (() => {
+    const params = new URLSearchParams();
+    if (fromName) params.set("from", fromName);
+    if (departure.destination) params.set("to", departure.destination);
+    const qs = params.toString();
+    return qs ? `/journey?${qs}` : "/journey";
+  })();
+
   return (
     <>
-      {/* Backdrop — taps dismiss the sheet */}
-      <div
-        onClick={onClose}
-        className="fixed inset-0 z-[9998] bg-black/50"
-        aria-hidden="true"
-      />
-
       {/*
-       * Sheet container.
-       *
-       * Uses flex-col so the header stays pinned to the top while the
-       * body scrolls independently. Previously the whole sheet was a
-       * single overflow-y-auto block which meant scrolling long routes
-       * could hide the title/close button. Now:
-       *   - drag handle   : shrink-0 (never scrolls)
-       *   - header        : shrink-0 (sticky)
-       *   - body          : flex-1 + overflow-y-auto (scrolls)
-       *
-       * Height is taller than before (90vh instead of 80vh) so long
-       * Scottish/Cornish services with 15+ stops have more real estate.
+       * Backdrop — taps dismiss the popup. Uses flex layout so the
+       * popup child can be centered horizontally AND vertically.
+       * Clicking the backdrop triggers onClose; clicking inside the
+       * popup stops propagation so the popup stays open while the
+       * user interacts with it or scrolls the calling-points list.
        */}
       <div
-        ref={sheetRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Train calling points"
-        className={cn(
-          "fixed left-0 right-0 bottom-0 z-[9999]",
-          "bg-board-bg border-t border-board-border",
-          "flex flex-col",
-          /* Respect safe area + leave ~1rem above sheet-top for context */
-          "max-h-[calc(100dvh-1rem)] min-h-[40vh]",
-          "pb-[env(safe-area-inset-bottom)]"
-        )}
+        onClick={onClose}
+        className="fixed inset-0 z-[9998] bg-black/70 flex items-center justify-center p-4 pb-[calc(56px+1rem)]"
+        role="presentation"
       >
-        {/* Drag handle (visual only — tap backdrop or close button to dismiss) */}
-        <div className="flex justify-center pt-2 pb-1 shrink-0">
-          <div className="w-10 h-1 bg-board-border rounded-full" />
-        </div>
-
-        {/* Header — pinned to top */}
+        {/*
+         * Popup container — centered modal, not a bottom sheet. Using
+         * flex-col with a bounded max-height and an inner scroll region
+         * means the user can scroll the calling points without the
+         * whole page scrolling behind, and without the popup dismissing.
+         * overscroll-contain on the inner scroller prevents scroll
+         * chaining out of the popup on mobile.
+         */}
+        <div
+          ref={sheetRef}
+          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Train calling points"
+          className={cn(
+            "relative w-full max-w-md",
+            "bg-board-bg border border-board-border",
+            "flex flex-col",
+            "max-h-[calc(100dvh-5rem)]"
+          )}
+        >
+        {/* Header — pinned to top of popup */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-board-border shrink-0">
           <div className="flex-1 min-w-0">
             <AmberText variant="secondary" size="xs" uppercase>
@@ -195,12 +210,12 @@ export default function ServiceDetailSheet({
          *
          * Dedicated scroll container so long lists scroll cleanly
          * without the header drifting off-screen. overscroll-contain
-         * prevents scroll chaining to the page underneath on mobile.
-         * Extra bottom padding (56px nav + breathing room) ensures the
-         * last row isn't obscured by the fixed nav bar beneath.
+         * prevents scroll chaining to the page underneath on mobile,
+         * so dragging within the popup never scrolls the rail page
+         * behind or accidentally dismisses the modal.
          */}
         <div
-          className="flex-1 overflow-y-auto overscroll-contain px-4 py-3 pb-[calc(56px+1rem)]"
+          className="flex-1 overflow-y-auto overscroll-contain px-4 py-3"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
           {!hasCallingPoints && (
@@ -290,6 +305,32 @@ export default function ServiceDetailSheet({
               </div>
             </>
           )}
+        </div>
+
+        {/*
+         * Footer — PLAN JOURNEY deep link into the Plan tab, pre-
+         * populated with the user's rail origin as FROM and this
+         * train's final destination as TO. Same amber-outline style
+         * as the main PLAN JOURNEY button on the Plan tab so the
+         * action reads consistently across the app.
+         */}
+        <div className="shrink-0 border-t border-board-border p-3">
+          <Link
+            href={planHref}
+            onClick={onClose}
+            className={cn(
+              "w-full flex items-center justify-center gap-2 py-2.5",
+              "bg-surface border border-amber",
+              "font-mono text-xs tracking-widest text-amber uppercase",
+              "hover:bg-amber/10 transition-colors duration-200",
+              "amber-glow"
+            )}
+            aria-label="Plan a journey to this destination"
+          >
+            <Route size={14} strokeWidth={1.5} />
+            <span>PLAN JOURNEY</span>
+          </Link>
+        </div>
         </div>
       </div>
     </>

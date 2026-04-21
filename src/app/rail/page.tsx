@@ -34,16 +34,16 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Star, ArrowLeftRight, TrainFront, Mail, Check } from "lucide-react";
+import { Star, ArrowLeftRight, TrainFront, Mail, Check, Trash2, ArrowRight } from "lucide-react";
 import { mutate } from "swr";
 import AmberText from "@/components/shared/AmberText";
 import BoardPanel from "@/components/shared/BoardPanel";
 import PullToRefresh from "@/components/shared/PullToRefresh";
 import RailStationSearch from "@/components/rail/RailStationSearch";
 import RailDepartureBoard from "@/components/rail/RailDepartureBoard";
-import SavedRouteCard from "@/components/rail/SavedRouteCard";
 import ServiceDetailSheet from "@/components/rail/ServiceDetailSheet";
 import { useSavedRailJourneys } from "@/hooks/useSavedRailJourneys";
+import { cleanStationName } from "@/lib/utils";
 import type { UKRailStation, RailDeparture } from "@/lib/rail-types";
 import type { SavedRailJourney } from "@/lib/db";
 
@@ -60,8 +60,12 @@ interface StationSelection {
   name: string;
 }
 
-/* Quick-pick chips — one tap populates the FROM input. */
-const LONDON_TERMINAL_CHIPS: { crs: string; label: string; name: string }[] = [
+/*
+ * Quick-pick chips — one tap populates FROM or TO.
+ * Kept shared between QUICK FROM and QUICK TO so users can build
+ * common journeys (e.g. KGX -> LDS) with two taps.
+ */
+const QUICK_STATION_CHIPS: { crs: string; label: string; name: string }[] = [
   { crs: "KGX", label: "KGX", name: "London Kings Cross" },
   { crs: "LST", label: "LST", name: "London Liverpool Street" },
   { crs: "PAD", label: "PAD", name: "London Paddington" },
@@ -128,9 +132,14 @@ function RailPageFull() {
     setToStation({ crs: station.crs, name: station.name });
   };
 
-  /** One-tap pick a common London terminal as the FROM station. */
-  const handleTerminalChip = (terminal: { crs: string; name: string }) => {
-    setFromStation({ crs: terminal.crs, name: terminal.name });
+  /** One-tap pick a common station as the FROM input. */
+  const handleQuickFrom = (chip: { crs: string; name: string }) => {
+    setFromStation({ crs: chip.crs, name: chip.name });
+  };
+
+  /** One-tap pick a common station as the TO input. */
+  const handleQuickTo = (chip: { crs: string; name: string }) => {
+    setToStation({ crs: chip.crs, name: chip.name });
   };
 
   /**
@@ -217,20 +226,60 @@ function RailPageFull() {
           </div>
         </div>
 
-      {/* ---- Saved Routes ---- */}
+      {/*
+       * Saved Routes — horizontal scroll strip (mirrors the Plan tab's
+       * pattern). Each chip is tap-to-open and has a small remove
+       * button. Station names are cleaned so long pairs still fit on
+       * one line inside a compact chip.
+       */}
       {journeys.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase px-1">
             SAVED ROUTES
           </div>
-          {journeys.map((j) => (
-            <SavedRouteCard
-              key={j.id}
-              journey={j}
-              onOpen={handleOpenSaved}
-              onRemove={removeJourney}
-            />
-          ))}
+          <div
+            className="flex gap-2 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1"
+            style={{ scrollbarWidth: "none" }}
+          >
+            {journeys.map((j) => (
+              <div
+                key={j.id}
+                onClick={() => handleOpenSaved(j)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleOpenSaved(j);
+                  }
+                }}
+                tabIndex={0}
+                role="button"
+                aria-label={`Open ${j.fromName} to ${j.toName}`}
+                className="shrink-0 snap-start border border-board-border bg-surface p-2.5 cursor-pointer hover:border-amber-faint focus:border-amber-faint focus:outline-none transition-colors flex items-center gap-1.5 min-w-0"
+              >
+                <Star
+                  size={11}
+                  strokeWidth={1.5}
+                  fill="currentColor"
+                  className="text-amber shrink-0"
+                />
+                <span className="font-mono text-[11px] tracking-wider text-amber uppercase whitespace-nowrap flex items-center gap-1.5">
+                  {cleanStationName(j.fromName)}
+                  <ArrowRight size={10} strokeWidth={1.5} className="text-amber-faint" />
+                  {cleanStationName(j.toName)}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeJourney(j.id);
+                  }}
+                  className="shrink-0 ml-1 p-1 text-amber-faint hover:text-red-500 transition-colors"
+                  aria-label={`Remove ${j.fromName} to ${j.toName}`}
+                >
+                  <Trash2 size={11} strokeWidth={1.5} />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -238,18 +287,18 @@ function RailPageFull() {
            collision with the separate PLAN nav tab for TfL journeys). */}
       <BoardPanel title="NEW ROUTE">
         <div className="space-y-3">
-          {/* Quick chips for London terminals — one tap sets FROM. */}
+          {/* Quick chips — one tap sets FROM. */}
           <div>
             <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mb-1.5">
               QUICK FROM
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {LONDON_TERMINAL_CHIPS.map((t) => {
+              {QUICK_STATION_CHIPS.map((t) => {
                 const isActive = fromStation?.crs === t.crs;
                 return (
                   <button
                     key={t.crs}
-                    onClick={() => handleTerminalChip(t)}
+                    onClick={() => handleQuickFrom(t)}
                     aria-label={`Set from to ${t.name}`}
                     title={t.name}
                     className={`px-2.5 py-1 font-mono text-[10px] tracking-wider uppercase border transition-colors ${
@@ -272,6 +321,34 @@ function RailPageFull() {
             onSelect={handleFromSelect}
             onClear={() => setFromStation(null)}
           />
+
+          {/* Quick chips — one tap sets TO. */}
+          <div>
+            <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mb-1.5">
+              QUICK TO
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {QUICK_STATION_CHIPS.map((t) => {
+                const isActive = toStation?.crs === t.crs;
+                return (
+                  <button
+                    key={t.crs}
+                    onClick={() => handleQuickTo(t)}
+                    aria-label={`Set to ${t.name}`}
+                    title={t.name}
+                    className={`px-2.5 py-1 font-mono text-[10px] tracking-wider uppercase border transition-colors ${
+                      isActive
+                        ? "border-amber text-amber bg-amber/10"
+                        : "border-board-border text-amber-faint hover:border-amber-faint hover:text-amber"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <RailStationSearch
             label="TO (OPTIONAL)"
             placeholder="Filter to destination..."
@@ -374,10 +451,11 @@ function RailPageFull() {
         )}
       </div>
 
-        {/* ---- Service detail bottom sheet ---- */}
+        {/* ---- Service detail popup ---- */}
         <ServiceDetailSheet
           departure={expandedDeparture}
           highlightCrs={toStation?.crs || null}
+          fromName={fromStation?.name || null}
           onClose={() => setExpandedDeparture(null)}
         />
       </div>
