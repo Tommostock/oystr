@@ -103,6 +103,33 @@ function RailPageFull() {
   const [toStation, setToStation] = useState<StationSelection | null>(null);
 
   /*
+   * Deep-link pre-fill from ?fromCrs=&fromName=&toCrs=&toName= query
+   * params. Used when the user taps a saved rail route or a rail
+   * search result on the Depart tab so the board loads ready-to-go.
+   *
+   * Reads window.location.search once on mount to avoid pulling the
+   * whole page under a Suspense boundary (useSearchParams would).
+   */
+  const didPrefillFromQuery = useRef(false);
+  useEffect(() => {
+    if (didPrefillFromQuery.current) return;
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const fromCrs = params.get("fromCrs");
+    const fromName = params.get("fromName");
+    const toCrs = params.get("toCrs");
+    const toName = params.get("toName");
+    if (!fromCrs && !toCrs) return;
+    didPrefillFromQuery.current = true;
+    if (fromCrs && fromName) {
+      setFromStation({ crs: fromCrs.toUpperCase(), name: fromName });
+    }
+    if (toCrs && toName) {
+      setToStation({ crs: toCrs.toUpperCase(), name: toName });
+    }
+  }, []);
+
+  /*
    * Currently expanded departure (opens the ServiceDetailSheet).
    * We keep the full departure object in state — not just an ID — so
    * the sheet can render calling points immediately without a second

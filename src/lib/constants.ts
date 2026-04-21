@@ -154,7 +154,7 @@ export const NAV_TABS = [
   { href: "/journey", label: "Plan", icon: "route" },
   { href: "/rail", label: "Rail", icon: "train-front" },
   { href: "/status", label: "Status", icon: "activity" },
-  { href: "/saved", label: "Saved", icon: "star" },
+  { href: "/flights", label: "Flights", icon: "plane" },
 ] as const;
 
 /* ========================================

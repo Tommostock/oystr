@@ -14,12 +14,16 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowRight, TrainFront } from "lucide-react";
 import { useFavourites } from "@/hooks/useFavourites";
+import { useSavedRailJourneys } from "@/hooks/useSavedRailJourneys";
+import { useRailDepartures } from "@/hooks/useRailDepartures";
 import { useArrivals } from "@/hooks/useArrivals";
 import { LINE_COLOURS } from "@/lib/constants";
 import { cn, cleanStationName, isBusStop } from "@/lib/utils";
 import { useCountdown } from "@/hooks/useCountdown";
-import { db } from "@/lib/db";
+import { db, type SavedRailJourney } from "@/lib/db";
 
 interface QuickViewWidgetProps {
   /** Called when a station card is tapped */
@@ -124,6 +128,106 @@ function QuickViewCard({
 }
 
 /**
+ * Saved National Rail route card. Mirrors QuickViewCard visually
+ * but shows the next 2 live departures for the saved FROM -> TO
+ * route. Tapping routes to the Rail tab via query params so the
+ * full board loads there with the chosen FROM/TO pre-selected.
+ */
+function QuickRailCard({
+  journey,
+  onOpen,
+}: {
+  journey: SavedRailJourney;
+  onOpen: (j: SavedRailJourney) => void;
+}) {
+  const { departures, isLoading, notConfigured } = useRailDepartures({
+    fromCrs: journey.fromCrs,
+    toCrs: journey.toCrs,
+    numRows: 2,
+  });
+  const nextTwo = departures.slice(0, 2);
+
+  return (
+    <button
+      onClick={() => onOpen(journey)}
+      className={cn(
+        "w-full text-left border border-board-border bg-surface",
+        "p-3 transition-colors duration-200",
+        "hover:border-amber-faint cursor-pointer"
+      )}
+      aria-label={`Open ${journey.fromName} to ${journey.toName} on Rail tab`}
+    >
+      {/* Route header with rail icon */}
+      <div className="flex items-center gap-1.5 mb-2 min-w-0">
+        <TrainFront
+          size={12}
+          strokeWidth={1.5}
+          className="shrink-0 text-amber"
+        />
+        <span className="font-mono text-xs tracking-wider text-amber uppercase truncate">
+          {cleanStationName(journey.fromName)}
+        </span>
+        <ArrowRight
+          size={10}
+          strokeWidth={1.5}
+          className="shrink-0 text-amber-faint"
+        />
+        <span className="font-mono text-xs tracking-wider text-amber uppercase truncate">
+          {cleanStationName(journey.toName)}
+        </span>
+      </div>
+
+      {/* Next departures or loading / error state */}
+      {notConfigured ? (
+        <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
+          RAIL UNAVAILABLE
+        </div>
+      ) : isLoading && nextTwo.length === 0 ? (
+        <div className="font-mono text-xs tracking-wider text-amber-faint animate-pulse">
+          LOADING...
+        </div>
+      ) : nextTwo.length === 0 ? (
+        <div className="font-mono text-xs tracking-wider text-amber-faint">
+          NO DIRECT TRAINS
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {nextTwo.map((dep, i) => {
+            const status = dep.cancelled
+              ? { label: "CXL", colour: "#ff3b30" }
+              : dep.estimatedDeparture === "On time"
+                ? { label: "ON TIME", colour: "#34c759" }
+                : dep.delayed && dep.estimatedDeparture
+                  ? {
+                      label: `EXP ${dep.estimatedDeparture}`,
+                      colour: "#ff9500",
+                    }
+                  : {
+                      label: (dep.estimatedDeparture || "").toUpperCase(),
+                      colour: "#ff9500",
+                    };
+            return (
+              <div
+                key={`${dep.serviceId}-${i}`}
+                className="flex items-baseline gap-1.5 text-xs font-mono tracking-wider"
+              >
+                <span className="text-amber">{dep.scheduledDeparture}</span>
+                <span
+                  className="text-[10px] truncate"
+                  style={{ color: status.colour }}
+                >
+                  {status.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </button>
+  );
+}
+
+/**
  * Compact arrival row for the quick-view widget.
  */
 function QuickArrivalRow({
@@ -174,6 +278,8 @@ export default function QuickViewWidget({
   onStationSelect,
 }: QuickViewWidgetProps) {
   const { favourites } = useFavourites();
+  const { journeys: railJourneys } = useSavedRailJourneys();
+  const router = useRouter();
 
   /*
    * Enrich bus stops missing their stop letter.
@@ -228,8 +334,86 @@ export default function QuickViewWidget({
     enrichBusStops();
   }, [favourites]);
 
-  /* Don't render if no saved stations */
-  if (favourites.length === 0) return null;
+  /*
+   * Enrich tube / DLR / rail stations missing their line IDs.
+   *
+   * Moved here from the old Saved page so saved non-bus stations
+   * continue to pick up their line-colour dots after that page was
+   * removed. Runs at most once per mount and skips anything that
+   * already has lines or is a bus stop (handled above).
+   */
+  const stationEnrichRef = useRef(false);
+  useEffect(() => {
+    const stationsWithoutLines = favourites.filter(
+      (s) => s.lines.length === 0 && !isBusStop(s.naptanId, s.modes)
+    );
+    if (stationsWithoutLines.length === 0 || stationEnrichRef.current) return;
+    stationEnrichRef.current = true;
+
+    async function enrichStations() {
+      for (const station of stationsWithoutLines) {
+        try {
+          const directResp = await fetch(
+            `/api/tfl/disruptions?stopId=${station.naptanId}`
+          );
+          if (directResp.ok) {
+            const directData = await directResp.json();
+            if (directData.lines?.length > 0) {
+              const lineIds = directData.lines.map(
+                (l: { id: string } | string) =>
+                  typeof l === "string" ? l : l.id
+              );
+              await db.favourites.update(station.naptanId, { lines: lineIds });
+              continue;
+            }
+          }
+          const cleanName = cleanStationName(station.name);
+          const searchResp = await fetch(
+            `/api/tfl/search?query=${encodeURIComponent(cleanName)}`
+          );
+          if (!searchResp.ok) continue;
+          const results = await searchResp.json();
+          const match =
+            results.find(
+              (r: { naptanId: string }) => r.naptanId === station.naptanId
+            ) ||
+            results.find((r: { name: string }) =>
+              r.name.toLowerCase().includes(cleanName.toLowerCase())
+            ) ||
+            results[0];
+          if (match?.lines?.length > 0) {
+            const lineIds = match.lines.map(
+              (l: { id: string } | string) =>
+                typeof l === "string" ? l : l.id
+            );
+            await db.favourites.update(station.naptanId, { lines: lineIds });
+          }
+        } catch {
+          /* Silently fail — line dots are not critical */
+        }
+      }
+      stationEnrichRef.current = false;
+    }
+    enrichStations();
+  }, [favourites]);
+
+  /* Open a saved rail route on the Rail tab with from/to pre-selected. */
+  const handleRailOpen = (j: SavedRailJourney) => {
+    const qs = new URLSearchParams({
+      fromCrs: j.fromCrs,
+      fromName: j.fromName,
+      toCrs: j.toCrs,
+      toName: j.toName,
+    });
+    router.push(`/rail?${qs.toString()}`);
+  };
+
+  const hasAnySaved = favourites.length > 0 || railJourneys.length > 0;
+  if (!hasAnySaved) return null;
+
+  const sortedFavourites = [...favourites].sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
 
   return (
     <div className="space-y-2">
@@ -237,7 +421,7 @@ export default function QuickViewWidget({
         SAVED STATIONS
       </div>
       <div className="grid grid-cols-2 gap-2">
-        {[...favourites].sort((a, b) => a.name.localeCompare(b.name)).map((station) => (
+        {sortedFavourites.map((station) => (
           <QuickViewCard
             key={station.naptanId}
             naptanId={station.naptanId}
@@ -251,6 +435,13 @@ export default function QuickViewWidget({
                 name: station.name,
               })
             }
+          />
+        ))}
+        {railJourneys.map((journey) => (
+          <QuickRailCard
+            key={journey.id}
+            journey={journey}
+            onOpen={handleRailOpen}
           />
         ))}
       </div>

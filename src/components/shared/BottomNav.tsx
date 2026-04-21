@@ -20,7 +20,7 @@ import {
   MapPin,
   Route,
   Activity,
-  Star,
+  Plane,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_TABS } from "@/lib/constants";
@@ -37,7 +37,7 @@ const iconMap = {
   "map-pin": MapPin,
   route: Route,
   activity: Activity,
-  star: Star,
+  plane: Plane,
 } as const;
 
 /* ========================================

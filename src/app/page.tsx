@@ -19,7 +19,7 @@
 "use client";
 
 import { useState, useEffect, useRef, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { RotateCcw, List, HelpCircle } from "lucide-react";
 import StationSearch from "@/components/shared/StationSearch";
@@ -68,6 +68,20 @@ function HomeContent() {
   /* The station the user has selected (null = none selected yet) */
   const [selectedStation, setSelectedStation] =
     useState<SelectedStation | null>(null);
+  const router = useRouter();
+
+  /*
+   * National Rail stations selected via search don't have a TfL
+   * arrivals board — they live on the Rail tab. Route the user there
+   * with the CRS pre-filled so their chosen station loads as FROM.
+   */
+  const handleRailStationSelect = (station: { crs: string; name: string }) => {
+    const qs = new URLSearchParams({
+      fromCrs: station.crs,
+      fromName: station.name,
+    });
+    router.push(`/rail?${qs.toString()}`);
+  };
 
   /* About popup state */
   const [showAbout, setShowAbout] = useState(false);
@@ -352,6 +366,8 @@ function HomeContent() {
       <div className="flex items-start gap-2">
         <StationSearch
           onSelect={(station) => setSelectedStation(station)}
+          onRailStationSelect={handleRailStationSelect}
+          includeRail
           placeholder="Search for a station..."
           className="flex-1"
         />

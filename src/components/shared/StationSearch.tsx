@@ -21,8 +21,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, X } from "lucide-react";
+import { Search, X, TrainFront } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { searchStations as searchRailStations } from "@/lib/uk-rail-stations";
 
 /* ========================================
  * TYPES
@@ -46,9 +47,36 @@ interface SearchResult {
   allNaptanIds?: string[];
 }
 
+/**
+ * A National Rail station match from the bundled UK rail list.
+ * Only `crs` and `name` are known — the rest of the SearchResult
+ * fields are left empty. Flagged with isRail=true so the dropdown
+ * can render it differently and route taps to the Rail tab.
+ */
+interface RailSearchResult extends SearchResult {
+  isRail: true;
+  crs: string;
+}
+
+/** Union: TfL result or a bundled UK rail result. */
+type AnySearchResult = SearchResult | RailSearchResult;
+
+function isRailResult(r: AnySearchResult): r is RailSearchResult {
+  return "isRail" in r && r.isRail === true;
+}
+
 interface StationSearchProps {
-  /** Called when the user selects a station from the dropdown */
+  /** Called when the user selects a TfL station from the dropdown */
   onSelect: (station: SearchResult) => void;
+  /**
+   * Called when the user selects a National Rail station. Only fires
+   * if `includeRail` is true; otherwise rail results aren't surfaced.
+   * When omitted, the default behaviour (opening the Rail tab with
+   * the chosen station as FROM) is used.
+   */
+  onRailStationSelect?: (station: { crs: string; name: string }) => void;
+  /** Include bundled UK National Rail stations in the dropdown. */
+  includeRail?: boolean;
   /** Placeholder text for the input */
   placeholder?: string;
   /** Controlled value — sets the input text from the parent (e.g. after swap) */
@@ -62,14 +90,16 @@ interface StationSearchProps {
  * ======================================== */
 export default function StationSearch({
   onSelect,
+  onRailStationSelect,
+  includeRail = false,
   placeholder = "Search for a station...",
   value,
   className,
 }: StationSearchProps) {
   /* The current text in the search input */
   const [query, setQuery] = useState(value || "");
-  /* The list of matching stations from the API */
-  const [results, setResults] = useState<SearchResult[]>([]);
+  /* The list of matching stations (TfL + optional rail) */
+  const [results, setResults] = useState<AnySearchResult[]>([]);
   /* Whether the dropdown is visible */
   const [isOpen, setIsOpen] = useState(false);
   /* Whether we're waiting for API results */
@@ -91,38 +121,70 @@ export default function StationSearch({
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   /**
-   * Search the TfL API for stations matching the query.
-   * Debounced to avoid making too many API calls while typing.
+   * Search the TfL API for stations matching the query, and (when
+   * includeRail is on) merge in bundled UK National Rail stations
+   * from the offline list so users can find e.g. Leeds or Edinburgh
+   * without leaving the Depart tab.
+   *
+   * Rail entries are deduped against TfL by exact name match so
+   * London terminals that appear on both boards (Kings Cross etc.)
+   * don't show twice.
    */
-  const searchStations = useCallback(async (searchQuery: string) => {
-    /* Don't search if the query is too short */
-    if (searchQuery.trim().length < 2) {
-      setResults([]);
-      setIsOpen(false);
-      return;
-    }
-
-    setIsSearching(true);
-
-    try {
-      const response = await fetch(
-        `/api/tfl/search?query=${encodeURIComponent(searchQuery.trim())}`
-      );
-
-      if (!response.ok) {
-        throw new Error("Search failed");
+  const searchStations = useCallback(
+    async (searchQuery: string) => {
+      /* Don't search if the query is too short */
+      if (searchQuery.trim().length < 2) {
+        setResults([]);
+        setIsOpen(false);
+        return;
       }
 
-      const data: SearchResult[] = await response.json();
-      setResults(data);
-      setIsOpen(data.length > 0);
-    } catch (error) {
-      console.error("Station search error:", error);
-      setResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  }, []);
+      setIsSearching(true);
+
+      try {
+        const response = await fetch(
+          `/api/tfl/search?query=${encodeURIComponent(searchQuery.trim())}`
+        );
+
+        if (!response.ok) {
+          throw new Error("Search failed");
+        }
+
+        const tflResults: SearchResult[] = await response.json();
+        let merged: AnySearchResult[] = tflResults;
+
+        if (includeRail) {
+          const tflNames = new Set(
+            tflResults.map((r) => r.name.toLowerCase().trim())
+          );
+          const railMatches = searchRailStations(searchQuery)
+            .filter((r) => !tflNames.has(r.name.toLowerCase().trim()))
+            .slice(0, 8)
+            .map<RailSearchResult>((r) => ({
+              /* Synthesize a SearchResult shape; crs acts as the unique key */
+              naptanId: `rail:${r.crs}`,
+              name: r.name,
+              lat: 0,
+              lon: 0,
+              modes: ["national-rail"],
+              lines: [],
+              isRail: true,
+              crs: r.crs,
+            }));
+          merged = [...tflResults, ...railMatches];
+        }
+
+        setResults(merged);
+        setIsOpen(merged.length > 0);
+      } catch (error) {
+        console.error("Station search error:", error);
+        setResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [includeRail]
+  );
 
   /**
    * Handle input changes with debouncing.
@@ -145,13 +207,22 @@ export default function StationSearch({
 
   /**
    * Handle selecting a station from the dropdown.
+   * Routes rail-only picks through onRailStationSelect (if provided)
+   * so the parent can navigate to the Rail tab with the chosen CRS.
    */
-  const handleSelect = (station: SearchResult) => {
+  const handleSelect = (station: AnySearchResult) => {
     /* Update the input to show the selected station name */
     setQuery(station.name);
     /* Close the dropdown */
     setIsOpen(false);
-    /* Tell the parent component about the selection */
+    if (isRailResult(station)) {
+      if (onRailStationSelect) {
+        onRailStationSelect({ crs: station.crs, name: station.name });
+      }
+      /* If no rail handler is wired, silently swallow the tap —
+         the caller opted into includeRail without wiring the handler. */
+      return;
+    }
     onSelect(station);
   };
 
@@ -262,49 +333,67 @@ export default function StationSearch({
           )}
           role="listbox"
         >
-          {results.map((station) => (
-            <li key={station.naptanId}>
-              <button
-                onClick={() => handleSelect(station)}
-                className={cn(
-                  /* Full width button */
-                  "w-full text-left px-4 py-3",
-                  /* Amber text with hover highlight */
-                  "text-amber hover:bg-board-border",
-                  /* Mono font styling */
-                  "font-mono text-sm tracking-wider",
-                  /* Divider between items */
-                  "border-b border-board-border last:border-b-0",
-                  /* Smooth hover transition */
-                  "transition-colors duration-150"
-                )}
-                role="option"
-              >
-                {/* Station name with optional stop letter badge and zone */}
-                <div className="flex items-center gap-2 uppercase">
-                  {/* Bus stop letter badge — e.g. [H] */}
-                  {station.stopLetter && (
-                    <span className="shrink-0 w-6 h-6 flex items-center justify-center border border-amber text-amber text-xs font-mono">
-                      {station.stopLetter}
-                    </span>
+          {results.map((station) => {
+            const rail = isRailResult(station);
+            return (
+              <li key={station.naptanId}>
+                <button
+                  onClick={() => handleSelect(station)}
+                  className={cn(
+                    /* Full width button */
+                    "w-full text-left px-4 py-3",
+                    /* Amber text with hover highlight */
+                    "text-amber hover:bg-board-border",
+                    /* Mono font styling */
+                    "font-mono text-sm tracking-wider",
+                    /* Divider between items */
+                    "border-b border-board-border last:border-b-0",
+                    /* Smooth hover transition */
+                    "transition-colors duration-150"
                   )}
-                  <span className="truncate flex-1">{station.name}</span>
-                  {/* Zone badge — e.g. "Z1" or "Z2/3" */}
-                  {station.zone && (
-                    <span className="shrink-0 text-amber amber-glow text-xs font-mono">
-                      Z{station.zone}
-                    </span>
-                  )}
-                </div>
-                {/* Transport modes and indicator as small labels underneath */}
-                <div className="text-amber-faint text-xs mt-1 uppercase">
-                  {station.indicator
-                    ? `${(station.modes || []).join(" / ")} -- ${station.indicator}`
-                    : (station.modes || []).join(" / ")}
-                </div>
-              </button>
-            </li>
-          ))}
+                  role="option"
+                >
+                  {/* Station name with optional stop letter badge and zone/rail marker */}
+                  <div className="flex items-center gap-2 uppercase">
+                    {/* Rail icon for National Rail entries */}
+                    {rail && (
+                      <TrainFront
+                        size={14}
+                        strokeWidth={1.5}
+                        className="shrink-0 text-amber"
+                        aria-hidden="true"
+                      />
+                    )}
+                    {/* Bus stop letter badge — e.g. [H] */}
+                    {!rail && station.stopLetter && (
+                      <span className="shrink-0 w-6 h-6 flex items-center justify-center border border-amber text-amber text-xs font-mono">
+                        {station.stopLetter}
+                      </span>
+                    )}
+                    <span className="truncate flex-1">{station.name}</span>
+                    {/* Zone badge or CRS code on the right */}
+                    {rail ? (
+                      <span className="shrink-0 border border-amber-faint text-amber-faint text-xs font-mono px-1.5 py-0.5">
+                        {station.crs}
+                      </span>
+                    ) : station.zone ? (
+                      <span className="shrink-0 text-amber amber-glow text-xs font-mono">
+                        Z{station.zone}
+                      </span>
+                    ) : null}
+                  </div>
+                  {/* Mode line — rail entries get a distinct NATIONAL RAIL label */}
+                  <div className="text-amber-faint text-xs mt-1 uppercase">
+                    {rail
+                      ? "NATIONAL RAIL"
+                      : station.indicator
+                        ? `${(station.modes || []).join(" / ")} -- ${station.indicator}`
+                        : (station.modes || []).join(" / ")}
+                  </div>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 
