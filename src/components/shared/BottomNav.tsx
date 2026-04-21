@@ -59,9 +59,17 @@ export default function BottomNav() {
   return (
     <nav
       className={cn(
-        /* Fixed to bottom, full width, above everything including map */
-        "fixed bottom-0 left-0 right-0 z-[9000]",
-        /* Dark background with top border */
+        /*
+         * Natural flex-flow placement at the bottom of the body's flex
+         * column (body is h-dvh + flex-col + overflow-hidden; main is
+         * the scroller). No position:fixed — avoids mobile Safari's
+         * intermittent "fixed nav floats mid-page" bug when the viewport
+         * resizes (keyboard show/hide, URL-bar reveal, PWA orientation).
+         *
+         * shrink-0 keeps the nav at its intrinsic height so flex doesn't
+         * squash it when main content is taller than the viewport.
+         */
+        "shrink-0 z-[9000]",
         "bg-board-bg border-t border-board-border",
         /* Safe area padding for phones with home indicators */
         "pb-[env(safe-area-inset-bottom)]"
