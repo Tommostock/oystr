@@ -14,7 +14,7 @@
 import { useEffect, useMemo } from "react";
 import { Trash2, ArrowRight, Armchair, Pencil } from "lucide-react";
 import { cn, cleanStationName } from "@/lib/utils";
-import { useRailDepartures } from "@/hooks/useRailDepartures";
+import { useTrackedRailService } from "@/hooks/useTrackedRailService";
 import type { TrackedRailJourney } from "@/lib/db";
 import type { RailDeparture, CallingPoint } from "@/lib/rail-types";
 
@@ -110,32 +110,47 @@ export default function TrackedJourneyCard({
   const isToday = journey.travelDate === today;
 
   /*
-   * Only poll live data on the travel day itself — RDM only returns
-   * live departures for services imminently running, so querying for
-   * future dates would waste bandwidth and always come back empty.
+   * Live data for the tracked service. Uses a destination-arrivals
+   * lookup so journeys still resolve AFTER the train has left its
+   * origin station — vital for the "I'm on this train already" case.
    */
-  const { departures } = useRailDepartures({
-    fromCrs: isToday ? journey.fromCrs : null,
-    toCrs: isToday ? journey.toCrs : null,
-    numRows: 15,
+  const { departure: liveDeparture } = useTrackedRailService({
+    fromCrs: journey.fromCrs,
+    toCrs: journey.toCrs,
+    scheduledDeparture: journey.scheduledDeparture,
+    /* Don't burn API calls on future-dated journeys — the RDM arrival
+       board only includes services within a short upcoming window. */
+    enabled: isToday,
   });
 
-  /* Find the live RailDeparture matching our tracked service. */
-  const liveDeparture = useMemo<RailDeparture | null>(() => {
-    if (!isToday || departures.length === 0) return null;
-    const match = departures.find(
-      (d) => d.scheduledDeparture === journey.scheduledDeparture
-    );
-    return match ?? null;
-  }, [isToday, departures, journey.scheduledDeparture]);
+  /*
+   * Has the train already left its origin? True when today's clock
+   * has passed the scheduled departure time. Used to flip the status
+   * badge to "EN ROUTE" so the user sees at a glance that the journey
+   * is in progress — different from a pre-departure "ON TIME" status.
+   */
+  const hasDeparted = useMemo(() => {
+    if (!isToday) return false;
+    const now = new Date();
+    const dep = localDateTime(journey.travelDate, journey.scheduledDeparture);
+    return !!dep && now.getTime() >= dep.getTime();
+  }, [isToday, journey.travelDate, journey.scheduledDeparture]);
 
   /* Status text + colour for live data; falls back to scheduled state. */
   const status = useMemo(() => {
     if (!liveDeparture) {
-      return { label: isToday ? "SCHEDULED" : formatTravelDate(journey.travelDate), colour: "#cc7700" };
+      return {
+        label: isToday ? "SCHEDULED" : formatTravelDate(journey.travelDate),
+        colour: "#cc7700",
+      };
     }
     if (liveDeparture.cancelled) {
       return { label: "CANCELLED", colour: "#ff3b30" };
+    }
+    /* In-progress: once the train has left, show EN ROUTE regardless
+       of whether the origin departure was on time or slightly delayed. */
+    if (hasDeparted) {
+      return { label: "EN ROUTE", colour: "#34c759" };
     }
     if (liveDeparture.estimatedDeparture === "On time") {
       return { label: "ON TIME", colour: "#34c759" };
@@ -154,7 +169,7 @@ export default function TrackedJourneyCard({
       label: liveDeparture.estimatedDeparture.toUpperCase() || "SCHEDULED",
       colour: "#ff9500",
     };
-  }, [liveDeparture, isToday, journey.travelDate]);
+  }, [liveDeparture, isToday, hasDeparted, journey.travelDate]);
 
   /* Next stop + destination ETA from the live calling points. */
   const nextStop = useMemo(() => {
@@ -235,7 +250,7 @@ export default function TrackedJourneyCard({
       {/* Top row: TRACKING label + travel-date chip + remove button */}
       <div className="flex items-center gap-2 mb-1.5">
         <span className="font-mono text-[10px] tracking-wider text-amber uppercase">
-          {liveDeparture ? "ON BOARD" : "TRACKING"}
+          {hasDeparted ? "ON BOARD" : "TRACKING"}
         </span>
         <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
           {formatTravelDate(journey.travelDate)}
