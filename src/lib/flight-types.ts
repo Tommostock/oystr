@@ -148,6 +148,13 @@ export interface FlightDetailLeg {
   scheduledTime: string;
   /** Scheduled date in YYYY-MM-DD (local to this airport) */
   scheduledDate: string;
+  /**
+   * Scheduled time as an ISO UTC timestamp (e.g. "2026-04-22T17:05:00Z").
+   * Needed because the local HH:mm above can't be converted back to UTC
+   * without knowing the airport's timezone — which is especially fiddly
+   * for airports that observe DST shifts.
+   */
+  scheduledTimeUtc: string | null;
   /** Estimated/predicted time if different from scheduled */
   estimatedTime: string | null;
   /** Actual time if the event has happened */

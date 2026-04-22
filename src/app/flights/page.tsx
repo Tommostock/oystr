@@ -13,18 +13,32 @@
 
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, Trash2 } from "lucide-react";
+import { Clock, Trash2, Plane } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import AirportSearch from "@/components/flights/AirportSearch";
 import FlightSearch from "@/components/flights/FlightSearch";
+import TrackedFlightCard from "@/components/flights/TrackedFlightCard";
+import FlightSeatEditor from "@/components/flights/FlightSeatEditor";
 import { LONDON_AIRPORTS } from "@/lib/airports";
 import { useRecentAirports } from "@/hooks/useRecentAirports";
+import { useTrackedFlights } from "@/hooks/useTrackedFlights";
 
 export default function FlightsPage() {
   const router = useRouter();
   const { recents, addRecent, removeRecent } = useRecentAirports();
+  const { flights: trackedFlights, removeFlight, updateSeats } =
+    useTrackedFlights();
+
+  /*
+   * Which tracked flight currently has its seat editor open (null
+   * when closed). Kept as an ID rather than a full record so the
+   * editor updates automatically when IndexedDB re-hydrates after
+   * save.
+   */
+  const [editingSeatsId, setEditingSeatsId] = useState<string | null>(null);
+  const editingFlight = trackedFlights.find((f) => f.id === editingSeatsId) ?? null;
 
   /**
    * Common handler for every selection path. Records the airport as
@@ -50,6 +64,32 @@ export default function FlightsPage() {
   return (
     <div className="p-4 space-y-4">
       <PageHeader title="Flights" subtitle="LIVE DEPARTURES WORLDWIDE" />
+
+      {/* ---- Tracked flights — only rendered when the user has any ---- */}
+      {trackedFlights.length > 0 && (
+        <div>
+          <div className="flex items-center gap-1.5 mb-1.5 px-1">
+            <Plane
+              size={10}
+              strokeWidth={1.5}
+              className="text-amber-faint shrink-0"
+            />
+            <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
+              MY FLIGHTS
+            </span>
+          </div>
+          <div className="space-y-2">
+            {trackedFlights.map((f) => (
+              <TrackedFlightCard
+                key={f.id}
+                flight={f}
+                onRemove={(id) => removeFlight(id)}
+                onEditSeats={(id) => setEditingSeatsId(id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ---- London quick-pick chips ---- */}
       <div>
@@ -145,6 +185,19 @@ export default function FlightsPage() {
         </div>
         <FlightSearch />
       </div>
+
+      {/* ---- Seat editor — lives here so the modal state survives
+               tracked-list re-renders as IndexedDB streams updates ---- */}
+      <FlightSeatEditor
+        open={editingFlight !== null}
+        initialSeats={editingFlight?.seats ?? []}
+        onSave={async (seats) => {
+          if (editingSeatsId) {
+            await updateSeats(editingSeatsId, seats);
+          }
+        }}
+        onClose={() => setEditingSeatsId(null)}
+      />
     </div>
   );
 }

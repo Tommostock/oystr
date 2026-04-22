@@ -13,13 +13,15 @@
 
 "use client";
 
-import { use, useCallback } from "react";
-import { Plane, Clock, Radio } from "lucide-react";
+import { use, useCallback, useEffect, useState } from "react";
+import { Plane, Clock, Radio, Star, Armchair, Check } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import BoardPanel from "@/components/shared/BoardPanel";
 import BoardState from "@/components/shared/BoardState";
 import PullToRefresh from "@/components/shared/PullToRefresh";
+import FlightSeatEditor from "@/components/flights/FlightSeatEditor";
 import { useFlightDetail } from "@/hooks/useFlightDetail";
+import { useTrackedFlights } from "@/hooks/useTrackedFlights";
 import type { FlightDetail, FlightDetailLeg } from "@/lib/flight-types";
 
 interface PageProps {
@@ -193,9 +195,99 @@ export default function FlightDetailPage({ params }: PageProps) {
   const { flight, isLoading, error, notConfigured, notFound, refresh } =
     useFlightDetail({ flightNumber });
 
+  const {
+    flights: trackedFlights,
+    trackFlight,
+    removeFlight,
+    updateSeats,
+    buildTrackedFlightId,
+  } = useTrackedFlights();
+
+  /*
+   * The tracked-flight ID we'd save this flight under, if we could.
+   * Null while we don't yet know the travel date (i.e. before live
+   * data resolves). Keeping this derived rather than stored keeps
+   * the Save/Tracked toggle reactive to live data updates.
+   */
+  const trackedId =
+    flight && flight.departure.scheduledDate
+      ? buildTrackedFlightId({
+          flightNumber: flight.flightNumber,
+          travelDate: flight.departure.scheduledDate,
+        })
+      : null;
+
+  const trackedRecord =
+    trackedId != null
+      ? trackedFlights.find((f) => f.id === trackedId) ?? null
+      : null;
+  const isTracked = trackedRecord !== null;
+
+  /* Seat-editor modal open/closed */
+  const [seatEditorOpen, setSeatEditorOpen] = useState(false);
+
+  /* Brief "just tracked" flash on the button */
+  const [justTracked, setJustTracked] = useState(false);
+  useEffect(() => {
+    if (!justTracked) return;
+    const id = setTimeout(() => setJustTracked(false), 1500);
+    return () => clearTimeout(id);
+  }, [justTracked]);
+
   const handlePullRefresh = useCallback(async () => {
     await refresh();
   }, [refresh]);
+
+  /**
+   * Toggle tracking for the current flight. Uses live data to fill
+   * in all the fields we'll need later (airports, times, UTC arrival
+   * for auto-clear).
+   */
+  const handleToggleTrack = useCallback(async () => {
+    if (!flight) return;
+    if (trackedRecord) {
+
+      await removeFlight(trackedRecord.id);
+      return;
+    }
+
+    /*
+     * Use the real UTC timestamp from the provider. Falling back to
+     * dep_date + arr_local + Z would double-count the departure
+     * airport's UTC offset and silently break auto-clear for any
+     * transatlantic / intercontinental flight.
+     */
+    const arrivalIso =
+      flight.arrival.scheduledTimeUtc ??
+      flight.departure.scheduledTimeUtc ??
+      new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    await trackFlight({
+      flightNumber: flight.flightNumber,
+      airline: flight.airline,
+      airlineCode: flight.airlineCode,
+      travelDate: flight.departure.scheduledDate,
+      departureIata: flight.departure.airport.iata,
+      departureName: flight.departure.airport.name,
+      departureCity: flight.departure.airport.city,
+      arrivalIata: flight.arrival.airport.iata,
+      arrivalName: flight.arrival.airport.name,
+      arrivalCity: flight.arrival.airport.city,
+      scheduledDeparture: flight.departure.scheduledTime,
+      scheduledArrivalUtc: arrivalIso,
+      seats: [],
+    });
+    setJustTracked(true);
+  }, [flight, trackedRecord, trackFlight, removeFlight]);
+
+  /** Persist the edited seat list to IndexedDB. */
+  const handleSeatsSave = useCallback(
+    async (seats: string[]) => {
+      if (!trackedRecord) return;
+      await updateSeats(trackedRecord.id, seats);
+    },
+    [trackedRecord, updateSeats]
+  );
 
   return (
     <PullToRefresh onRefresh={handlePullRefresh}>
@@ -235,7 +327,7 @@ export default function FlightDetailPage({ params }: PageProps) {
             </p>
           )}
           {flight && (
-            <div className="pt-1">
+            <div className="pt-1 flex items-center gap-2 flex-wrap">
               <span
                 className={
                   "inline-block px-2 py-0.5 font-mono text-[10px] tracking-widest uppercase border " +
@@ -244,6 +336,62 @@ export default function FlightDetailPage({ params }: PageProps) {
               >
                 {prettyStatus(flight.status)}
               </span>
+
+              {/* ---- Track / Tracked toggle ---- */}
+              <button
+                onClick={handleToggleTrack}
+                aria-label={
+                  isTracked
+                    ? `Stop tracking ${flight.flightNumber}`
+                    : `Track ${flight.flightNumber}`
+                }
+                aria-pressed={isTracked}
+                className={
+                  "ml-auto inline-flex items-center gap-1.5 px-2 py-1 border font-mono text-[10px] tracking-widest uppercase transition-colors " +
+                  (isTracked
+                    ? "border-amber text-amber bg-amber/10 amber-glow"
+                    : "border-board-border text-amber-faint hover:border-amber hover:text-amber")
+                }
+              >
+                {justTracked ? (
+                  <>
+                    <Check size={10} strokeWidth={2} />
+                    TRACKED
+                  </>
+                ) : isTracked ? (
+                  <>
+                    <Star
+                      size={10}
+                      strokeWidth={1.5}
+                      className="fill-amber"
+                    />
+                    TRACKING
+                  </>
+                ) : (
+                  <>
+                    <Star size={10} strokeWidth={1.5} />
+                    TRACK
+                  </>
+                )}
+              </button>
+
+              {/* ---- Seats button — only when tracking ---- */}
+              {isTracked && (
+                <button
+                  onClick={() => setSeatEditorOpen(true)}
+                  aria-label={
+                    (trackedRecord?.seats.length ?? 0) > 0
+                      ? "Edit seats"
+                      : "Add seats"
+                  }
+                  className="inline-flex items-center gap-1.5 px-2 py-1 border border-board-border text-amber-faint hover:border-amber hover:text-amber font-mono text-[10px] tracking-widest uppercase transition-colors"
+                >
+                  <Armchair size={10} strokeWidth={1.5} />
+                  {(trackedRecord?.seats.length ?? 0) > 0
+                    ? trackedRecord?.seats.join(" ")
+                    : "ADD SEATS"}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -389,6 +537,14 @@ export default function FlightDetailPage({ params }: PageProps) {
           </>
         )}
       </div>
+
+      {/* ---- Seat editor (only mounts when the user opens it) ---- */}
+      <FlightSeatEditor
+        open={seatEditorOpen}
+        initialSeats={trackedRecord?.seats ?? []}
+        onSave={handleSeatsSave}
+        onClose={() => setSeatEditorOpen(false)}
+      />
     </PullToRefresh>
   );
 }

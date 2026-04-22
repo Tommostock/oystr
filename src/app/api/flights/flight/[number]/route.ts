@@ -121,6 +121,7 @@ function mapStatus(raw: string | undefined | null): FlightStatus {
 function normaliseLeg(leg: any): FlightDetailLeg {
   const airport = leg.airport ?? {};
   const scheduledLocal = leg.scheduledTime?.local;
+  const scheduledUtcRaw: string | undefined = leg.scheduledTime?.utc;
   const actualLocal    = leg.actualTime?.local ?? leg.runwayTime?.local ?? null;
   const predictedLocal = leg.predictedTime?.local ?? leg.revisedTime?.local ?? null;
 
@@ -133,6 +134,15 @@ function normaliseLeg(leg: any): FlightDetailLeg {
   const estimatedTime =
     predictedTime && predictedTime !== scheduledTime ? predictedTime : null;
 
+  /*
+   * AeroDataBox formats UTC as "2026-04-22 17:05Z" — rewrite the
+   * space to 'T' so it's a valid ISO 8601 string that Date can parse
+   * anywhere (and that we can compare with other UTC values safely).
+   */
+  const scheduledTimeUtc = scheduledUtcRaw
+    ? scheduledUtcRaw.replace(" ", "T").replace(/Z$/, "Z")
+    : null;
+
   return {
     airport: {
       iata: airport.iata ?? "???",
@@ -143,6 +153,7 @@ function normaliseLeg(leg: any): FlightDetailLeg {
     },
     scheduledTime,
     scheduledDate,
+    scheduledTimeUtc,
     estimatedTime,
     actualTime,
     terminal: leg.terminal ?? null,

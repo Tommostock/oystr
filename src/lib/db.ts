@@ -127,6 +127,61 @@ export interface SavedAirport {
 }
 
 /**
+ * A specific flight the user is actively travelling on (or plans to
+ * travel on). Mirrors TrackedRailJourney but keyed by flight number +
+ * travel date, and supports multiple seat numbers (for when the user
+ * is flying with family or colleagues under a single booking).
+ *
+ * Auto-clears ~60 minutes after scheduled arrival UTC — longer than
+ * the 10 minute rail buffer because disembarking an aircraft, clearing
+ * immigration, and fetching bags takes noticeably longer.
+ */
+export interface TrackedFlight {
+  /** Unique key — "${flightNumber}-${travelDate}" (e.g. "BA 175-2026-04-22") */
+  id: string;
+  /** Flight number in canonical "BA 175" form. */
+  flightNumber: string;
+  /** Operating airline display name (e.g. "British Airways"). */
+  airline: string;
+  /** 2-3 char airline code (e.g. "BA", "U2"). */
+  airlineCode: string;
+  /** Departure date in YYYY-MM-DD (local to the departure airport). */
+  travelDate: string;
+  /** Departure airport IATA (e.g. "LHR"). */
+  departureIata: string;
+  /** Departure airport display name. */
+  departureName: string;
+  /** Departure city — used as the primary display label on the card. */
+  departureCity: string | null;
+  /** Arrival airport IATA (e.g. "JFK"). */
+  arrivalIata: string;
+  /** Arrival airport display name. */
+  arrivalName: string;
+  /** Arrival city — used as the primary display label. */
+  arrivalCity: string | null;
+  /** Scheduled departure time in HH:mm (local to the departure airport). */
+  scheduledDeparture: string;
+  /**
+   * Scheduled arrival time as an ISO UTC timestamp, e.g.
+   * "2026-04-22T17:05:00Z". Stored in UTC because departure and
+   * arrival airports can be in different timezones — using UTC
+   * keeps the auto-clear calculation correct everywhere.
+   *
+   * The card itself re-fetches live data from useFlightDetail, so
+   * this value is only used for auto-clear timing.
+   */
+  scheduledArrivalUtc: string;
+  /**
+   * Booked seat numbers, e.g. ["14A"] or ["14A", "14B", "14C"] for
+   * a family of three. Empty array means "no seats entered yet" —
+   * the user can still track the flight without entering seats.
+   */
+  seats: string[];
+  /** Unix timestamp when the user tracked this flight. */
+  trackedAt: number;
+}
+
+/**
  * A specific rail service the user is actively travelling on (or plans
  * to travel on). Unlike SavedRailJourney (a generic route), a
  * TrackedRailJourney is tied to a single date + scheduled departure —
@@ -189,6 +244,7 @@ class OystrDatabase extends Dexie {
   savedRailStations!: Table<SavedRailStation>;
   savedAirports!: Table<SavedAirport>;
   trackedRailJourneys!: Table<TrackedRailJourney>;
+  trackedFlights!: Table<TrackedFlight>;
   /*
    * The savedJourneys table has existed in the schema since v1 but
    * wasn't typed or used until Plan-tab saved journeys shipped.
@@ -289,6 +345,26 @@ class OystrDatabase extends Dexie {
       savedRailStations: "crs, name, addedAt",
       savedAirports: "iata, name, addedAt",
       trackedRailJourneys: "id, travelDate, trackedAt",
+    });
+
+    /*
+     * Schema version 7: adds active-flight tracking. trackedFlights
+     * stores specific flights the user is on or plans to get, scoped
+     * to a date (YYYY-MM-DD local to the departure airport). Auto-
+     * cleared ~60 min after scheduled arrival UTC so the card clears
+     * itself once the trip is comfortably over.
+     */
+    this.version(7).stores({
+      favourites: "naptanId, name, addedAt",
+      timetables: "id, lineId, stationId, cachedAt",
+      lineStatuses: "lineId, cachedAt",
+      savedJourneys: "id, savedAt",
+      stations: "naptanId, name, *lines",
+      savedRailJourneys: "id, fromCrs, toCrs, addedAt",
+      savedRailStations: "crs, name, addedAt",
+      savedAirports: "iata, name, addedAt",
+      trackedRailJourneys: "id, travelDate, trackedAt",
+      trackedFlights: "id, travelDate, trackedAt",
     });
   }
 }
