@@ -26,7 +26,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import type { FlightDeparture } from "@/lib/flight-types";
-import { getAirportByIata } from "@/lib/london-airports";
 
 /*
  * Env var name for the flights provider key.
@@ -78,14 +77,16 @@ export async function GET(request: NextRequest) {
   const iata = rawIata.trim().toUpperCase();
 
   /*
-   * Restrict to airports we've declared — keeps arbitrary
-   * third-party IATA codes out of the proxy and flags typos early.
-   * Expanding beyond London is a matter of adding to the bundled
-   * airports list.
+   * Validate the IATA format only — 3 uppercase letters. We
+   * deliberately do NOT limit to a known airport list: the Flights
+   * tab is designed to work for any airport worldwide (Rome,
+   * Edinburgh, JFK, etc.), and the upstream provider is the source
+   * of truth for whether a given airport is covered. Cheap regex
+   * check still catches typos like "lhrx" or "1HR".
    */
-  if (!getAirportByIata(iata)) {
+  if (!/^[A-Z]{3}$/.test(iata)) {
     return NextResponse.json(
-      { error: `Unsupported airport: ${iata}` },
+      { error: `Invalid IATA code: ${iata}` },
       { status: 400 }
     );
   }

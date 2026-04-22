@@ -14,16 +14,20 @@
 
 /* ========================================
  * AIRPORT
- * Static metadata for an airport. The bundled London list lives in
- * london-airports.ts and only needs these fields.
+ * Static metadata for an airport. The bundled global list lives in
+ * airports.ts and is used for chip picks + the search autocomplete.
  * ======================================== */
 export interface Airport {
-  /** 3-letter IATA code (e.g. "LHR", "LGW") */
+  /** 3-letter IATA code (e.g. "LHR", "FCO", "EDI") */
   iata: string;
-  /** Display name (e.g. "London Heathrow") */
+  /** Display name (e.g. "Heathrow", "Fiumicino") */
   name: string;
-  /** Short chip label (e.g. "LHR", "LONDON CITY") */
+  /** Short chip label (e.g. "LHR", "FCO") */
   label: string;
+  /** City the airport serves (e.g. "London", "Rome", "Edinburgh") */
+  city?: string;
+  /** Country (e.g. "United Kingdom", "Italy") */
+  country?: string;
 }
 
 /* ========================================
