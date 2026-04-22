@@ -1,70 +1,206 @@
 /**
  * API Route: /api/flights/departures
  *
- * Proxies live flight departure requests to a third-party aviation
- * data provider. Shape-only scaffold for now — the provider is not
- * wired up yet (awaiting the API key).
- *
- * Once a FLIGHTS_API_KEY (or equivalent) is available in env, fill
- * in the upstream fetch inside `fetchUpstreamDepartures` and return
- * the normalised departures array.
+ * Proxies live departure data from AeroDataBox (via RapidAPI) for a
+ * given airport IATA code. Normalises the upstream response into the
+ * app's FlightDeparture shape so the client never knows which
+ * provider we're using.
  *
  * Query params:
  *   ?iata=LHR       — 3-letter IATA code of the airport (REQUIRED)
- *   ?numRows=15     — optional: number of rows to return (default 15, max 50)
+ *   ?numRows=15     — number of rows to return (default 15, max 50)
  *
  * Returns:
  *   200 Array<FlightDeparture>               — sorted by scheduled time ASC
  *   400 { error }                            — missing / invalid iata
- *   503 { error, notConfigured: true }       — API key not set yet
+ *   503 { error, notConfigured: true }       — FLIGHTS_API_KEY not set
  *   502/500 { error }                        — upstream failure
- *
- * The notConfigured response matches the Rail API pattern so the
- * client hook + UI can show "AWAITING API KEY" rather than a
- * generic error while we're still setting up.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import type { FlightDeparture } from "@/lib/flight-types";
+import type { FlightDeparture, FlightStatus } from "@/lib/flight-types";
 
-/*
- * Env var name for the flights provider key.
- *
- * Kept as a single name so there is ONE place to change when we
- * pick a provider (AeroDataBox, AviationStack, etc). The proxy
- * never needs to know which provider it is — the upstream fetch
- * function below is the only thing that cares.
- */
 const FLIGHTS_API_KEY_ENV = "FLIGHTS_API_KEY";
+const AERODATABOX_HOST = "aerodatabox.p.rapidapi.com";
+
+/* ----------------------------------------
+ * Helpers
+ * -------------------------------------- */
 
 /**
- * Upstream fetch stub.
- *
- * TODO: wire up the real provider once the API key is available.
- * When it is, this function should:
- *   1. Call the provider's "departures at airport X" endpoint
- *   2. Cache the response server-side for 60–120s to respect free-
- *      tier rate limits (use Next's `next: { revalidate: 90 }` or
- *      unstable_cache for a keyed cache)
- *   3. Normalise each upstream flight record into FlightDeparture
- *   4. Sort by scheduled time ascending
- *   5. Return the top `numRows` rows
- *
- * The rest of the route (validation, notConfigured handling, error
- * envelope) is already in place — adding the provider only needs
- * this function body filled in.
+ * Format a Date as "YYYY-MM-DDTHH:mm" (UTC) for the AeroDataBox
+ * FIDS endpoint from/to path segments.
  */
-async function fetchUpstreamDepartures(
-  _iata: string,
-  _numRows: number,
-  _apiKey: string
-): Promise<FlightDeparture[]> {
-  /* Deliberately unimplemented until the key lands. */
-  throw new Error("UPSTREAM_NOT_IMPLEMENTED");
+function formatAeroDateTime(date: Date): string {
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  const h = String(date.getUTCHours()).padStart(2, "0");
+  const min = String(date.getUTCMinutes()).padStart(2, "0");
+  return `${y}-${m}-${d}T${h}:${min}`;
 }
 
+/**
+ * Extract "HH:mm" from an AeroDataBox local-time string like
+ * "2024-04-22 14:30+01:00".  Returns null if the string is missing
+ * or doesn't match.
+ */
+function extractTime(localStr: string | undefined | null): string | null {
+  if (!localStr) return null;
+  // Match the time part that comes after the date (before the +/- offset)
+  const match = localStr.match(/\d{4}-\d{2}-\d{2}[\sT](\d{2}:\d{2})/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Map an AeroDataBox status string to the app's FlightStatus enum.
+ */
+function mapStatus(raw: string | undefined | null): FlightStatus {
+  switch (raw) {
+    case "CheckIn":         return "on-time";
+    case "Boarding":        return "boarding";
+    case "GateClosed":      return "gate-closed";
+    case "Departed":        return "departed";
+    case "Delayed":         return "delayed";
+    case "Expected":        return "expected";
+    case "EnRoute":         return "scheduled";
+    case "Landed":          return "landed";
+    case "Arrived":         return "landed";
+    case "Cancelled":
+    case "CanceledUncertain": return "cancelled";
+    case "Diverted":        return "diverted";
+    default:                return "scheduled";
+  }
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+/**
+ * Normalise a single AeroDataBox departure item into a FlightDeparture.
+ *
+ * AeroDataBox response shape (relevant fields):
+ * {
+ *   number: "BA292",
+ *   status: "Boarding",
+ *   airline: { name: "British Airways", iata: "BA" },
+ *   aircraft: { model: "Boeing 777", registration: "G-STBK" },
+ *   movement: {
+ *     airport: { iata: "JFK", municipalityName: "New York", name: "..." },
+ *     scheduledTime: { local: "2024-04-22 10:00+01:00", utc: "..." },
+ *     revisedTime:   { local: "2024-04-22 10:15+01:00", utc: "..." },
+ *     terminal: "5",
+ *     gate: "A7"
+ *   }
+ * }
+ */
+function normaliseDeparture(item: any): FlightDeparture {
+  const movement = item.movement ?? {};
+  const destAirport = movement.airport ?? {};
+  const airline = item.airline ?? {};
+  const aircraft = item.aircraft ?? {};
+  const scheduledLocal = extractTime(movement.scheduledTime?.local);
+  const revisedLocal   = extractTime(movement.revisedTime?.local);
+
+  const status = mapStatus(item.status);
+
+  // Only surface an estimated time if it differs from scheduled
+  const estimatedDeparture =
+    revisedLocal && revisedLocal !== scheduledLocal ? revisedLocal : null;
+
+  // Build a readable destination label: "New York" or fall back to IATA
+  const destination =
+    destAirport.municipalityName ||
+    destAirport.shortName ||
+    destAirport.name ||
+    destAirport.iata ||
+    "Unknown";
+
+  return {
+    id: item.number ?? "UNKNOWN",
+    airline: airline.name ?? "Unknown Airline",
+    airlineCode: airline.iata ?? "??",
+    flightNumber: item.number ?? "UNKNOWN",
+    scheduledDeparture: scheduledLocal ?? "N/A",
+    estimatedDeparture,
+    destinationIata: destAirport.iata ?? "???",
+    destination,
+    terminal: movement.terminal ?? null,
+    gate: movement.gate ?? null,
+    status,
+    cancelled: status === "cancelled",
+    aircraftModel: aircraft.model,
+    aircraftRegistration: aircraft.registration,
+  };
+}
+
+/* ----------------------------------------
+ * Upstream fetch
+ * -------------------------------------- */
+
+async function fetchUpstreamDepartures(
+  iata: string,
+  numRows: number,
+  apiKey: string
+): Promise<FlightDeparture[]> {
+  // Use a 6-hour window from now so the board always has upcoming flights
+  const now = new Date();
+  const sixHoursLater = new Date(now.getTime() + 6 * 60 * 60 * 1000);
+
+  const from = formatAeroDateTime(now);
+  const to   = formatAeroDateTime(sixHoursLater);
+
+  const url = new URL(
+    `https://${AERODATABOX_HOST}/flights/airports/iata/${iata}/${from}/${to}`
+  );
+  url.searchParams.set("direction", "Departure");
+  // Only show the operating airline's row to avoid duplicate
+  // codeshare entries (one flight can appear under 3-4 airline codes)
+  url.searchParams.set("withCodeshared", "false");
+  url.searchParams.set("withCargo", "false");
+  url.searchParams.set("withPrivate", "false");
+  url.searchParams.set("withLocation", "false");
+
+  const res = await fetch(url.toString(), {
+    headers: {
+      "x-rapidapi-host": AERODATABOX_HOST,
+      "x-rapidapi-key": apiKey,
+    },
+    // Cache server-side for 90 seconds to avoid hammering the free tier
+    next: { revalidate: 90 },
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`AeroDataBox ${res.status}: ${body.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const rows: any[] = data.departures ?? [];
+
+  // Sort ascending by scheduled departure (already usually sorted, but defensive)
+  rows.sort((a, b) => {
+    const ta = a.movement?.scheduledTime?.utc ?? "";
+    const tb = b.movement?.scheduledTime?.utc ?? "";
+    return ta.localeCompare(tb);
+  });
+
+  // Drop flights that have already left — a real FIDS board clears
+  // them within a few minutes of departure. Keep Cancelled/Diverted
+  // so travellers who arrive late still see the bad news.
+  const stillRelevant = rows.filter((r) => {
+    const s = r.status;
+    return s !== "Departed" && s !== "Landed" && s !== "Arrived";
+  });
+
+  return stillRelevant.slice(0, numRows).map(normaliseDeparture);
+}
+
+/* ----------------------------------------
+ * Route handler
+ * -------------------------------------- */
+
 export async function GET(request: NextRequest) {
-  const rawIata = request.nextUrl.searchParams.get("iata");
+  const rawIata   = request.nextUrl.searchParams.get("iata");
   const numRowsRaw = request.nextUrl.searchParams.get("numRows");
 
   if (!rawIata) {
@@ -76,14 +212,6 @@ export async function GET(request: NextRequest) {
 
   const iata = rawIata.trim().toUpperCase();
 
-  /*
-   * Validate the IATA format only — 3 uppercase letters. We
-   * deliberately do NOT limit to a known airport list: the Flights
-   * tab is designed to work for any airport worldwide (Rome,
-   * Edinburgh, JFK, etc.), and the upstream provider is the source
-   * of truth for whether a given airport is covered. Cheap regex
-   * check still catches typos like "lhrx" or "1HR".
-   */
   if (!/^[A-Z]{3}$/.test(iata)) {
     return NextResponse.json(
       { error: `Invalid IATA code: ${iata}` },
@@ -91,7 +219,6 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  /* Clamp the caller-requested row count to 1-50 (default 15). */
   let numRows = 15;
   if (numRowsRaw) {
     const parsed = parseInt(numRowsRaw, 10);
@@ -100,18 +227,10 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  /*
-   * Graceful degradation: API key missing in env — return 503 with
-   * a notConfigured flag so the UI shows the "awaiting API key"
-   * state rather than crashing.
-   */
   const apiKey = process.env[FLIGHTS_API_KEY_ENV];
   if (!apiKey) {
     return NextResponse.json(
-      {
-        error: "Flight service not configured",
-        notConfigured: true,
-      },
+      { error: "Flight service not configured", notConfigured: true },
       { status: 503 }
     );
   }
@@ -120,22 +239,6 @@ export async function GET(request: NextRequest) {
     const departures = await fetchUpstreamDepartures(iata, numRows, apiKey);
     return NextResponse.json(departures);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unknown upstream error";
-    /*
-     * During the scaffold phase the stub throws
-     * UPSTREAM_NOT_IMPLEMENTED — surface it as notConfigured too,
-     * so enabling the feature is a single key-swap + stub-fill.
-     */
-    if (message === "UPSTREAM_NOT_IMPLEMENTED") {
-      return NextResponse.json(
-        {
-          error: "Flight service not configured",
-          notConfigured: true,
-        },
-        { status: 503 }
-      );
-    }
     console.error("Flight departures error:", error);
     return NextResponse.json(
       { error: "Failed to fetch flight departures" },
