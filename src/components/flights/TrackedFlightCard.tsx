@@ -14,9 +14,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Trash2, ArrowRight, Armchair, Pencil } from "lucide-react";
+import { Trash2, ArrowRight, Armchair, Pencil, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFlightDetail } from "@/hooks/useFlightDetail";
+import { formatAirportFullName } from "@/lib/airports";
 import type { TrackedFlight } from "@/lib/db";
 import type { FlightStatus } from "@/lib/flight-types";
 
@@ -59,6 +60,32 @@ function formatTravelDate(travelDate: string): string {
       month: "short",
     })
     .toUpperCase();
+}
+
+/**
+ * Always-show date label that combines the absolute date with a
+ * "TODAY" / "TOMORROW" prefix when relevant, so the user sees both
+ * at a glance (e.g. "WED 22 APR · TODAY").
+ */
+function formatTravelDateLong(travelDate: string): string {
+  const parsed = new Date(`${travelDate}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return travelDate;
+  const absolute = parsed
+    .toLocaleDateString("en-GB", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    })
+    .toUpperCase();
+
+  const today = localDateString();
+  if (travelDate === today) return `${absolute} -- TODAY`;
+
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (travelDate === localDateString(tomorrow)) return `${absolute} -- TOMORROW`;
+
+  return absolute;
 }
 
 /** Colour class for the status chip — matches the detail page. */
@@ -110,8 +137,20 @@ export default function TrackedFlightCard({
   const isFuture = flight.travelDate > today;
   const isPast = flight.travelDate < today;
 
-  const fromCity = flight.departureCity || flight.departureName;
-  const toCity = flight.arrivalCity || flight.arrivalName;
+  /*
+   * Use the disambiguated full airport name so London Gatwick vs
+   * London Heathrow (and similar) are never guessable — critical
+   * because every major city has multiple airports and "LONDON"
+   * alone tells you nothing useful.
+   */
+  const fromFullName = formatAirportFullName({
+    name: flight.departureName,
+    city: flight.departureCity,
+  });
+  const toFullName = formatAirportFullName({
+    name: flight.arrivalName,
+    city: flight.arrivalCity,
+  });
 
   /*
    * Prefer the live departure time over the one we stored at
@@ -126,8 +165,14 @@ export default function TrackedFlightCard({
   const terminal = live?.departure.terminal ?? null;
   const gate = live?.departure.gate ?? null;
 
+  /*
+   * Status chip: prefer the live status when we have it, otherwise
+   * show "SCHEDULED" as a placeholder. The travel-date is now always
+   * visible in its own row above, so the chip doesn't need to carry
+   * that information any more.
+   */
   const status = live?.status;
-  const statusLabel = status ? prettyStatus(status) : formatTravelDate(flight.travelDate);
+  const statusLabel = status ? prettyStatus(status) : "SCHEDULED";
   const statusClasses = status
     ? statusChipClasses(status)
     : "border-amber-faint text-amber-faint";
@@ -147,22 +192,18 @@ export default function TrackedFlightCard({
         isPast && "opacity-60"
       )}
     >
-      {/* ---- Top row: flight number + airline + status chip ---- */}
-      <div className="flex items-start justify-between gap-2">
-        <button
-          onClick={handleCardClick}
-          className="text-left min-w-0 flex-1"
-          aria-label={`Open ${flight.flightNumber} detail`}
-        >
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="font-board text-xl tracking-wider text-amber amber-glow">
-              {flight.flightNumber}
-            </span>
-            <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase truncate">
-              {flight.airline}
-            </span>
-          </div>
-        </button>
+      {/* ---- Date header (always visible) ---- */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <Calendar
+            size={10}
+            strokeWidth={1.5}
+            className="text-amber-faint shrink-0"
+          />
+          <span className="font-mono text-[9px] tracking-widest text-amber-faint uppercase truncate">
+            {formatTravelDateLong(flight.travelDate)}
+          </span>
+        </div>
         <button
           onClick={() => onRemove(flight.id)}
           className="shrink-0 p-1 text-amber-faint hover:text-red-500 transition-colors"
@@ -172,7 +213,23 @@ export default function TrackedFlightCard({
         </button>
       </div>
 
-      {/* ---- Route: FROM --> TO ---- */}
+      {/* ---- Flight number + airline ---- */}
+      <button
+        onClick={handleCardClick}
+        className="text-left min-w-0 w-full block"
+        aria-label={`Open ${flight.flightNumber} detail`}
+      >
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="font-board text-xl tracking-wider text-amber amber-glow">
+            {flight.flightNumber}
+          </span>
+          <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase truncate">
+            {flight.airline}
+          </span>
+        </div>
+      </button>
+
+      {/* ---- Route: FROM --> TO (with full disambiguated airport names) ---- */}
       <button
         onClick={handleCardClick}
         className="w-full flex items-center gap-2 text-left"
@@ -182,8 +239,11 @@ export default function TrackedFlightCard({
           <div className="font-board text-lg tracking-wider text-amber uppercase truncate">
             {flight.departureIata}
           </div>
-          <div className="font-mono text-[9px] tracking-wider text-amber-faint uppercase truncate">
-            {fromCity}
+          <div
+            className="font-mono text-[9px] tracking-wider text-amber-faint uppercase truncate"
+            title={fromFullName}
+          >
+            {fromFullName}
           </div>
         </div>
         <ArrowRight
@@ -195,8 +255,11 @@ export default function TrackedFlightCard({
           <div className="font-board text-lg tracking-wider text-amber uppercase truncate">
             {flight.arrivalIata}
           </div>
-          <div className="font-mono text-[9px] tracking-wider text-amber-faint uppercase truncate">
-            {toCity}
+          <div
+            className="font-mono text-[9px] tracking-wider text-amber-faint uppercase truncate"
+            title={toFullName}
+          >
+            {toFullName}
           </div>
         </div>
       </button>

@@ -268,6 +268,30 @@ export function getAirportByIata(iata: string): Airport | null {
 }
 
 /**
+ * Build the best disambiguated display name for an airport.
+ *
+ * Rules:
+ *   - city missing or equals name      -> return name      ("Dublin")
+ *   - name already starts with city    -> return name      ("London Gatwick")
+ *   - otherwise combine city + name    ->                  ("Paris Charles de Gaulle")
+ *
+ * Guarantees the result is never ambiguous for cities with multiple
+ * airports (London, Paris, Milan, Rome, etc.) which was the whole
+ * point of showing the full name at a glance.
+ */
+export function formatAirportFullName(airport: {
+  name: string;
+  city?: string | null;
+}): string {
+  const city = airport.city?.trim();
+  const name = airport.name.trim();
+  if (!city) return name;
+  if (city.toLowerCase() === name.toLowerCase()) return name;
+  if (name.toLowerCase().startsWith(city.toLowerCase())) return name;
+  return `${city} ${name}`;
+}
+
+/**
  * Search bundled airports by name, city, or IATA code.
  *
  * Ranking:

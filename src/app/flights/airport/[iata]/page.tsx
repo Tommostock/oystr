@@ -21,7 +21,7 @@ import PullToRefresh from "@/components/shared/PullToRefresh";
 import FlightDepartureBoard from "@/components/flights/FlightDepartureBoard";
 import FlightArrivalsBoard from "@/components/flights/FlightArrivalsBoard";
 import SaveAirportButton from "@/components/flights/SaveAirportButton";
-import { getAirportByIata } from "@/lib/airports";
+import { getAirportByIata, formatAirportFullName } from "@/lib/airports";
 import type { FlightArrival, FlightDeparture } from "@/lib/flight-types";
 
 type BoardDirection = "departures" | "arrivals";
@@ -97,26 +97,36 @@ export default function AirportPage({ params }: PageProps) {
         />
 
         {/* ---- Airport header card — mirrors the rail station page ---- */}
-        <div className="border border-board-border bg-surface p-3 space-y-2">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 min-w-0 flex-1">
-              <h2 className="font-board text-2xl tracking-wider text-amber uppercase amber-glow break-words">
-                {(city || name).toUpperCase()}
-              </h2>
-              <span className="shrink-0 border border-amber-faint text-amber font-mono text-xs tracking-wider px-1.5 py-0.5">
-                {iata}
-              </span>
+        {(() => {
+          /*
+           * Prominent disambiguated name ("London Gatwick") — critical
+           * for cities with multiple airports so the user can confirm
+           * they've opened the right one at a glance. Secondary line
+           * shows the country only, since the airport name already
+           * encodes the city.
+           */
+          const fullName = formatAirportFullName({ name, city });
+          return (
+            <div className="border border-board-border bg-surface p-3 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 min-w-0 flex-1">
+                  <h2 className="font-board text-2xl tracking-wider text-amber uppercase amber-glow break-words">
+                    {fullName.toUpperCase()}
+                  </h2>
+                  <span className="shrink-0 border border-amber-faint text-amber font-mono text-xs tracking-wider px-1.5 py-0.5">
+                    {iata}
+                  </span>
+                </div>
+                <SaveAirportButton
+                  airport={{ iata, name, city, country }}
+                />
+              </div>
+              <p className="font-mono text-[10px] tracking-wider text-amber-faint uppercase truncate">
+                {country || "LIVE AIRPORT BOARD"}
+              </p>
             </div>
-            <SaveAirportButton
-              airport={{ iata, name, city, country }}
-            />
-          </div>
-          <p className="font-mono text-[10px] tracking-wider text-amber-faint uppercase truncate">
-            {[name !== city ? name : null, country]
-              .filter(Boolean)
-              .join(" -- ") || "LIVE AIRPORT BOARD"}
-          </p>
-        </div>
+          );
+        })()}
 
         {/* ---- Direction toggle ---- */}
         <div

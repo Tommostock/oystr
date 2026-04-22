@@ -14,7 +14,15 @@
 "use client";
 
 import { use, useCallback, useEffect, useState } from "react";
-import { Plane, Clock, Radio, Star, Armchair, Check } from "lucide-react";
+import {
+  Plane,
+  Clock,
+  Radio,
+  Star,
+  Armchair,
+  Check,
+  Calendar,
+} from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import BoardPanel from "@/components/shared/BoardPanel";
 import BoardState from "@/components/shared/BoardState";
@@ -22,6 +30,7 @@ import PullToRefresh from "@/components/shared/PullToRefresh";
 import FlightSeatEditor from "@/components/flights/FlightSeatEditor";
 import { useFlightDetail } from "@/hooks/useFlightDetail";
 import { useTrackedFlights } from "@/hooks/useTrackedFlights";
+import { formatAirportFullName } from "@/lib/airports";
 import type { FlightDetail, FlightDetailLeg } from "@/lib/flight-types";
 
 interface PageProps {
@@ -89,6 +98,24 @@ function formatDistance(km: number | null): string | null {
   return `${Math.round(km).toLocaleString()} KM / ${miles.toLocaleString()} MI`;
 }
 
+/**
+ * Render an ISO date (YYYY-MM-DD) as e.g. "WED 22 APR 2026".
+ * Returns the raw string unchanged if it can't be parsed.
+ */
+function formatFlightDate(isoDate: string): string {
+  if (!isoDate) return "";
+  const d = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return isoDate;
+  return d
+    .toLocaleDateString("en-GB", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    })
+    .toUpperCase();
+}
+
 /* ========================================
  * LEG PANEL
  * One airport block — used twice (departure, arrival). Laid out as a
@@ -102,24 +129,40 @@ interface LegPanelProps {
 }
 
 function LegPanel({ title, leg, variant }: LegPanelProps) {
-  const { airport, scheduledTime, estimatedTime, actualTime } = leg;
+  const { airport, scheduledTime, scheduledDate, estimatedTime, actualTime } =
+    leg;
 
   // Choose the most useful "display" time: actual > estimated > scheduled
   const displayTime = actualTime ?? estimatedTime ?? scheduledTime;
   const isDelayed =
     estimatedTime != null && estimatedTime !== scheduledTime && !actualTime;
 
+  /*
+   * Disambiguated full name ("London Gatwick" not just "London") so
+   * the user can tell apart the 5 London airports, 2 Paris airports,
+   * 2 Milan airports, etc. at a glance.
+   */
+  const fullName = formatAirportFullName({
+    name: airport.name,
+    city: airport.city,
+  });
+
   return (
     <BoardPanel title={title}>
       <div className="p-3 space-y-3">
-        {/* Airport code + city */}
-        <div className="flex items-baseline gap-2 flex-wrap">
-          <span className="font-board text-4xl tracking-wider text-amber amber-glow">
-            {airport.iata}
-          </span>
-          <span className="font-mono text-[11px] tracking-wider text-amber-faint uppercase truncate">
-            {airport.city || airport.name}
-          </span>
+        {/* Airport code + full disambiguated name */}
+        <div>
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="font-board text-4xl tracking-wider text-amber amber-glow">
+              {airport.iata}
+            </span>
+          </div>
+          <div
+            className="font-mono text-[11px] tracking-wider text-amber-faint uppercase truncate mt-0.5"
+            title={fullName}
+          >
+            {fullName}
+          </div>
         </div>
 
         {/* Primary time (large, amber, glow) */}
@@ -142,6 +185,13 @@ function LegPanel({ title, leg, variant }: LegPanelProps) {
           {displayTime !== scheduledTime && (
             <p className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-1">
               SCHEDULED {scheduledTime}
+            </p>
+          )}
+          {/* Date under the time so the user knows which day this is */}
+          {scheduledDate && (
+            <p className="font-mono text-[9px] tracking-widest text-amber-faint uppercase mt-0.5 flex items-center gap-1">
+              <Calendar size={9} strokeWidth={1.5} />
+              {formatFlightDate(scheduledDate)}
             </p>
           )}
         </div>

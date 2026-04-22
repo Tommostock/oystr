@@ -82,7 +82,7 @@ export default function FlightSearch() {
             setValue(e.target.value);
             if (error) setError(null);
           }}
-          placeholder="BA175"
+          placeholder="e.g. BA175"
           aria-label="Flight number"
           autoComplete="off"
           autoCapitalize="characters"

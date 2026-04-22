@@ -18,6 +18,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import type { FlightArrival, FlightStatus } from "@/lib/flight-types";
+import { getAirportByIata } from "@/lib/airports";
 
 const FLIGHTS_API_KEY_ENV = "FLIGHTS_API_KEY";
 const AERODATABOX_HOST = "aerodatabox.p.rapidapi.com";
@@ -60,6 +61,40 @@ function mapStatus(raw: string | undefined | null): FlightStatus {
   }
 }
 
+/**
+ * Build the best disambiguated airport display string for a board row.
+ *
+ * Order of preference:
+ *   1. Curated bundled-list name — "London Gatwick" / "Paris Charles
+ *      de Gaulle" — for the ~150 airports we care about most.
+ *   2. Combined upstream city + name.
+ *   3. Raw city / IATA fallback.
+ */
+function buildAirportDisplay(
+  city: string | undefined | null,
+  name: string | undefined | null,
+  iata: string | undefined | null
+): string {
+  if (iata) {
+    const bundled = getAirportByIata(iata);
+    if (bundled) {
+      const c = bundled.city?.trim();
+      const n = bundled.name.trim();
+      if (!c || c.toLowerCase() === n.toLowerCase()) return n;
+      if (n.toLowerCase().startsWith(c.toLowerCase())) return n;
+      return `${c} ${n}`;
+    }
+  }
+  const c = city?.trim();
+  const n = name?.trim();
+  if (c && n) {
+    if (c.toLowerCase() === n.toLowerCase()) return c;
+    if (n.toLowerCase().startsWith(c.toLowerCase())) return n;
+    return `${c} ${n}`;
+  }
+  return c || n || iata || "Unknown";
+}
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
@@ -81,12 +116,11 @@ function normaliseArrival(item: any): FlightArrival {
   const estimatedArrival =
     revisedLocal && revisedLocal !== scheduledLocal ? revisedLocal : null;
 
-  const origin =
-    originAirport.municipalityName ||
-    originAirport.shortName ||
-    originAirport.name ||
-    originAirport.iata ||
-    "Unknown";
+  const origin = buildAirportDisplay(
+    originAirport.municipalityName,
+    originAirport.shortName ?? originAirport.name,
+    originAirport.iata
+  );
 
   return {
     id: item.number ?? "UNKNOWN",

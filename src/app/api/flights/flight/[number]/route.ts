@@ -31,6 +31,7 @@ import type {
   FlightStatus,
   FlightLiveLocation,
 } from "@/lib/flight-types";
+import { getAirportByIata } from "@/lib/airports";
 
 const FLIGHTS_API_KEY_ENV = "FLIGHTS_API_KEY";
 const AERODATABOX_HOST = "aerodatabox.p.rapidapi.com";
@@ -143,11 +144,28 @@ function normaliseLeg(leg: any): FlightDetailLeg {
     ? scheduledUtcRaw.replace(" ", "T").replace(/Z$/, "Z")
     : null;
 
+  /*
+   * Prefer the bundled airport record's human-friendly name for the
+   * ~150 most-trafficked airports — AeroDataBox often returns just
+   * "London" for LTN, "Paris" for CDG/ORY, etc., which defeats the
+   * disambiguation we want at the detail-page level.
+   */
+  const iata = airport.iata ?? "???";
+  const bundled = iata ? getAirportByIata(iata) : null;
+  const displayName =
+    bundled?.name ??
+    airport.shortName ??
+    airport.name ??
+    iata ??
+    "Unknown";
+  const displayCity =
+    bundled?.city ?? airport.municipalityName ?? null;
+
   return {
     airport: {
-      iata: airport.iata ?? "???",
-      name: airport.shortName ?? airport.name ?? airport.iata ?? "Unknown",
-      city: airport.municipalityName ?? null,
+      iata,
+      name: displayName,
+      city: displayCity,
       countryCode: airport.countryCode ?? null,
       timeZone: airport.timeZone ?? null,
     },

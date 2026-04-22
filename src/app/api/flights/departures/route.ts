@@ -19,6 +19,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import type { FlightDeparture, FlightStatus } from "@/lib/flight-types";
+import { getAirportByIata } from "@/lib/airports";
 
 const FLIGHTS_API_KEY_ENV = "FLIGHTS_API_KEY";
 const AERODATABOX_HOST = "aerodatabox.p.rapidapi.com";
@@ -73,6 +74,47 @@ function mapStatus(raw: string | undefined | null): FlightStatus {
   }
 }
 
+/**
+ * Build the best disambiguated airport display string for a board row.
+ *
+ * Order of preference:
+ *   1. Bundled AIRPORTS record by IATA — our own list has human-
+ *      friendly disambiguated names like "London Gatwick" / "Paris
+ *      Charles de Gaulle" where the upstream often returns just
+ *      "London" or "Paris" (especially for secondary airports).
+ *   2. Combined city + name — for airports the bundled list doesn't
+ *      cover, we still try to produce something better than just
+ *      city alone.
+ *   3. Raw city or IATA fallback.
+ */
+function buildAirportDisplay(
+  city: string | undefined | null,
+  name: string | undefined | null,
+  iata: string | undefined | null
+): string {
+  // 1. Known IATA → curated name
+  if (iata) {
+    const bundled = getAirportByIata(iata);
+    if (bundled) {
+      const c = bundled.city?.trim();
+      const n = bundled.name.trim();
+      if (!c || c.toLowerCase() === n.toLowerCase()) return n;
+      if (n.toLowerCase().startsWith(c.toLowerCase())) return n;
+      return `${c} ${n}`;
+    }
+  }
+
+  // 2. Use upstream city + name when they disambiguate each other
+  const c = city?.trim();
+  const n = name?.trim();
+  if (c && n) {
+    if (c.toLowerCase() === n.toLowerCase()) return c;
+    if (n.toLowerCase().startsWith(c.toLowerCase())) return n;
+    return `${c} ${n}`;
+  }
+  return c || n || iata || "Unknown";
+}
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
@@ -107,13 +149,15 @@ function normaliseDeparture(item: any): FlightDeparture {
   const estimatedDeparture =
     revisedLocal && revisedLocal !== scheduledLocal ? revisedLocal : null;
 
-  // Build a readable destination label: "New York" or fall back to IATA
-  const destination =
-    destAirport.municipalityName ||
-    destAirport.shortName ||
-    destAirport.name ||
-    destAirport.iata ||
-    "Unknown";
+  // Build a disambiguated destination label: "London Gatwick" rather
+  // than just "London". For cities with multiple airports (London,
+  // Paris, Milan, Rome, NY, Tokyo, ...) the city alone is ambiguous,
+  // so combine city + airport shortName where they differ.
+  const destination = buildAirportDisplay(
+    destAirport.municipalityName,
+    destAirport.shortName ?? destAirport.name,
+    destAirport.iata
+  );
 
   return {
     id: item.number ?? "UNKNOWN",
