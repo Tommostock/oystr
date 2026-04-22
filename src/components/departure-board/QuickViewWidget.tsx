@@ -18,12 +18,19 @@ import { useRouter } from "next/navigation";
 import { TrainFront } from "lucide-react";
 import { useFavourites } from "@/hooks/useFavourites";
 import { useSavedRailStations } from "@/hooks/useSavedRailStations";
+import { useSavedAirports } from "@/hooks/useSavedAirports";
 import { useRailDepartures } from "@/hooks/useRailDepartures";
+import { useFlightDepartures } from "@/hooks/useFlightDepartures";
 import { useArrivals } from "@/hooks/useArrivals";
 import { LINE_COLOURS } from "@/lib/constants";
 import { cn, cleanStationName, isBusStop } from "@/lib/utils";
 import { useCountdown } from "@/hooks/useCountdown";
-import { db, type SavedRailStation } from "@/lib/db";
+import {
+  db,
+  type SavedRailStation,
+  type SavedAirport,
+} from "@/lib/db";
+import { Plane } from "lucide-react";
 
 interface QuickViewWidgetProps {
   /** Called when a station card is tapped */
@@ -225,6 +232,105 @@ function QuickRailStationCard({
 }
 
 /**
+ * Saved AIRPORT card — shows the airport name + IATA with its next 2
+ * live departures. Tapping opens /flights/airport/[iata].
+ *
+ * Gracefully handles the pre-API-key state: the underlying
+ * useFlightDepartures hook surfaces a notConfigured flag, which the
+ * card renders as "AWAITING FLIGHTS" so pinning an airport still
+ * works even before the provider is wired up.
+ */
+function QuickAirportCard({
+  airport,
+  onOpen,
+}: {
+  airport: SavedAirport;
+  onOpen: (a: SavedAirport) => void;
+}) {
+  const { departures, isLoading, notConfigured } = useFlightDepartures({
+    iata: airport.iata,
+    numRows: 2,
+  });
+  const nextTwo = departures.slice(0, 2);
+
+  return (
+    <button
+      onClick={() => onOpen(airport)}
+      className={cn(
+        "w-full text-left border border-board-border bg-surface",
+        "p-3 transition-colors duration-200",
+        "hover:border-amber-faint cursor-pointer"
+      )}
+      aria-label={`Open ${airport.name} airport`}
+    >
+      <div className="flex items-center gap-1.5 mb-2 min-w-0">
+        <Plane
+          size={12}
+          strokeWidth={1.5}
+          className="shrink-0 text-amber"
+        />
+        <span className="font-mono text-xs tracking-wider text-amber uppercase truncate flex-1">
+          {airport.city || airport.name}
+        </span>
+        <span className="shrink-0 font-mono text-[10px] tracking-wider text-amber-faint border border-board-border px-1">
+          {airport.iata}
+        </span>
+      </div>
+
+      {notConfigured ? (
+        <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
+          AWAITING FLIGHTS
+        </div>
+      ) : isLoading && nextTwo.length === 0 ? (
+        <div className="font-mono text-xs tracking-wider text-amber-faint animate-pulse">
+          LOADING...
+        </div>
+      ) : nextTwo.length === 0 ? (
+        <div className="font-mono text-xs tracking-wider text-amber-faint">
+          NO DEPARTURES
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {nextTwo.map((dep, i) => {
+            const status = dep.cancelled
+              ? { label: "CXL", colour: "#ff3b30" }
+              : dep.status === "on-time" || dep.status === "boarding"
+                ? { label: dep.status === "boarding" ? "BOARD" : "ON TIME", colour: "#34c759" }
+                : dep.status === "delayed" && dep.estimatedDeparture
+                  ? {
+                      label: `EXP ${dep.estimatedDeparture}`,
+                      colour: "#ff9500",
+                    }
+                  : dep.status === "departed"
+                    ? { label: "DEP", colour: "#cc7700" }
+                    : { label: "SCHED", colour: "#ff9500" };
+            return (
+              <div
+                key={`${dep.id}-${i}`}
+                className="flex items-center gap-1.5 text-xs font-mono tracking-wider"
+              >
+                <span className="text-amber shrink-0">
+                  {dep.scheduledDeparture}
+                </span>
+                <span className="text-amber-faint truncate flex-1 uppercase">
+                  {dep.destination}
+                </span>
+                <span
+                  className="shrink-0 text-[10px]"
+                  style={{ color: status.colour }}
+                >
+                  {status.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </button>
+  );
+}
+
+/**
  * Compact arrival row for the quick-view widget.
  */
 function QuickArrivalRow({
@@ -276,6 +382,7 @@ export default function QuickViewWidget({
 }: QuickViewWidgetProps) {
   const { favourites } = useFavourites();
   const { stations: railStations } = useSavedRailStations();
+  const { airports: savedAirports } = useSavedAirports();
   const router = useRouter();
 
   /*
@@ -399,7 +506,15 @@ export default function QuickViewWidget({
     router.push(`/rail/station/${encodeURIComponent(s.crs)}`);
   };
 
-  const hasAnySaved = favourites.length > 0 || railStations.length > 0;
+  /* Open a saved airport's focused page. */
+  const handleAirportOpen = (a: SavedAirport) => {
+    router.push(`/flights/airport/${encodeURIComponent(a.iata)}`);
+  };
+
+  const hasAnySaved =
+    favourites.length > 0 ||
+    railStations.length > 0 ||
+    savedAirports.length > 0;
   if (!hasAnySaved) return null;
 
   const sortedFavourites = [...favourites].sort((a, b) =>
@@ -433,6 +548,13 @@ export default function QuickViewWidget({
             key={`rail-station-${station.crs}`}
             station={station}
             onOpen={handleRailStationOpen}
+          />
+        ))}
+        {savedAirports.map((airport) => (
+          <QuickAirportCard
+            key={`airport-${airport.iata}`}
+            airport={airport}
+            onOpen={handleAirportOpen}
           />
         ))}
       </div>

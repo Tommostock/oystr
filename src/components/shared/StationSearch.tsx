@@ -21,9 +21,10 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, X, TrainFront } from "lucide-react";
+import { Search, X, TrainFront, Plane } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { searchStations as searchRailStations } from "@/lib/uk-rail-stations";
+import { searchAirports } from "@/lib/airports";
 
 /* ========================================
  * TYPES
@@ -58,11 +59,30 @@ interface RailSearchResult extends SearchResult {
   crs: string;
 }
 
-/** Union: TfL result or a bundled UK rail result. */
-type AnySearchResult = SearchResult | RailSearchResult;
+/**
+ * An airport match from the bundled international airport list.
+ * Flagged so the dropdown renders with a plane icon and taps
+ * route to /flights/airport/[iata].
+ */
+interface AirportSearchResult extends SearchResult {
+  isAirport: true;
+  iata: string;
+  city?: string;
+  country?: string;
+}
+
+/** Union: TfL result, UK rail result, or airport result. */
+type AnySearchResult =
+  | SearchResult
+  | RailSearchResult
+  | AirportSearchResult;
 
 function isRailResult(r: AnySearchResult): r is RailSearchResult {
   return "isRail" in r && r.isRail === true;
+}
+
+function isAirportResult(r: AnySearchResult): r is AirportSearchResult {
+  return "isAirport" in r && r.isAirport === true;
 }
 
 interface StationSearchProps {
@@ -75,8 +95,21 @@ interface StationSearchProps {
    * the chosen station as FROM) is used.
    */
   onRailStationSelect?: (station: { crs: string; name: string }) => void;
+  /**
+   * Called when the user selects an airport. Only fires if
+   * `includeAirports` is true. Typically routes to
+   * /flights/airport/[iata].
+   */
+  onAirportSelect?: (airport: {
+    iata: string;
+    name: string;
+    city?: string;
+    country?: string;
+  }) => void;
   /** Include bundled UK National Rail stations in the dropdown. */
   includeRail?: boolean;
+  /** Include bundled international airports in the dropdown. */
+  includeAirports?: boolean;
   /** Placeholder text for the input */
   placeholder?: string;
   /** Controlled value — sets the input text from the parent (e.g. after swap) */
@@ -91,7 +124,9 @@ interface StationSearchProps {
 export default function StationSearch({
   onSelect,
   onRailStationSelect,
+  onAirportSelect,
   includeRail = false,
+  includeAirports = false,
   placeholder = "Search for a station...",
   value,
   className,
@@ -171,7 +206,25 @@ export default function StationSearch({
               isRail: true,
               crs: r.crs,
             }));
-          merged = [...tflResults, ...railMatches];
+          merged = [...merged, ...railMatches];
+        }
+
+        if (includeAirports) {
+          const airportMatches = searchAirports(searchQuery)
+            .slice(0, 6)
+            .map<AirportSearchResult>((a) => ({
+              naptanId: `airport:${a.iata}`,
+              name: a.name,
+              lat: 0,
+              lon: 0,
+              modes: ["airport"],
+              lines: [],
+              isAirport: true,
+              iata: a.iata,
+              city: a.city,
+              country: a.country,
+            }));
+          merged = [...merged, ...airportMatches];
         }
 
         setResults(merged);
@@ -183,7 +236,7 @@ export default function StationSearch({
         setIsSearching(false);
       }
     },
-    [includeRail]
+    [includeRail, includeAirports]
   );
 
   /**
@@ -221,6 +274,17 @@ export default function StationSearch({
       }
       /* If no rail handler is wired, silently swallow the tap —
          the caller opted into includeRail without wiring the handler. */
+      return;
+    }
+    if (isAirportResult(station)) {
+      if (onAirportSelect) {
+        onAirportSelect({
+          iata: station.iata,
+          name: station.name,
+          city: station.city,
+          country: station.country,
+        });
+      }
       return;
     }
     onSelect(station);
@@ -335,6 +399,7 @@ export default function StationSearch({
         >
           {results.map((station) => {
             const rail = isRailResult(station);
+            const airport = isAirportResult(station);
             return (
               <li key={station.naptanId}>
                 <button
@@ -353,9 +418,8 @@ export default function StationSearch({
                   )}
                   role="option"
                 >
-                  {/* Station name with optional stop letter badge and zone/rail marker */}
+                  {/* Station name with optional stop letter badge and zone/rail/airport marker */}
                   <div className="flex items-center gap-2 uppercase">
-                    {/* Rail icon for National Rail entries */}
                     {rail && (
                       <TrainFront
                         size={14}
@@ -364,17 +428,33 @@ export default function StationSearch({
                         aria-hidden="true"
                       />
                     )}
+                    {airport && (
+                      <Plane
+                        size={14}
+                        strokeWidth={1.5}
+                        className="shrink-0 text-amber"
+                        aria-hidden="true"
+                      />
+                    )}
                     {/* Bus stop letter badge — e.g. [H] */}
-                    {!rail && station.stopLetter && (
+                    {!rail && !airport && station.stopLetter && (
                       <span className="shrink-0 w-6 h-6 flex items-center justify-center border border-amber text-amber text-xs font-mono">
                         {station.stopLetter}
                       </span>
                     )}
-                    <span className="truncate flex-1">{station.name}</span>
-                    {/* Zone badge or CRS code on the right */}
+                    <span className="truncate flex-1">
+                      {airport && station.city
+                        ? `${station.city} -- ${station.name}`
+                        : station.name}
+                    </span>
+                    {/* Right-side badge: CRS / IATA / zone */}
                     {rail ? (
                       <span className="shrink-0 border border-amber-faint text-amber-faint text-xs font-mono px-1.5 py-0.5">
                         {station.crs}
+                      </span>
+                    ) : airport ? (
+                      <span className="shrink-0 border border-amber-faint text-amber-faint text-xs font-mono px-1.5 py-0.5">
+                        {station.iata}
                       </span>
                     ) : station.zone ? (
                       <span className="shrink-0 text-amber amber-glow text-xs font-mono">
@@ -382,13 +462,17 @@ export default function StationSearch({
                       </span>
                     ) : null}
                   </div>
-                  {/* Mode line — rail entries get a distinct NATIONAL RAIL label */}
+                  {/* Mode line */}
                   <div className="text-amber-faint text-xs mt-1 uppercase">
                     {rail
                       ? "NATIONAL RAIL"
-                      : station.indicator
-                        ? `${(station.modes || []).join(" / ")} -- ${station.indicator}`
-                        : (station.modes || []).join(" / ")}
+                      : airport
+                        ? station.country
+                          ? `AIRPORT -- ${station.country.toUpperCase()}`
+                          : "AIRPORT"
+                        : station.indicator
+                          ? `${(station.modes || []).join(" / ")} -- ${station.indicator}`
+                          : (station.modes || []).join(" / ")}
                   </div>
                 </button>
               </li>

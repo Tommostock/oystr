@@ -109,6 +109,24 @@ export interface SavedRailStation {
 }
 
 /**
+ * A saved AIRPORT. Same pattern as SavedRailStation but keyed by
+ * 3-letter IATA code. Surfaces as a quick-view card on the Terminal
+ * tab and opens /flights/airport/[iata] on tap.
+ */
+export interface SavedAirport {
+  /** 3-letter IATA code, uppercase. Primary key. */
+  iata: string;
+  /** Display name (e.g. "Heathrow", "Fiumicino"). */
+  name: string;
+  /** City the airport serves — shown on the card for context. */
+  city?: string;
+  /** Country, for secondary display. */
+  country?: string;
+  /** Unix timestamp when the user saved this airport. */
+  addedAt: number;
+}
+
+/**
  * A specific rail service the user is actively travelling on (or plans
  * to travel on). Unlike SavedRailJourney (a generic route), a
  * TrackedRailJourney is tied to a single date + scheduled departure —
@@ -169,6 +187,7 @@ class OystrDatabase extends Dexie {
   timetables!: Table<CachedTimetable>;
   savedRailJourneys!: Table<SavedRailJourney>;
   savedRailStations!: Table<SavedRailStation>;
+  savedAirports!: Table<SavedAirport>;
   trackedRailJourneys!: Table<TrackedRailJourney>;
   /*
    * The savedJourneys table has existed in the schema since v1 but
@@ -251,6 +270,24 @@ class OystrDatabase extends Dexie {
       stations: "naptanId, name, *lines",
       savedRailJourneys: "id, fromCrs, toCrs, addedAt",
       savedRailStations: "crs, name, addedAt",
+      trackedRailJourneys: "id, travelDate, trackedAt",
+    });
+
+    /*
+     * Schema version 6: adds airport favourites. Mirrors
+     * savedRailStations but keyed by IATA. Powers the Save button
+     * on /flights/airport/[iata] and the saved-airport quick cards
+     * on the Terminal tab.
+     */
+    this.version(6).stores({
+      favourites: "naptanId, name, addedAt",
+      timetables: "id, lineId, stationId, cachedAt",
+      lineStatuses: "lineId, cachedAt",
+      savedJourneys: "id, savedAt",
+      stations: "naptanId, name, *lines",
+      savedRailJourneys: "id, fromCrs, toCrs, addedAt",
+      savedRailStations: "crs, name, addedAt",
+      savedAirports: "iata, name, addedAt",
       trackedRailJourneys: "id, travelDate, trackedAt",
     });
   }

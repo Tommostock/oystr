@@ -91,6 +91,14 @@ function HomeContent() {
     router.push(`/rail/station/${encodeURIComponent(station.crs)}`);
   };
 
+  /*
+   * Airports from search route to their focused page
+   * (/flights/airport/[iata]) — mirrors the rail-station flow.
+   */
+  const handleAirportSelect = (airport: { iata: string; name: string }) => {
+    router.push(`/flights/airport/${encodeURIComponent(airport.iata)}`);
+  };
+
   /* About popup state */
   const [showAbout, setShowAbout] = useState(false);
   const aboutRef = useRef<HTMLDivElement>(null);
@@ -371,8 +379,10 @@ function HomeContent() {
         <StationSearch
           onSelect={(station) => setSelectedStation(station)}
           onRailStationSelect={handleRailStationSelect}
+          onAirportSelect={handleAirportSelect}
           includeRail
-          placeholder="Search for a station..."
+          includeAirports
+          placeholder="Search for a station or airport..."
           className="flex-1"
         />
         {/* Near Me button — compact icon next to search */}
