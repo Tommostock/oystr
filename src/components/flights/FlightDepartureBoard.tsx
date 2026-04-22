@@ -20,7 +20,7 @@ import { useFlightDepartures } from "@/hooks/useFlightDepartures";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
 import LoadingBoard from "@/components/shared/LoadingBoard";
-import FlightArrivalRow from "./FlightArrivalRow";
+import FlightDepartureRow from "./FlightDepartureRow";
 import type { FlightDeparture } from "@/lib/flight-types";
 
 interface FlightDepartureBoardProps {
@@ -113,7 +113,7 @@ export default function FlightDepartureBoard({
     <BoardPanel title={title}>
       <div role="table" aria-label={`${airportName} departures`}>
         {departures.slice(0, maxRows).map((dep) => (
-          <FlightArrivalRow
+          <FlightDepartureRow
             key={dep.id}
             departure={dep}
             onClick={onFlightTap}

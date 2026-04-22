@@ -20,9 +20,12 @@ import { mutate } from "swr";
 import AmberText from "@/components/shared/AmberText";
 import PullToRefresh from "@/components/shared/PullToRefresh";
 import FlightDepartureBoard from "@/components/flights/FlightDepartureBoard";
+import FlightArrivalsBoard from "@/components/flights/FlightArrivalsBoard";
 import SaveAirportButton from "@/components/flights/SaveAirportButton";
 import { getAirportByIata } from "@/lib/airports";
-import type { FlightDeparture } from "@/lib/flight-types";
+import type { FlightArrival, FlightDeparture } from "@/lib/flight-types";
+
+type BoardDirection = "departures" | "arrivals";
 
 interface PageProps {
   /* Next.js 15 passes dynamic params as a Promise in client pages. */
@@ -44,16 +47,30 @@ export default function AirportPage({ params }: PageProps) {
   const country = airport?.country;
 
   /*
-   * Placeholder state for when a tap-to-expand flight-detail popup
-   * arrives later. The board already surfaces onFlightTap — we keep
-   * the handler scaffolded so wiring the popup is a one-line swap.
+   * Board direction toggle. Defaults to DEPARTURES so the first
+   * glance shows outbound flights — this is the most common use
+   * (checking your own flight's status before heading to the
+   * airport). Arrivals become one tap away.
    */
-  const [, setExpandedFlight] = useState<FlightDeparture | null>(null);
+  const [direction, setDirection] = useState<BoardDirection>("departures");
 
+  /*
+   * Placeholder state for when a tap-to-expand flight-detail popup
+   * arrives later. Both boards forward taps through here so wiring
+   * the popup is a one-line swap once live data is in.
+   */
+  const [, setExpandedFlight] =
+    useState<FlightDeparture | FlightArrival | null>(null);
+
+  /*
+   * Pull-to-refresh invalidates every /api/flights/ SWR key at once
+   * so both departures and arrivals refresh even if only one is
+   * on-screen — cheaper than checking which direction is active.
+   */
   const handlePullRefresh = useCallback(async () => {
     await mutate(
       (key) =>
-        typeof key === "string" && key.startsWith("/api/flights/departures"),
+        typeof key === "string" && key.startsWith("/api/flights/"),
       undefined,
       { revalidate: true }
     );
@@ -109,13 +126,54 @@ export default function AirportPage({ params }: PageProps) {
           </p>
         </div>
 
-        {/* ---- Live departure board ---- */}
-        <FlightDepartureBoard
-          iata={iata}
-          airportName={city || name}
-          maxRows={15}
-          onFlightTap={setExpandedFlight}
-        />
+        {/* ---- Direction toggle ---- */}
+        <div
+          role="tablist"
+          aria-label="Board direction"
+          className="grid grid-cols-2 gap-1.5"
+        >
+          {(
+            [
+              { id: "departures" as const, label: "DEPARTURES" },
+              { id: "arrivals" as const, label: "ARRIVALS" },
+            ] as const
+          ).map((opt) => {
+            const isActive = direction === opt.id;
+            return (
+              <button
+                key={opt.id}
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setDirection(opt.id)}
+                className={
+                  "py-2 font-mono text-[11px] tracking-wider uppercase border transition-colors " +
+                  (isActive
+                    ? "border-amber text-amber bg-amber/10 amber-glow"
+                    : "border-board-border text-amber-faint hover:border-amber-faint hover:text-amber")
+                }
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ---- Active board ---- */}
+        {direction === "departures" ? (
+          <FlightDepartureBoard
+            iata={iata}
+            airportName={city || name}
+            maxRows={15}
+            onFlightTap={setExpandedFlight}
+          />
+        ) : (
+          <FlightArrivalsBoard
+            iata={iata}
+            airportName={city || name}
+            maxRows={15}
+            onFlightTap={setExpandedFlight}
+          />
+        )}
       </div>
     </PullToRefresh>
   );

@@ -1,31 +1,29 @@
 /**
- * FlightArrivalRow.tsx — Single row on the flight departure board
+ * FlightArrivalRow.tsx — Single row on the flight ARRIVALS board
  *
- * Dot-matrix board row for one flight leaving an airport. Modelled on
- * RailArrivalRow so the Flights tab reads consistently with Rail.
+ * Dot-matrix board row for one inbound flight. Mirrors
+ * FlightDepartureRow but swaps destination for origin and surfaces
+ * the baggage-reclaim belt, which is the headline arrivals-only
+ * piece of info (it's the first thing you want to know when you
+ * step off the plane).
  *
  * Layout:
- *   [gate]  DESTINATION               HH:mm
- *           AIRLINE · FLIGHT#          ON TIME / EXP HH:mm / CANCELLED
- *
- * Status colours:
- *   ON TIME / BOARDING   -> green
- *   DELAYED / EXP time   -> amber (default)
- *   CANCELLED / DIVERTED -> red
+ *   [gate]  ORIGIN                    HH:mm
+ *           AIRLINE · FLIGHT#         LANDED / EXP HH:mm / BELT 5
  */
 
 "use client";
 
 import { cn } from "@/lib/utils";
-import type { FlightDeparture, FlightStatus } from "@/lib/flight-types";
+import type { FlightArrival, FlightStatus } from "@/lib/flight-types";
 
 interface FlightArrivalRowProps {
-  departure: FlightDeparture;
-  onClick?: (departure: FlightDeparture) => void;
+  arrival: FlightArrival;
+  onClick?: (arrival: FlightArrival) => void;
   className?: string;
 }
 
-/** Map the normalised status to a short board label + colour. */
+/** Status label + colour for an arriving flight. */
 function getStatusLabel(
   status: FlightStatus,
   estimated: string | null,
@@ -36,17 +34,16 @@ function getStatusLabel(
       return { text: "CANCELLED", colour: "#ff3b30" };
     case "diverted":
       return { text: "DIVERTED", colour: "#ff3b30" };
-    case "boarding":
-      return { text: "BOARDING", colour: "#34c759" };
-    case "gate-closed":
-      return { text: "GATE CLOSED", colour: "#ff3b30" };
+    case "landed":
+      return { text: "LANDED", colour: "#34c759" };
     case "on-time":
       return { text: "ON TIME", colour: "#34c759" };
-    case "departed":
-      return { text: "DEPARTED", colour: "#cc7700" };
+    case "expected":
+      return { text: "EXPECTED", colour: "#cc7700" };
     case "delayed":
       return {
-        text: estimated && estimated !== scheduled ? `EXP ${estimated}` : "DELAYED",
+        text:
+          estimated && estimated !== scheduled ? `EXP ${estimated}` : "DELAYED",
         colour: "#ff9500",
       };
     case "scheduled":
@@ -57,21 +54,25 @@ function getStatusLabel(
 }
 
 export default function FlightArrivalRow({
-  departure,
+  arrival,
   onClick,
   className,
 }: FlightArrivalRowProps) {
   const status = getStatusLabel(
-    departure.status,
-    departure.estimatedDeparture,
-    departure.scheduledDeparture
+    arrival.status,
+    arrival.estimatedArrival,
+    arrival.scheduledArrival
   );
 
-  /* Gate can be null until ~45min before departure. Same display
-     idiom as the Rail board's "TBA" for unknown platforms. */
-  const gateKnown = !!departure.gate?.trim();
-  const gate = departure.gate?.trim() || "TBA";
+  /*
+   * Left-most column shows either the arrival gate (where the
+   * aircraft will park — useful while the flight's still inbound)
+   * or a "TBA" placeholder, same idiom as the departures board.
+   */
+  const gateKnown = !!arrival.gate?.trim();
+  const gate = arrival.gate?.trim() || "TBA";
   const clickable = !!onClick;
+  const beltKnown = !!arrival.baggageBelt?.trim();
 
   const content = (
     <div
@@ -82,9 +83,9 @@ export default function FlightArrivalRow({
         className
       )}
       role="row"
-      aria-label={`${departure.destination} flight ${departure.flightNumber} at ${departure.scheduledDeparture}, ${status.text.toLowerCase()}`}
+      aria-label={`Arrival from ${arrival.origin}, flight ${arrival.flightNumber}, ${status.text.toLowerCase()}`}
     >
-      {/* ---- Gate column. "TBA" stays small + dim so it reads as metadata. ---- */}
+      {/* ---- Gate column. ---- */}
       <div className="shrink-0 w-12 text-center pt-0.5">
         {gateKnown ? (
           <span className="font-board text-xl text-amber amber-glow tracking-wider">
@@ -97,32 +98,37 @@ export default function FlightArrivalRow({
         )}
       </div>
 
-      {/* ---- Destination + airline/flight number ---- */}
+      {/* ---- Origin + airline / flight number ---- */}
       <div className="flex-1 min-w-0">
         <div className="font-board text-xl text-amber amber-glow tracking-wider uppercase truncate">
-          {departure.destination || "UNKNOWN"}
+          {arrival.origin || "UNKNOWN"}
         </div>
         <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-0.5 truncate">
-          {departure.airlineCode
-            ? `${departure.airlineCode} · ${departure.flightNumber}`
-            : departure.flightNumber}
-          {departure.terminal && (
-            <span className="ml-2 text-amber-dim">T{departure.terminal}</span>
+          {arrival.airlineCode
+            ? `${arrival.airlineCode} · ${arrival.flightNumber}`
+            : arrival.flightNumber}
+          {arrival.terminal && (
+            <span className="ml-2 text-amber-dim">T{arrival.terminal}</span>
           )}
         </div>
       </div>
 
-      {/* ---- Scheduled time + status ---- */}
+      {/* ---- Scheduled time + status + optional belt ---- */}
       <div className="shrink-0 text-right min-w-[5rem] pt-0.5">
         <div className="font-board text-xl text-amber amber-glow tracking-wider">
-          {departure.scheduledDeparture || "--:--"}
+          {arrival.scheduledArrival || "--:--"}
         </div>
         <div
           className="font-mono text-[10px] tracking-wider mt-0.5 uppercase"
           style={{ color: status.colour }}
         >
-          {status.text || " "}
+          {status.text || " "}
         </div>
+        {beltKnown && (
+          <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-0.5">
+            BELT {arrival.baggageBelt}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -130,9 +136,9 @@ export default function FlightArrivalRow({
   if (clickable) {
     return (
       <button
-        onClick={() => onClick!(departure)}
+        onClick={() => onClick!(arrival)}
         className="w-full text-left"
-        aria-label={`View details for ${departure.flightNumber} to ${departure.destination}`}
+        aria-label={`View details for ${arrival.flightNumber} from ${arrival.origin}`}
       >
         {content}
       </button>
