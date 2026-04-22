@@ -141,6 +141,13 @@ export const RDM_API_BASE =
 export const ARRIVALS_POLL_INTERVAL = 30_000; // 30 seconds
 export const LINE_STATUS_POLL_INTERVAL = 60_000; // 60 seconds
 export const RAIL_DEPARTURES_POLL_INTERVAL = 30_000; // 30 seconds
+/*
+ * Flight boards poll slower than tube/rail because the free tiers of
+ * aviation data providers (AeroDataBox et al.) cap monthly requests
+ * very tightly. 2 minutes gives the user a lively feel without
+ * burning through the quota when multiple airports are viewed.
+ */
+export const FLIGHT_DEPARTURES_POLL_INTERVAL = 120_000; // 2 minutes
 
 /* ========================================
  * NAVIGATION TABS

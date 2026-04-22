@@ -1,123 +1,100 @@
 /**
- * flights/page.tsx — Flights tab (placeholder)
+ * flights/page.tsx — Flights tab
  *
- * Reserved for future live-flight tracking (Heathrow, Gatwick,
- * London City, Stansted, Luton). Intentionally a static placeholder
- * for now — no hooks, no fetches — so the tab is immediately
- * reachable and works fully offline.
+ * London airport departure boards. Mirrors the Rail tab's structure:
+ *   1. Page header + subtitle
+ *   2. Quick-pick airport chips (LHR / LGW / LCY / STN / LTN)
+ *   3. Live departure board for the selected airport
  *
- * Styled to mirror the COMING SOON treatment the Rail tab used
- * before its data provider was wired up, for visual consistency.
+ * Data for the board comes via /api/flights/departures. That route
+ * returns a notConfigured response while no API key is in env, and
+ * the board component shows an "AWAITING API KEY" state in that
+ * case — so this page is fully navigable even before the provider
+ * is wired up. Flipping the switch later is a matter of dropping
+ * FLIGHTS_API_KEY into .env.local and filling in the upstream
+ * stub in the API route.
  */
 
 "use client";
 
-import { Plane, Mail } from "lucide-react";
+import { useState, useCallback } from "react";
+import { mutate } from "swr";
 import AmberText from "@/components/shared/AmberText";
-import BoardPanel from "@/components/shared/BoardPanel";
+import PullToRefresh from "@/components/shared/PullToRefresh";
+import FlightDepartureBoard from "@/components/flights/FlightDepartureBoard";
+import { LONDON_AIRPORTS } from "@/lib/london-airports";
 
 export default function FlightsPage() {
+  /* Default to Heathrow since it's the highest-traffic London airport. */
+  const [selectedIata, setSelectedIata] = useState<string>(
+    LONDON_AIRPORTS[0].iata
+  );
+
+  const selectedAirport =
+    LONDON_AIRPORTS.find((a) => a.iata === selectedIata) ?? LONDON_AIRPORTS[0];
+
+  /*
+   * Pull-to-refresh invalidates every /api/flights/departures SWR
+   * key in one sweep. Covers the currently-visible board and any
+   * others that happen to be cached.
+   */
+  const handlePullRefresh = useCallback(async () => {
+    await mutate(
+      (key) =>
+        typeof key === "string" && key.startsWith("/api/flights/departures"),
+      undefined,
+      { revalidate: true }
+    );
+  }, []);
+
   return (
-    <div className="p-4 space-y-4">
-      {/* ---- Page Header ---- */}
-      <div className="text-center pt-4 pb-2">
-        <AmberText as="h1" size="lg" uppercase className="dot-matrix">
-          Flights
-        </AmberText>
-        <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-1">
-          LONDON AIRPORT LIVE DEPARTURES
+    <PullToRefresh onRefresh={handlePullRefresh}>
+      <div className="p-4 space-y-4">
+        {/* ---- Page Header ---- */}
+        <div className="text-center pt-4 pb-2">
+          <AmberText as="h1" size="lg" uppercase className="dot-matrix">
+            Flights
+          </AmberText>
+          <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-1">
+            LONDON AIRPORT LIVE DEPARTURES
+          </div>
         </div>
+
+        {/* ---- Airport picker chips ---- */}
+        <div>
+          <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mb-1.5 px-1">
+            AIRPORT
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {LONDON_AIRPORTS.map((airport) => {
+              const isActive = airport.iata === selectedIata;
+              return (
+                <button
+                  key={airport.iata}
+                  onClick={() => setSelectedIata(airport.iata)}
+                  aria-label={`Show departures from ${airport.name}`}
+                  aria-pressed={isActive}
+                  title={airport.name}
+                  className={`px-2.5 py-1 font-mono text-[10px] tracking-wider uppercase border transition-colors ${
+                    isActive
+                      ? "border-amber text-amber bg-amber/10"
+                      : "border-board-border text-amber-faint hover:border-amber-faint hover:text-amber"
+                  }`}
+                >
+                  {airport.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ---- Live departure board ---- */}
+        <FlightDepartureBoard
+          iata={selectedAirport.iata}
+          airportName={selectedAirport.name}
+          maxRows={15}
+        />
       </div>
-
-      {/* ---- Coming Soon board ---- */}
-      <BoardPanel title="SERVICE STATUS">
-        <div className="py-8 text-center space-y-5">
-          {/* Animated plane icon in amber */}
-          <div className="flex justify-center">
-            <div className="relative">
-              <Plane
-                size={56}
-                strokeWidth={1.25}
-                className="text-amber amber-glow"
-              />
-              {/* Subtle pulse underneath */}
-              <div
-                className="absolute inset-0 -z-10 blur-xl opacity-40"
-                style={{
-                  background:
-                    "radial-gradient(circle, #ff9500 0%, transparent 70%)",
-                }}
-                aria-hidden="true"
-              />
-            </div>
-          </div>
-
-          <div>
-            <AmberText
-              as="p"
-              size="2xl"
-              uppercase
-              className="dot-matrix animate-blink"
-            >
-              COMING SOON
-            </AmberText>
-          </div>
-
-          <div className="space-y-3 px-4">
-            <p className="font-mono text-xs tracking-wider text-amber uppercase leading-relaxed">
-              LIVE DEPARTURES FOR
-              <br />
-              LONDON HEATHROW
-              <br />
-              LONDON GATWICK
-              <br />
-              LONDON CITY
-              <br />
-              LONDON STANSTED
-              <br />
-              LONDON LUTON
-            </p>
-
-            <div className="border-t border-board-border mx-6 pt-3">
-              <p className="font-mono text-[11px] tracking-wider text-amber-faint uppercase leading-relaxed">
-                FLIGHT TRACKING
-                <br />
-                UNDER CONSTRUCTION
-              </p>
-            </div>
-          </div>
-        </div>
-      </BoardPanel>
-
-      {/* ---- Info panel: what's coming ---- */}
-      <BoardPanel title="WHAT TO EXPECT">
-        <ul className="space-y-2.5 font-mono text-xs tracking-wider text-amber-dim">
-          <li className="flex gap-3">
-            <span className="text-amber shrink-0">&gt;</span>
-            <span>LIVE DEPARTURE BOARDS FOR LONDON AIRPORTS</span>
-          </li>
-          <li className="flex gap-3">
-            <span className="text-amber shrink-0">&gt;</span>
-            <span>TRACK A SPECIFIC FLIGHT BY NUMBER</span>
-          </li>
-          <li className="flex gap-3">
-            <span className="text-amber shrink-0">&gt;</span>
-            <span>GATE, TERMINAL, AND STATUS UPDATES</span>
-          </li>
-          <li className="flex gap-3">
-            <span className="text-amber shrink-0">&gt;</span>
-            <span>PINNED JOURNEYS ACROSS RAIL AND AIR</span>
-          </li>
-        </ul>
-      </BoardPanel>
-
-      {/* ---- Footer hint ---- */}
-      <div className="text-center py-2">
-        <div className="inline-flex items-center gap-2 font-mono text-[10px] tracking-wider text-amber-faint uppercase">
-          <Mail size={12} strokeWidth={1.5} />
-          <span>WATCH THIS SPACE</span>
-        </div>
-      </div>
-    </div>
+    </PullToRefresh>
   );
 }
