@@ -418,21 +418,22 @@
 }
 
 /* ========================================
- * PAGE SLIDE TRANSITION
- * Slides content up from below like a real board update,
- * replacing the simple fade-in.
+ * PAGE FADE-IN
+ *
+ * Used to be a translateY slide, but a transform on <main> creates a
+ * new containing block for descendants using `position: fixed`. In
+ * some mobile browsers that lingers past the animation and captures
+ * the BottomNav's fixed positioning into <main>'s bounds, parking
+ * the nav mid-page. Opacity-only keeps the "board turns over" feel
+ * without ever putting a transform anywhere that could break the
+ * fixed nav.
  * ======================================== */
 @keyframes page-board-scroll {
   0% {
     opacity: 0;
-    transform: translateY(12px);
-  }
-  40% {
-    opacity: 1;
   }
   100% {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 

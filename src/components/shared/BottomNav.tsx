@@ -60,20 +60,32 @@ export default function BottomNav() {
     <nav
       className={cn(
         /*
-         * Natural flex-flow placement at the bottom of the body's flex
-         * column (body is h-dvh + flex-col + overflow-hidden; main is
-         * the scroller). No position:fixed — avoids mobile Safari's
-         * intermittent "fixed nav floats mid-page" bug when the viewport
-         * resizes (keyboard show/hide, URL-bar reveal, PWA orientation).
+         * Fixed to the viewport bottom so the nav stays glued to the
+         * screen edge regardless of what the page scrolls or how the
+         * mobile URL bar behaves. Earlier we experimented with a
+         * pure flex-flow placement, but on iOS Safari that parked the
+         * nav at the bottom of the body (above the URL bar) and left
+         * a visible gap below — so we're back on position:fixed.
          *
-         * shrink-0 keeps the nav at its intrinsic height so flex doesn't
-         * squash it when main content is taller than the viewport.
+         * The transform that previously captured position:fixed inside
+         * an animated ancestor has been removed from the page-transition
+         * animation in globals.css, so the mid-page-floating bug we
+         * hit before should not resurface.
          */
-        "shrink-0 z-[9000]",
-        "bg-board-bg border-t border-board-border",
-        /* Safe area padding for phones with home indicators */
-        "pb-[env(safe-area-inset-bottom)]"
+        "fixed bottom-0 left-0 right-0 z-[9000]",
+        "bg-board-bg border-t border-board-border"
       )}
+      /*
+       * Bottom padding combines the device safe-area inset with a
+       * small always-on buffer (~4px). On phones with a home
+       * indicator the inset dominates; on browsers without one, the
+       * buffer keeps the nav from hugging the viewport edge. max()
+       * ensures we take whichever is larger so the nav never sits
+       * directly on the edge.
+       */
+      style={{
+        paddingBottom: "max(env(safe-area-inset-bottom, 0px), 4px)",
+      }}
       aria-label="Main navigation"
     >
       <div className="flex items-center justify-around h-14">

@@ -162,7 +162,7 @@ export default function RootLayout({
           media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)"
         />
       </head>
-      <body className="h-dvh flex flex-col overflow-hidden bg-board-bg text-amber antialiased pt-[env(safe-area-inset-top)]">
+      <body className="min-h-dvh flex flex-col bg-board-bg text-amber antialiased pt-[env(safe-area-inset-top)]">
         {/* Splash screen — shows once on first visit */}
         <SplashScreen />
 
@@ -179,20 +179,24 @@ export default function RootLayout({
         <OnboardingOverlay />
 
         {/*
-         * Main content area — the single scroll container for the app.
+         * Main content area.
          *
-         * body is locked to h-dvh + overflow-hidden so the viewport never
-         * scrolls; instead main scrolls internally via overflow-y-auto.
-         * This keeps the BottomNav pinned at the bottom in natural flex
-         * flow, avoiding iOS Safari's fragile `position: fixed` handling
-         * which could leave the nav stranded mid-page after keyboard /
-         * viewport-size changes.
+         * flex-1 lets main fill the space between banners and nav. The
+         * bottom padding clears the fixed BottomNav (3.5rem = h-14) plus
+         * the safe-area inset plus a small visual buffer so content
+         * doesn't tuck right up against the nav.
          */}
-        <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain page-transition">
+        <main
+          className="flex-1 page-transition min-h-0"
+          style={{
+            paddingBottom:
+              "calc(3.5rem + env(safe-area-inset-bottom, 0px) + 0.5rem)",
+          }}
+        >
           {children}
         </main>
 
-        {/* Bottom tab navigation — always visible, sits at the end of the flex column */}
+        {/* Bottom tab navigation — always visible, fixed to viewport bottom */}
         <BottomNav />
       </body>
     </html>
