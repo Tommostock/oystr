@@ -1,0 +1,394 @@
+/**
+ * flights/flight/[number]/page.tsx — Single-flight detail view
+ *
+ * Lands here from:
+ *   - The "FIND A FLIGHT" search box on /flights
+ *   - Tapping a row on any FlightDepartureBoard / FlightArrivalsBoard
+ *
+ * Shows a dot-matrix styled breakdown of one flight: the two airports,
+ * all relevant times (scheduled / estimated / actual), terminal + gate
+ * + baggage belt, aircraft info, great-circle distance + duration, and
+ * live GPS position when the aircraft is airborne.
+ */
+
+"use client";
+
+import { use, useCallback } from "react";
+import { Plane, Clock, Radio } from "lucide-react";
+import PageHeader from "@/components/shared/PageHeader";
+import BoardPanel from "@/components/shared/BoardPanel";
+import BoardState from "@/components/shared/BoardState";
+import PullToRefresh from "@/components/shared/PullToRefresh";
+import { useFlightDetail } from "@/hooks/useFlightDetail";
+import type { FlightDetail, FlightDetailLeg } from "@/lib/flight-types";
+
+interface PageProps {
+  /* Next.js 15 passes dynamic params as a Promise in client pages. */
+  params: Promise<{ number: string }>;
+}
+
+/* ========================================
+ * UTILITIES
+ * ======================================== */
+
+/**
+ * Map normalised status to a CSS class string so we can colour the
+ * status chip consistently. Greens for on-track, ambers for delays
+ * and planning-stage, reds for bad news.
+ */
+function statusChipClasses(status: FlightDetail["status"]): string {
+  switch (status) {
+    case "on-time":
+    case "boarding":
+    case "landed":
+      return "border-good text-good bg-good/10";
+    case "cancelled":
+    case "diverted":
+    case "gate-closed":
+      return "border-bad text-bad bg-bad/10";
+    case "delayed":
+      return "border-amber text-amber bg-amber/15 amber-glow";
+    default:
+      return "border-amber-faint text-amber-faint";
+  }
+}
+
+/**
+ * Pretty-print the status. Replaces the kebab-case enum with
+ * upper-case words so it looks like the lettering on a real board.
+ */
+function prettyStatus(status: FlightDetail["status"]): string {
+  switch (status) {
+    case "on-time":    return "ON TIME";
+    case "gate-closed": return "GATE CLOSED";
+    case "unknown":    return "SCHEDULED";
+    default:           return status.toUpperCase();
+  }
+}
+
+/**
+ * Format a duration in minutes as e.g. "7h 50m".
+ */
+function formatDuration(minutes: number | null): string | null {
+  if (minutes == null) return null;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m}M`;
+  if (m === 0) return `${h}H`;
+  return `${h}H ${m}M`;
+}
+
+/**
+ * Distance in km → "5,554 KM / 3,451 MI".
+ */
+function formatDistance(km: number | null): string | null {
+  if (km == null) return null;
+  const miles = Math.round(km * 0.621371);
+  return `${Math.round(km).toLocaleString()} KM / ${miles.toLocaleString()} MI`;
+}
+
+/* ========================================
+ * LEG PANEL
+ * One airport block — used twice (departure, arrival). Laid out as a
+ * big airport code on the left, city underneath, then a column with
+ * times and terminal/gate/belt details on the right.
+ * ======================================== */
+interface LegPanelProps {
+  title: string;
+  leg: FlightDetailLeg;
+  variant: "departure" | "arrival";
+}
+
+function LegPanel({ title, leg, variant }: LegPanelProps) {
+  const { airport, scheduledTime, estimatedTime, actualTime } = leg;
+
+  // Choose the most useful "display" time: actual > estimated > scheduled
+  const displayTime = actualTime ?? estimatedTime ?? scheduledTime;
+  const isDelayed =
+    estimatedTime != null && estimatedTime !== scheduledTime && !actualTime;
+
+  return (
+    <BoardPanel title={title}>
+      <div className="p-3 space-y-3">
+        {/* Airport code + city */}
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="font-board text-4xl tracking-wider text-amber amber-glow">
+            {airport.iata}
+          </span>
+          <span className="font-mono text-[11px] tracking-wider text-amber-faint uppercase truncate">
+            {airport.city || airport.name}
+          </span>
+        </div>
+
+        {/* Primary time (large, amber, glow) */}
+        <div>
+          <div className="flex items-baseline gap-2">
+            <span className="font-board text-3xl tracking-wider text-amber amber-glow">
+              {displayTime}
+            </span>
+            {isDelayed && (
+              <span className="font-mono text-[10px] tracking-wider text-bad uppercase">
+                DELAYED
+              </span>
+            )}
+            {actualTime && (
+              <span className="font-mono text-[10px] tracking-wider text-good uppercase">
+                ACTUAL
+              </span>
+            )}
+          </div>
+          {displayTime !== scheduledTime && (
+            <p className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-1">
+              SCHEDULED {scheduledTime}
+            </p>
+          )}
+        </div>
+
+        {/* Terminal / Gate / Check-in / Belt — a responsive grid */}
+        <dl className="grid grid-cols-2 gap-x-3 gap-y-2 pt-2 border-t border-board-border">
+          <DetailItem label="TERMINAL" value={leg.terminal} />
+          <DetailItem label="GATE" value={leg.gate} />
+          {variant === "departure" && (
+            <DetailItem label="CHECK-IN" value={leg.checkInDesk} />
+          )}
+          {variant === "arrival" && (
+            <DetailItem label="BELT" value={leg.baggageBelt} />
+          )}
+        </dl>
+      </div>
+    </BoardPanel>
+  );
+}
+
+function DetailItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | null;
+}) {
+  return (
+    <div>
+      <dt className="font-mono text-[9px] tracking-widest text-amber-faint uppercase">
+        {label}
+      </dt>
+      <dd className="font-board text-lg tracking-wider text-amber uppercase">
+        {value || <span className="text-amber-faint">TBA</span>}
+      </dd>
+    </div>
+  );
+}
+
+/* ========================================
+ * PAGE
+ * ======================================== */
+export default function FlightDetailPage({ params }: PageProps) {
+  const { number: rawNumber } = use(params);
+  /*
+   * Decode %20 if present so the header reads "BA 175" instead of
+   * "BA%20175". The hook re-encodes before calling the API.
+   */
+  const flightNumber = decodeURIComponent(rawNumber).toUpperCase();
+
+  const { flight, isLoading, error, notConfigured, notFound, refresh } =
+    useFlightDetail({ flightNumber });
+
+  const handlePullRefresh = useCallback(async () => {
+    await refresh();
+  }, [refresh]);
+
+  return (
+    <PullToRefresh onRefresh={handlePullRefresh}>
+      <div className="p-4 space-y-4">
+        <PageHeader
+          title="Flight"
+          subtitle="LIVE FLIGHT DETAIL"
+          back={{
+            href: "/flights",
+            label: "FLIGHTS",
+            ariaLabel: "Back to Flights",
+          }}
+        />
+
+        {/* ---- Flight-number header ---- */}
+        <div className="border border-board-border bg-surface p-3 space-y-2">
+          <div className="flex items-center gap-2 text-amber-faint">
+            <Plane size={14} strokeWidth={1.5} />
+            <span className="font-mono text-[10px] tracking-widest uppercase">
+              FLIGHT
+            </span>
+          </div>
+          <div className="flex items-baseline gap-3 flex-wrap">
+            <h2 className="font-board text-3xl tracking-wider text-amber uppercase amber-glow">
+              {flight?.flightNumber || flightNumber}
+            </h2>
+            {flight?.airline && (
+              <span className="font-mono text-xs tracking-wider text-amber uppercase truncate">
+                {flight.airline}
+              </span>
+            )}
+          </div>
+          {flight?.callSign && (
+            <p className="font-mono text-[10px] tracking-wider text-amber-faint uppercase flex items-center gap-1.5">
+              <Radio size={10} strokeWidth={1.5} />
+              CALL SIGN {flight.callSign}
+            </p>
+          )}
+          {flight && (
+            <div className="pt-1">
+              <span
+                className={
+                  "inline-block px-2 py-0.5 font-mono text-[10px] tracking-widest uppercase border " +
+                  statusChipClasses(flight.status)
+                }
+              >
+                {prettyStatus(flight.status)}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* ---- Content states ---- */}
+        {notConfigured && (
+          <BoardPanel title="FLIGHT">
+            <BoardState
+              variant="notConfigured"
+              message="AWAITING API KEY"
+              hint="Set FLIGHTS_API_KEY in your environment to enable flight search."
+            />
+          </BoardPanel>
+        )}
+
+        {!notConfigured && notFound && (
+          <BoardPanel title="FLIGHT">
+            <BoardState
+              variant="empty"
+              message="FLIGHT NOT FOUND"
+              hint={
+                <>
+                  No current or upcoming operation for{" "}
+                  <span className="text-amber">{flightNumber}</span>. Check the
+                  number and try again — e.g. BA175, LH 400.
+                </>
+              }
+            />
+          </BoardPanel>
+        )}
+
+        {!notConfigured && !notFound && error && (
+          <BoardPanel title="FLIGHT">
+            <BoardState
+              variant="error"
+              message="COULD NOT LOAD FLIGHT"
+              onRetry={() => refresh()}
+            />
+          </BoardPanel>
+        )}
+
+        {!notConfigured && !notFound && !error && isLoading && !flight && (
+          <BoardPanel title="FLIGHT">
+            <BoardState variant="loading" message="FETCHING FLIGHT..." />
+          </BoardPanel>
+        )}
+
+        {/* ---- Departure / Arrival — stacked on mobile, side-by-side on md ---- */}
+        {flight && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <LegPanel
+                title="DEPARTURE"
+                leg={flight.departure}
+                variant="departure"
+              />
+              <LegPanel
+                title="ARRIVAL"
+                leg={flight.arrival}
+                variant="arrival"
+              />
+            </div>
+
+            {/* ---- Route / distance / duration ---- */}
+            <BoardPanel title="ROUTE">
+              <div className="p-3 grid grid-cols-2 gap-3">
+                <DetailItem
+                  label="DISTANCE"
+                  value={formatDistance(flight.distanceKm)}
+                />
+                <DetailItem
+                  label="BLOCK TIME"
+                  value={formatDuration(flight.durationMinutes)}
+                />
+              </div>
+            </BoardPanel>
+
+            {/* ---- Aircraft ---- */}
+            {(flight.aircraftModel || flight.aircraftRegistration) && (
+              <BoardPanel title="AIRCRAFT">
+                <div className="p-3 grid grid-cols-2 gap-3">
+                  <DetailItem label="MODEL" value={flight.aircraftModel} />
+                  <DetailItem
+                    label="REGISTRATION"
+                    value={flight.aircraftRegistration}
+                  />
+                </div>
+              </BoardPanel>
+            )}
+
+            {/* ---- Live position — only when the aircraft is airborne ---- */}
+            {flight.liveLocation && (
+              <BoardPanel title="LIVE POSITION">
+                <div className="p-3 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <DetailItem
+                      label="LATITUDE"
+                      value={flight.liveLocation.lat.toFixed(3)}
+                    />
+                    <DetailItem
+                      label="LONGITUDE"
+                      value={flight.liveLocation.lon.toFixed(3)}
+                    />
+                    {flight.liveLocation.altitudeFeet != null && (
+                      <DetailItem
+                        label="ALTITUDE"
+                        value={`${flight.liveLocation.altitudeFeet.toLocaleString()} FT`}
+                      />
+                    )}
+                    {flight.liveLocation.groundSpeedKts != null && (
+                      <DetailItem
+                        label="GROUND SPEED"
+                        value={`${Math.round(
+                          flight.liveLocation.groundSpeedKts
+                        )} KTS`}
+                      />
+                    )}
+                    {flight.liveLocation.trueTrack != null && (
+                      <DetailItem
+                        label="HEADING"
+                        value={`${Math.round(
+                          flight.liveLocation.trueTrack
+                        )}°`}
+                      />
+                    )}
+                  </div>
+                  {flight.liveLocation.reportedAtUtc && (
+                    <p className="font-mono text-[9px] tracking-wider text-amber-faint uppercase flex items-center gap-1.5">
+                      <Clock size={10} strokeWidth={1.5} />
+                      REPORTED {flight.liveLocation.reportedAtUtc}
+                    </p>
+                  )}
+                </div>
+              </BoardPanel>
+            )}
+
+            {/* ---- Last-updated footer ---- */}
+            {flight.lastUpdatedUtc && (
+              <p className="font-mono text-[9px] tracking-wider text-amber-faint uppercase text-center">
+                AS OF {flight.lastUpdatedUtc}
+              </p>
+            )}
+          </>
+        )}
+      </div>
+    </PullToRefresh>
+  );
+}

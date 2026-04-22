@@ -117,6 +117,100 @@ export interface FlightArrival {
 }
 
 /* ========================================
+ * FLIGHT DETAIL (normalised)
+ *
+ * Full flight record for a single flight number (e.g. "BA9279").
+ * Richer than FlightDeparture / FlightArrival: contains both the
+ * departure and arrival airports + times in one object, plus
+ * aircraft info and optional live-position data.
+ *
+ * The flight-by-number endpoint can return multiple records for
+ * the same flight number (yesterday / today / tomorrow), so the
+ * API route picks the most recent one relevant to "now" and
+ * normalises it into this shape.
+ * ======================================== */
+export interface FlightDetailAirport {
+  /** 3-letter IATA (e.g. "LHR") */
+  iata: string;
+  /** Display name (e.g. "London Heathrow") */
+  name: string;
+  /** City the airport serves (e.g. "London") */
+  city: string | null;
+  /** 2-letter country code (e.g. "GB") */
+  countryCode: string | null;
+  /** IANA timezone (e.g. "Europe/London") — useful for showing local times */
+  timeZone: string | null;
+}
+
+export interface FlightDetailLeg {
+  airport: FlightDetailAirport;
+  /** Scheduled time in HH:mm (local to this airport) */
+  scheduledTime: string;
+  /** Scheduled date in YYYY-MM-DD (local to this airport) */
+  scheduledDate: string;
+  /** Estimated/predicted time if different from scheduled */
+  estimatedTime: string | null;
+  /** Actual time if the event has happened */
+  actualTime: string | null;
+  /** Terminal — null until assigned */
+  terminal: string | null;
+  /** Gate — null until assigned */
+  gate: string | null;
+  /** Check-in desk (departure only) — null where not applicable */
+  checkInDesk: string | null;
+  /** Baggage reclaim belt (arrival only) — null until assigned */
+  baggageBelt: string | null;
+}
+
+export interface FlightLiveLocation {
+  lat: number;
+  lon: number;
+  altitudeFeet: number | null;
+  groundSpeedKts: number | null;
+  /** Compass heading in degrees (0 = north) */
+  trueTrack: number | null;
+  /** ISO UTC timestamp when the position was reported */
+  reportedAtUtc: string;
+}
+
+export interface FlightDetail {
+  /** The flight number the user searched for (normalised, e.g. "BA 9279") */
+  flightNumber: string;
+  /** Operating airline name (e.g. "British Airways") */
+  airline: string;
+  /** Short airline code (e.g. "BA") */
+  airlineCode: string;
+  /** Radio call sign if available (e.g. "SPEEDBIRD 175") */
+  callSign: string | null;
+  /** Normalised status — drives the colour of the status chip */
+  status: FlightStatus;
+  /** Convenience flag mirroring status === "cancelled" */
+  cancelled: boolean;
+  /** True when this record is a codeshare (rare — we default to operator) */
+  isCodeshare: boolean;
+
+  /** Departure leg — always present */
+  departure: FlightDetailLeg;
+  /** Arrival leg — always present */
+  arrival: FlightDetailLeg;
+
+  /** Aircraft info where known */
+  aircraftModel: string | null;
+  aircraftRegistration: string | null;
+
+  /** Great-circle distance between the two airports in kilometres */
+  distanceKm: number | null;
+  /** Scheduled block time in minutes (dep → arr) */
+  durationMinutes: number | null;
+
+  /** Live aircraft position — only present when the flight is airborne */
+  liveLocation: FlightLiveLocation | null;
+
+  /** ISO UTC of the last provider update — useful for "AS OF ..." footer */
+  lastUpdatedUtc: string | null;
+}
+
+/* ========================================
  * API ERROR SHAPE
  * Matches the Rail API's notConfigured pattern so the hook + UI
  * can show a friendly "awaiting API key" message instead of
@@ -126,4 +220,6 @@ export interface FlightApiError {
   error: string;
   /** True when the server is missing FLIGHTS_API_KEY */
   notConfigured?: boolean;
+  /** True when the flight number is correctly formatted but not found */
+  notFound?: boolean;
 }

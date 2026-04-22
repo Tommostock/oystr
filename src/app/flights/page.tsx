@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { Clock, Trash2 } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import AirportSearch from "@/components/flights/AirportSearch";
+import FlightSearch from "@/components/flights/FlightSearch";
 import { LONDON_AIRPORTS } from "@/lib/airports";
 import { useRecentAirports } from "@/hooks/useRecentAirports";
 
@@ -135,6 +136,14 @@ export default function FlightsPage() {
             goToAirport({ iata: airport.iata, name: airport.name })
           }
         />
+      </div>
+
+      {/* ---- Flight number search ---- */}
+      <div>
+        <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mb-1.5 px-1">
+          FIND A FLIGHT
+        </div>
+        <FlightSearch />
       </div>
     </div>
   );

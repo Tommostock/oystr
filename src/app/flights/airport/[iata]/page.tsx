@@ -14,6 +14,7 @@
 "use client";
 
 import { use, useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 import { mutate } from "swr";
 import PageHeader from "@/components/shared/PageHeader";
 import PullToRefresh from "@/components/shared/PullToRefresh";
@@ -53,12 +54,20 @@ export default function AirportPage({ params }: PageProps) {
   const [direction, setDirection] = useState<BoardDirection>("departures");
 
   /*
-   * Placeholder state for when a tap-to-expand flight-detail popup
-   * arrives later. Both boards forward taps through here so wiring
-   * the popup is a one-line swap once live data is in.
+   * Row-tap handler — navigates to the flight detail page so the
+   * user can see full origin/destination, aircraft, and live
+   * position. The row's flight number is URL-encoded so the space
+   * between airline code and number survives the route segment.
    */
-  const [, setExpandedFlight] =
-    useState<FlightDeparture | FlightArrival | null>(null);
+  const router = useRouter();
+  const handleFlightTap = useCallback(
+    (flight: FlightDeparture | FlightArrival) => {
+      const fn = flight.flightNumber?.trim();
+      if (!fn) return;
+      router.push(`/flights/flight/${encodeURIComponent(fn)}`);
+    },
+    [router]
+  );
 
   /*
    * Pull-to-refresh invalidates every /api/flights/ SWR key at once
@@ -147,14 +156,14 @@ export default function AirportPage({ params }: PageProps) {
             iata={iata}
             airportName={city || name}
             maxRows={15}
-            onFlightTap={setExpandedFlight}
+            onFlightTap={handleFlightTap}
           />
         ) : (
           <FlightArrivalsBoard
             iata={iata}
             airportName={city || name}
             maxRows={15}
-            onFlightTap={setExpandedFlight}
+            onFlightTap={handleFlightTap}
           />
         )}
       </div>
