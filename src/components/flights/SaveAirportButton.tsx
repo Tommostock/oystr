@@ -1,16 +1,15 @@
 /**
- * SaveAirportButton.tsx — Toggle an airport as a favourite
+ * SaveAirportButton.tsx — Save/unsave an airport
  *
- * Mirrors SaveRailStationButton. Writes to savedAirports so a tap
- * here pins the airport on the Terminal tab's quick-view grid.
+ * Thin wrapper: reads saved state from useSavedAirports, delegates
+ * the visual to the shared StarToggle primitive.
  */
 
 "use client";
 
 import { useEffect, useState } from "react";
-import { Star } from "lucide-react";
 import { useSavedAirports } from "@/hooks/useSavedAirports";
-import { cn } from "@/lib/utils";
+import StarToggle from "@/components/shared/StarToggle";
 
 interface SaveAirportButtonProps {
   airport: { iata: string; name: string; city?: string; country?: string };
@@ -48,20 +47,12 @@ export default function SaveAirportButton({
   };
 
   return (
-    <button
-      onClick={handleToggle}
+    <StarToggle
+      saved={saved}
+      onToggle={handleToggle}
       disabled={isToggling}
-      className={cn(
-        "shrink-0 p-2 transition-colors",
-        saved
-          ? "text-amber amber-glow hover:text-amber-dim"
-          : "text-amber-faint hover:text-amber",
-        className
-      )}
-      aria-label={saved ? `Remove ${airport.name} from saved` : `Save ${airport.name}`}
-      title={saved ? "Remove from saved" : "Save airport"}
-    >
-      <Star size={22} strokeWidth={1.5} fill={saved ? "currentColor" : "none"} />
-    </button>
+      label={airport.name}
+      className={className}
+    />
   );
 }

@@ -29,6 +29,7 @@ import {
 import type { LineStatus } from "@/lib/tfl-types";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
+import PageHeader from "@/components/shared/PageHeader";
 import LoadingBoard from "@/components/shared/LoadingBoard";
 import PullToRefresh from "@/components/shared/PullToRefresh";
 import LineStatusCard from "@/components/line-status/LineStatusCard";
@@ -131,14 +132,7 @@ export default function StatusPage() {
   if (isLoading && lines.length === 0) {
     return (
       <div className="p-4 space-y-4">
-        <div className="text-center pt-4 pb-2">
-          <AmberText as="h1" size="lg" uppercase className="dot-matrix">
-            Line Status
-          </AmberText>
-          <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-1">
-            LONDON TUBE NETWORK STATUS
-          </div>
-        </div>
+        <PageHeader title="Line Status" subtitle="LONDON TUBE NETWORK STATUS" />
         <BoardPanel>
           <LoadingBoard message="FETCHING LINE STATUS..." />
         </BoardPanel>
@@ -150,14 +144,7 @@ export default function StatusPage() {
   if (error && lines.length === 0) {
     return (
       <div className="p-4 space-y-4">
-        <div className="text-center pt-4 pb-2">
-          <AmberText as="h1" size="lg" uppercase className="dot-matrix">
-            Line Status
-          </AmberText>
-          <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-1">
-            LONDON TUBE NETWORK STATUS
-          </div>
-        </div>
+        <PageHeader title="Line Status" subtitle="LONDON TUBE NETWORK STATUS" />
         <BoardPanel>
           <div className="py-6 text-center space-y-3">
             <AmberText variant="dim" size="sm" className="dot-matrix">
@@ -189,14 +176,7 @@ export default function StatusPage() {
     <PullToRefresh onRefresh={() => refresh()}>
       <div className="p-4 space-y-4">
         {/* ---- Page Header ---- */}
-        <div className="text-center pt-4 pb-2">
-          <AmberText as="h1" size="lg" uppercase className="dot-matrix">
-            Line Status
-          </AmberText>
-          <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-1">
-            LONDON TUBE NETWORK STATUS
-          </div>
-        </div>
+        <PageHeader title="Line Status" subtitle="LONDON TUBE NETWORK STATUS" />
 
         {/* ---- Status Summary + timestamp ---- */}
         <BoardPanel>

@@ -14,10 +14,8 @@
 "use client";
 
 import { use, useCallback, useState } from "react";
-import Link from "next/link";
-import { RotateCcw } from "lucide-react";
 import { mutate } from "swr";
-import AmberText from "@/components/shared/AmberText";
+import PageHeader from "@/components/shared/PageHeader";
 import PullToRefresh from "@/components/shared/PullToRefresh";
 import FlightDepartureBoard from "@/components/flights/FlightDepartureBoard";
 import FlightArrivalsBoard from "@/components/flights/FlightArrivalsBoard";
@@ -79,30 +77,15 @@ export default function AirportPage({ params }: PageProps) {
   return (
     <PullToRefresh onRefresh={handlePullRefresh}>
       <div className="p-4 space-y-4">
-        {/* ---- Top bar with back link ---- */}
-        <div className="relative flex items-center justify-center pt-4 pb-2">
-          <Link
-            href="/flights"
-            className="absolute left-0 flex items-center gap-1.5 text-amber-faint hover:text-amber transition-colors font-mono text-xs tracking-wider"
-            aria-label="Back to Flights"
-          >
-            <RotateCcw size={14} strokeWidth={1.5} />
-            <span>FLIGHTS</span>
-          </Link>
-          <div className="flex flex-col items-center">
-            <AmberText
-              as="h1"
-              size="lg"
-              uppercase
-              className="dot-matrix amber-glow"
-            >
-              Airport
-            </AmberText>
-            <span className="font-mono text-[9px] tracking-[0.25em] text-amber-faint uppercase mt-0.5">
-              LIVE DEPARTURES
-            </span>
-          </div>
-        </div>
+        <PageHeader
+          title="Airport"
+          subtitle="LIVE DEPARTURES"
+          back={{
+            href: "/flights",
+            label: "FLIGHTS",
+            ariaLabel: "Back to Flights",
+          }}
+        />
 
         {/* ---- Airport header card — mirrors the rail station page ---- */}
         <div className="border border-board-border bg-surface p-3 space-y-2">

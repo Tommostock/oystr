@@ -28,6 +28,7 @@ import {
 import StationSearch from "@/components/shared/StationSearch";
 import BoardPanel from "@/components/shared/BoardPanel";
 import AmberText from "@/components/shared/AmberText";
+import PageHeader from "@/components/shared/PageHeader";
 import LoadingBoard from "@/components/shared/LoadingBoard";
 import JourneyCard from "@/components/journey/JourneyCard";
 import TimeSelector from "@/components/journey/TimeSelector";
@@ -366,15 +367,7 @@ export default function JourneyPage() {
 
   return (
     <div className="p-4 space-y-4">
-      {/* ---- Page Header ---- */}
-      <div className="text-center pt-4 pb-2">
-        <AmberText as="h1" size="lg" uppercase className="dot-matrix">
-          Tube
-        </AmberText>
-        <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-1">
-          LONDON TRANSPORT
-        </div>
-      </div>
+      <PageHeader title="Tube" subtitle="LONDON TRANSPORT" />
 
       {/*
        * Saved journeys.

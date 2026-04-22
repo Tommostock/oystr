@@ -5,21 +5,16 @@
  * useFlightDepartures hook, rendered in the dot-matrix BoardPanel
  * style shared with the Rail tab.
  *
- * Handles the usual set of states:
- *   - Loading (dot-matrix indicator)
- *   - Not configured (no API key yet — friendly "AWAITING API KEY" message)
- *   - Error (fallback + retry)
- *   - Empty (no departures listed)
- *   - Populated (up to `maxRows` flight rows)
+ * Loading / error / empty / not-configured states all delegate to
+ * the shared BoardState primitive so the behaviour matches every
+ * other board in the app.
  */
 
 "use client";
 
-import { RefreshCw } from "lucide-react";
 import { useFlightDepartures } from "@/hooks/useFlightDepartures";
 import BoardPanel from "@/components/shared/BoardPanel";
-import AmberText from "@/components/shared/AmberText";
-import LoadingBoard from "@/components/shared/LoadingBoard";
+import BoardState from "@/components/shared/BoardState";
 import FlightDepartureRow from "./FlightDepartureRow";
 import type { FlightDeparture } from "@/lib/flight-types";
 
@@ -45,70 +40,52 @@ export default function FlightDepartureBoard({
 
   const title = `${airportName.toUpperCase()} -- DEPARTURES`;
 
-  /* ---- Not configured: API key missing, explain + reassure ---- */
   if (notConfigured) {
     return (
       <BoardPanel title={title}>
-        <div className="py-6 text-center space-y-3">
-          <AmberText variant="dim" size="sm" className="dot-matrix">
-            AWAITING API KEY
-          </AmberText>
-          <p className="font-mono text-[11px] tracking-wider text-amber-faint leading-relaxed uppercase">
-            LIVE FLIGHT DATA APPEARS
-            <br />
-            ONCE THE PROVIDER IS CONNECTED
-          </p>
-        </div>
+        <BoardState
+          variant="notConfigured"
+          message="AWAITING API KEY"
+          hint={
+            <>
+              LIVE FLIGHT DATA APPEARS
+              <br />
+              ONCE THE PROVIDER IS CONNECTED
+            </>
+          }
+        />
       </BoardPanel>
     );
   }
 
-  /* ---- Loading ---- */
   if (isLoading && departures.length === 0) {
     return (
       <BoardPanel title={title}>
-        <LoadingBoard message="FETCHING FLIGHTS..." />
+        <BoardState variant="loading" message="FETCHING FLIGHTS..." />
       </BoardPanel>
     );
   }
 
-  /* ---- Error ---- */
   if (error && departures.length === 0) {
     return (
       <BoardPanel title={title}>
-        <div className="py-4 text-center space-y-3">
-          <AmberText variant="dim" size="sm" className="dot-matrix">
-            COULD NOT LOAD FLIGHTS
-          </AmberText>
-          <button
-            onClick={() => refresh()}
-            className="inline-flex items-center gap-2 px-3 py-1.5 border border-amber text-amber hover:bg-amber hover:text-board-bg transition-colors"
-            aria-label="Retry loading flights"
-          >
-            <RefreshCw size={12} strokeWidth={1.5} />
-            <span className="font-mono text-[10px] tracking-wider uppercase">
-              RETRY
-            </span>
-          </button>
-        </div>
+        <BoardState
+          variant="error"
+          message="COULD NOT LOAD FLIGHTS"
+          onRetry={() => refresh()}
+        />
       </BoardPanel>
     );
   }
 
-  /* ---- Empty ---- */
   if (departures.length === 0) {
     return (
       <BoardPanel title={title}>
-        <div className="py-6 text-center">
-          <AmberText variant="dim" size="sm" uppercase>
-            NO DEPARTURES LISTED
-          </AmberText>
-        </div>
+        <BoardState variant="empty" message="NO DEPARTURES LISTED" />
       </BoardPanel>
     );
   }
 
-  /* ---- Populated ---- */
   return (
     <BoardPanel title={title}>
       <div role="table" aria-label={`${airportName} departures`}>

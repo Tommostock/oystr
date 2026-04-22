@@ -21,9 +21,10 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { RotateCcw, List, HelpCircle } from "lucide-react";
+import { List, HelpCircle } from "lucide-react";
 import StationSearch from "@/components/shared/StationSearch";
 import NearMeButton from "@/components/shared/NearMeButton";
+import PageHeader from "@/components/shared/PageHeader";
 import DepartureBoard from "@/components/departure-board/DepartureBoard";
 import LastTrainBanner from "@/components/departure-board/LastTrainBanner";
 import { usePrefetchSaved } from "@/hooks/usePrefetchSaved";
@@ -276,48 +277,35 @@ function HomeContent() {
 
   return (
     <div className="p-4 space-y-4">
-      {/* ---- App Header with home reset button ---- */}
-      <div className="relative flex items-center justify-center pt-4 pb-2">
-        {/* Home/reset button — always visible, clears selection and returns to start */}
-        {selectedStation && (
+      {/*
+       * Terminal uses the hero treatment (2xl + strong glow) — it's
+       * the brand landing. RESET button appears only once the user
+       * has a selected station; About lives top-right.
+       */}
+      <PageHeader
+        title="Oystr"
+        subtitle={timeGreeting().toUpperCase()}
+        size="2xl"
+        glow="strong"
+        back={
+          selectedStation
+            ? {
+                label: "RESET",
+                ariaLabel: "Back to home",
+                onClick: () => setSelectedStation(null),
+              }
+            : undefined
+        }
+        action={
           <button
-            onClick={() => setSelectedStation(null)}
-            className="absolute left-0 flex items-center gap-1.5 text-amber-faint hover:text-amber transition-colors font-mono text-xs tracking-wider"
-            aria-label="Back to home"
+            onClick={() => setShowAbout(true)}
+            className="w-9 h-9 flex items-center justify-center border border-board-border text-amber-faint hover:text-amber hover:border-amber-faint transition-colors"
+            aria-label="About Oystr"
           >
-            <RotateCcw size={14} strokeWidth={1.5} />
-            <span>RESET</span>
+            <HelpCircle size={18} strokeWidth={1.5} />
           </button>
-        )}
-
-        <div className="flex flex-col items-center">
-          <AmberText
-            as="h1"
-            size="2xl"
-            uppercase
-            className="amber-glow-strong dot-matrix"
-          >
-            Oystr
-          </AmberText>
-          {/*
-           * Time-of-day greeting subtitle — friendlier than a static
-           * descriptor and matches the at-a-glance dot-matrix feel of
-           * the rest of the board.
-           */}
-          <span className="font-mono text-[9px] tracking-[0.25em] text-amber-faint uppercase mt-0.5">
-            {timeGreeting()}
-          </span>
-        </div>
-
-        {/* About button — top right */}
-        <button
-          onClick={() => setShowAbout(true)}
-          className="absolute right-0 w-9 h-9 flex items-center justify-center border border-board-border text-amber-faint hover:text-amber hover:border-amber-faint transition-colors"
-          aria-label="About Oystr"
-        >
-          <HelpCircle size={18} strokeWidth={1.5} />
-        </button>
-      </div>
+        }
+      />
 
       {/* ---- About Popup ---- */}
       {showAbout && (

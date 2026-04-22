@@ -26,6 +26,7 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { MapPin, RefreshCw, Search } from "lucide-react";
 import AmberText from "@/components/shared/AmberText";
+import PageHeader from "@/components/shared/PageHeader";
 
 /*
  * Dynamic import with SSR disabled.
@@ -94,18 +95,15 @@ export default function NearbyPage() {
 
   /**
    * Shared chrome (title strip + content) for all non-ready states.
-   * Consistent header with the rest of the app tabs — previously
-   * Nearby had no title at all when the map was loaded.
+   * The ready/map state uses a compacted inline header because it
+   * needs a border-b and must cede almost all vertical space to the
+   * map; PageHeader is the right fit for the other three states.
    */
   const headerStrip = (
-    <div className="text-center pt-4 pb-2">
-      <AmberText as="h1" size="lg" uppercase className="dot-matrix">
-        Nearby
-      </AmberText>
-      <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-1">
-        LIVE MAP OF STATIONS AROUND YOU
-      </div>
-    </div>
+    <PageHeader
+      title="Nearby"
+      subtitle="LIVE MAP OF STATIONS AROUND YOU"
+    />
   );
 
   /* ---- Loading state ---- */

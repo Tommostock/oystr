@@ -38,6 +38,7 @@ import { Star, ArrowLeftRight, TrainFront, Mail, Check, Trash2, ArrowRight } fro
 import { mutate } from "swr";
 import AmberText from "@/components/shared/AmberText";
 import BoardPanel from "@/components/shared/BoardPanel";
+import PageHeader from "@/components/shared/PageHeader";
 import PullToRefresh from "@/components/shared/PullToRefresh";
 import RailStationSearch from "@/components/rail/RailStationSearch";
 import RailDepartureBoard from "@/components/rail/RailDepartureBoard";
@@ -422,15 +423,10 @@ function RailPageFull() {
      */
     <PullToRefresh onRefresh={handlePullRefresh}>
       <div className="p-4 space-y-4">
-        {/* ---- Page Header ---- */}
-        <div className="text-center pt-4 pb-2">
-          <AmberText as="h1" size="lg" uppercase className="dot-matrix">
-            National Rail
-          </AmberText>
-          <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-1">
-            LONG-DISTANCE LIVE DEPARTURES
-          </div>
-        </div>
+        <PageHeader
+          title="National Rail"
+          subtitle="LONG-DISTANCE LIVE DEPARTURES"
+        />
 
       {/*
        * Tracked journeys — active / upcoming services the user has
@@ -730,15 +726,10 @@ function RailPageFull() {
 function ComingSoonPlaceholder() {
   return (
     <div className="p-4 space-y-4">
-      {/* ---- Page Header ---- */}
-      <div className="text-center pt-4 pb-2">
-        <AmberText as="h1" size="lg" uppercase className="dot-matrix">
-          National Rail
-        </AmberText>
-        <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-1">
-          LONG-DISTANCE LIVE DEPARTURES
-        </div>
-      </div>
+      <PageHeader
+        title="National Rail"
+        subtitle="LONG-DISTANCE LIVE DEPARTURES"
+      />
 
       {/* ---- Coming Soon board ---- */}
       <BoardPanel title="SERVICE STATUS">

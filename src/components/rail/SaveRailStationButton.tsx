@@ -1,17 +1,15 @@
 /**
- * SaveRailStationButton.tsx — Toggle a National Rail station as a favourite
+ * SaveRailStationButton.tsx — Save/unsave a National Rail station
  *
- * Mirrors SaveStationButton (tube/bus) but writes to savedRailStations
- * instead of favourites. A filled star means the station is pinned
- * and will appear as a card on the Depart tab.
+ * Thin wrapper: reads saved state from useSavedRailStations, delegates
+ * the visual to the shared StarToggle primitive.
  */
 
 "use client";
 
-import { useState, useEffect } from "react";
-import { Star } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useSavedRailStations } from "@/hooks/useSavedRailStations";
-import { cn } from "@/lib/utils";
+import StarToggle from "@/components/shared/StarToggle";
 
 interface SaveRailStationButtonProps {
   station: { crs: string; name: string };
@@ -23,7 +21,6 @@ export default function SaveRailStationButton({
   className,
 }: SaveRailStationButtonProps) {
   const { toggleStation, isSaved } = useSavedRailStations();
-
   const [saved, setSaved] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
 
@@ -48,24 +45,12 @@ export default function SaveRailStationButton({
   };
 
   return (
-    <button
-      onClick={handleToggle}
+    <StarToggle
+      saved={saved}
+      onToggle={handleToggle}
       disabled={isToggling}
-      className={cn(
-        "shrink-0 p-2 transition-colors",
-        saved
-          ? "text-amber amber-glow hover:text-amber-dim"
-          : "text-amber-faint hover:text-amber",
-        className
-      )}
-      aria-label={saved ? `Remove ${station.name} from saved` : `Save ${station.name}`}
-      title={saved ? "Remove from saved" : "Save station"}
-    >
-      <Star
-        size={22}
-        strokeWidth={1.5}
-        fill={saved ? "currentColor" : "none"}
-      />
-    </button>
+      label={station.name}
+      className={className}
+    />
   );
 }

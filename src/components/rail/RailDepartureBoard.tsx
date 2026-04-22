@@ -7,22 +7,16 @@
  * Tapping a row opens the ServiceDetailSheet (controlled by the parent
  * via onServiceTap).
  *
- * Renders one BoardPanel with up to `maxRows` rows, wrapped in a
- * pull-to-refresh handler. Shows friendly states for:
- *   - Loading (dot-matrix indicator)
- *   - API key not configured (helpful setup message)
- *   - Error (fallback message + retry button)
- *   - No departures at all (empty state)
- *   - No direct trains when a destination is set (explains a change may be required)
+ * Loading / error / empty / not-configured states are delegated to the
+ * shared BoardState primitive for consistency with the rest of the app.
  */
 
 "use client";
 
-import { RefreshCw } from "lucide-react";
 import { useRailDepartures } from "@/hooks/useRailDepartures";
 import BoardPanel from "@/components/shared/BoardPanel";
+import BoardState from "@/components/shared/BoardState";
 import AmberText from "@/components/shared/AmberText";
-import LoadingBoard from "@/components/shared/LoadingBoard";
 import RailArrivalRow from "./RailArrivalRow";
 import type { RailDeparture } from "@/lib/rail-types";
 
@@ -59,83 +53,61 @@ export default function RailDepartureBoard({
       toCrs,
       numRows: maxRows,
     });
-  /*
-   * Note: pull-to-refresh is now handled at the page level via SWR's
-   * global mutate (so pulling from the top of the whole Rail page
-   * refreshes everything). This component no longer needs its own
-   * PullToRefresh wrapper.
-   */
 
   const title = toName
     ? `${fromName.toUpperCase()} --> ${toName.toUpperCase()}`
     : fromName.toUpperCase();
 
-  /* ---- Not configured: friendly setup prompt ---- */
   if (notConfigured) {
     return (
       <BoardPanel title={title}>
-        <div className="py-6 text-center space-y-2">
-          <AmberText variant="secondary" size="sm" uppercase>
-            RAIL SERVICE UNAVAILABLE
-          </AmberText>
-          <p className="font-mono text-xs tracking-wider text-amber-faint">
-            RDM API KEY NOT CONFIGURED.
-            <br />
-            SUBSCRIBE TO &quot;LIVE ARRIVAL AND
-            <br />
-            DEPARTURE BOARDS&quot; AT raildata.org.uk
-          </p>
-        </div>
+        <BoardState
+          variant="notConfigured"
+          message="RAIL SERVICE UNAVAILABLE"
+          hint={
+            <>
+              RDM API KEY NOT CONFIGURED.
+              <br />
+              SUBSCRIBE TO &quot;LIVE ARRIVAL AND
+              <br />
+              DEPARTURE BOARDS&quot; AT raildata.org.uk
+            </>
+          }
+        />
       </BoardPanel>
     );
   }
 
-  /* ---- Loading (no cached data yet) ---- */
   if (isLoading && departures.length === 0) {
     return (
       <BoardPanel title={title}>
-        <LoadingBoard message="LOADING DEPARTURES..." />
+        <BoardState variant="loading" message="LOADING DEPARTURES..." />
       </BoardPanel>
     );
   }
 
-  /* ---- Error state — offer an explicit RETRY ---- */
   if (error && departures.length === 0) {
     return (
       <BoardPanel title={title}>
-        <div className="py-6 text-center space-y-3">
-          <AmberText variant="secondary" size="sm" uppercase>
-            UNABLE TO FETCH DEPARTURES
-          </AmberText>
-          <p className="font-mono text-xs tracking-wider text-amber-faint">
-            CHECK YOUR CONNECTION AND TRY AGAIN
-          </p>
-          <button
-            onClick={() => refresh()}
-            className="inline-flex items-center gap-2 px-3 py-1.5 border border-amber text-amber hover:bg-amber hover:text-board-bg transition-colors"
-            aria-label="Retry fetching departures"
-          >
-            <RefreshCw size={12} strokeWidth={1.5} />
-            <span className="font-mono text-[10px] tracking-wider uppercase">
-              RETRY
-            </span>
-          </button>
-        </div>
+        <BoardState
+          variant="error"
+          message="UNABLE TO FETCH DEPARTURES"
+          hint="CHECK YOUR CONNECTION AND TRY AGAIN"
+          onRetry={() => refresh()}
+        />
       </BoardPanel>
     );
   }
 
-  /* ---- No departures found ---- */
   if (departures.length === 0) {
     return (
       <BoardPanel title={title}>
-        <div className="py-6 text-center">
-          {toName ? (
-            <>
-              <AmberText variant="secondary" size="sm" uppercase>
-                NO DIRECT TRAINS FOUND
-              </AmberText>
-              <p className="font-mono text-xs tracking-wider text-amber-faint mt-3 leading-relaxed">
+        {toName ? (
+          <BoardState
+            variant="empty"
+            message="NO DIRECT TRAINS FOUND"
+            hint={
+              <>
                 NO DIRECT SERVICES FROM
                 <br />
                 {fromName.toUpperCase()} TO {toName.toUpperCase()}
@@ -148,19 +120,16 @@ export default function RailDepartureBoard({
                 CLEAR THE DESTINATION TO SEE
                 <br />
                 ALL DEPARTURES FROM HERE.
-              </p>
-            </>
-          ) : (
-            <AmberText variant="secondary" size="sm" uppercase>
-              NO DEPARTURES SCHEDULED
-            </AmberText>
-          )}
-        </div>
+              </>
+            }
+          />
+        ) : (
+          <BoardState variant="empty" message="NO DEPARTURES SCHEDULED" />
+        )}
       </BoardPanel>
     );
   }
 
-  /* ---- Normal render (pull-to-refresh lives at the page level) ---- */
   return (
     <div className="space-y-3">
       <BoardPanel title={title}>

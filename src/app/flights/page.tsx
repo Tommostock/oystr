@@ -16,7 +16,7 @@
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Clock, Trash2 } from "lucide-react";
-import AmberText from "@/components/shared/AmberText";
+import PageHeader from "@/components/shared/PageHeader";
 import AirportSearch from "@/components/flights/AirportSearch";
 import { LONDON_AIRPORTS } from "@/lib/airports";
 import { useRecentAirports } from "@/hooks/useRecentAirports";
@@ -48,15 +48,7 @@ export default function FlightsPage() {
 
   return (
     <div className="p-4 space-y-4">
-      {/* ---- Page Header ---- */}
-      <div className="text-center pt-4 pb-2">
-        <AmberText as="h1" size="lg" uppercase className="dot-matrix">
-          Flights
-        </AmberText>
-        <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase mt-1">
-          LIVE DEPARTURES WORLDWIDE
-        </div>
-      </div>
+      <PageHeader title="Flights" subtitle="LIVE DEPARTURES WORLDWIDE" />
 
       {/* ---- London quick-pick chips ---- */}
       <div>

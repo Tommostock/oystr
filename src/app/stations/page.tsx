@@ -13,7 +13,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { LINE_COLOURS, LINE_NAMES } from "@/lib/constants";
-import AmberText from "@/components/shared/AmberText";
+import PageHeader from "@/components/shared/PageHeader";
 import LoadingBoard from "@/components/shared/LoadingBoard";
 import { cn } from "@/lib/utils";
 
@@ -93,11 +93,7 @@ export default function StationsPage() {
     <div className="flex flex-col h-full">
       {/* ---- Header ---- */}
       <div className="p-4 pb-2">
-        <div className="text-center pt-4 pb-2">
-          <AmberText as="h1" size="lg" uppercase className="dot-matrix">
-            Station A-Z
-          </AmberText>
-        </div>
+        <PageHeader title="Station A-Z" subtitle="BROWSE EVERY TUBE STATION" />
 
         {/* Search filter */}
         <input

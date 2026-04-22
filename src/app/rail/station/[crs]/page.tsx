@@ -17,10 +17,8 @@
 "use client";
 
 import { use, useState, useCallback } from "react";
-import Link from "next/link";
-import { RotateCcw } from "lucide-react";
 import { mutate } from "swr";
-import AmberText from "@/components/shared/AmberText";
+import PageHeader from "@/components/shared/PageHeader";
 import PullToRefresh from "@/components/shared/PullToRefresh";
 import RailDepartureBoard from "@/components/rail/RailDepartureBoard";
 import ServiceDetailSheet from "@/components/rail/ServiceDetailSheet";
@@ -65,30 +63,11 @@ export default function RailStationPage({ params }: PageProps) {
   return (
     <PullToRefresh onRefresh={handlePullRefresh}>
       <div className="p-4 space-y-4">
-        {/* ---- Top bar with back link ---- */}
-        <div className="relative flex items-center justify-center pt-4 pb-2">
-          <Link
-            href="/"
-            className="absolute left-0 flex items-center gap-1.5 text-amber-faint hover:text-amber transition-colors font-mono text-xs tracking-wider"
-            aria-label="Back to Depart"
-          >
-            <RotateCcw size={14} strokeWidth={1.5} />
-            <span>DEPART</span>
-          </Link>
-          <div className="flex flex-col items-center">
-            <AmberText
-              as="h1"
-              size="lg"
-              uppercase
-              className="dot-matrix amber-glow"
-            >
-              National Rail
-            </AmberText>
-            <span className="font-mono text-[9px] tracking-[0.25em] text-amber-faint uppercase mt-0.5">
-              LIVE DEPARTURES
-            </span>
-          </div>
-        </div>
+        <PageHeader
+          title="National Rail"
+          subtitle="LIVE DEPARTURES"
+          back={{ href: "/", label: "TERMINAL", ariaLabel: "Back to Terminal" }}
+        />
 
         {/* ---- Station header card — mirrors the tube station panel on Depart ---- */}
         <div className="border border-board-border bg-surface p-3 space-y-2">
