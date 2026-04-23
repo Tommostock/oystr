@@ -97,12 +97,41 @@
  * When installed as a PWA (standalone mode), the app extends
  * behind the status bar and home indicator. These styles ensure
  * content doesn't get hidden under system UI elements.
+ *
+ * The `pt-[env(safe-area-inset-top)]` on <body> (layout.tsx) also
+ * handles the notch / Dynamic Island in Safari, so the inset is
+ * applied consistently whether installed or not. Here we additionally
+ * pad the sides for landscape / edge-to-edge displays.
  */
+body {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
 @media all and (display-mode: standalone) {
   body {
+    /* Standalone mode needs !important because the inline body pt-
+       class can get outranked on some iOS versions. */
     padding-top: env(safe-area-inset-top) !important;
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/*
+ * iOS SAFARI AUTO-ZOOM GUARD
+ *
+ * Mobile Safari (including on iPhone 17) zooms the page whenever the
+ * user taps a form field with a computed font-size < 16px. That's a
+ * huge UX regression — the layout jumps and pinch-to-reset is
+ * required afterwards. Enforcing a 16px minimum on every form field
+ * kills that behaviour across the whole app.
+ *
+ * Only applied at viewport widths <= 480px (i.e. phones); on larger
+ * screens we let Tailwind's font-size classes win for density.
+ */
+@media (max-width: 480px) {
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em);
   }
 }
 

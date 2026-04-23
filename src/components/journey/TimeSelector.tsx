@@ -129,7 +129,8 @@ export default function TimeSelector({ onTimeChange }: TimeSelectorProps) {
             "w-full py-2 px-3",
             "bg-surface text-amber",
             "border border-board-border focus:border-amber",
-            "font-mono text-sm tracking-wider",
+            /* 16px minimum — prevents iOS Safari auto-zoom on focus. */
+            "font-mono text-base tracking-wider",
             "outline-none transition-colors duration-200",
             /*
              * iOS Safari adds default padding/width to input[type="time"]

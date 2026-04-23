@@ -350,8 +350,9 @@ export default function StationSearch({
             /* Only bottom border (amber underline style) */
             "border-b-2 border-amber-faint focus:border-amber",
             "border-t-0 border-l-0 border-r-0",
-            /* Mono font with wide spacing, like a terminal */
-            "font-mono text-sm tracking-wider",
+            /* Mono font with wide spacing, like a terminal.
+               16px minimum — prevents iOS Safari auto-zoom on focus. */
+            "font-mono text-base tracking-wider",
             /* Placeholder styling */
             "placeholder:text-amber-faint placeholder:uppercase",
             /* Remove default focus outline, we use the border instead */

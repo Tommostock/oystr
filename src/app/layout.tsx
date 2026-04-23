@@ -131,31 +131,50 @@ export default function RootLayout({
          * Generated via the icon + background color in the manifest.
          *
          * Common iOS screen sizes (portrait, 3x scale):
+         *   iPhone 17 Pro Max: 1320x2868
+         *   iPhone 17 / 17 Pro: 1206x2622
          *   iPhone 15 Pro Max: 1290x2796
          *   iPhone 15 / 14:   1170x2532
          *   iPhone SE 3:      750x1334
          *   iPad Pro 12.9":   2048x2732
          */}
+        {/* iPhone 17 Pro Max (6.9") — 2025 */}
+        <link
+          rel="apple-touch-startup-image"
+          href="/icons/icon-512.png"
+          media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3)"
+        />
+        {/* iPhone 17 / 17 Pro (6.3") — 2025 */}
+        <link
+          rel="apple-touch-startup-image"
+          href="/icons/icon-512.png"
+          media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3)"
+        />
+        {/* iPhone 15 Pro Max / 16 Pro Max */}
         <link
           rel="apple-touch-startup-image"
           href="/icons/icon-512.png"
           media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)"
         />
+        {/* iPhone 15 / 14 Pro */}
         <link
           rel="apple-touch-startup-image"
           href="/icons/icon-512.png"
           media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)"
         />
+        {/* iPhone 14 / 13 */}
         <link
           rel="apple-touch-startup-image"
           href="/icons/icon-512.png"
           media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)"
         />
+        {/* iPhone 13 mini / 12 mini */}
         <link
           rel="apple-touch-startup-image"
           href="/icons/icon-512.png"
           media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)"
         />
+        {/* iPhone SE (2nd / 3rd gen) */}
         <link
           rel="apple-touch-startup-image"
           href="/icons/icon-512.png"

@@ -108,7 +108,8 @@ export default function AirportSearch({
             "bg-surface text-amber",
             "border-b-2 border-amber-faint focus:border-amber",
             "border-t-0 border-l-0 border-r-0",
-            "font-mono text-sm tracking-wider",
+            /* 16px minimum — prevents iOS Safari auto-zoom on focus. */
+            "font-mono text-base tracking-wider",
             "placeholder:text-amber-faint placeholder:uppercase",
             "outline-none transition-colors duration-200"
           )}
