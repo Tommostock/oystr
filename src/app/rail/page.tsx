@@ -464,8 +464,13 @@ function RailPageFull() {
           <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase px-1">
             SAVED ROUTES
           </div>
+          {/*
+           * Strip scrolls within the parent's p-4 padding — no edge-
+           * bleed. Keeps the first saved-route card's left edge
+           * aligned with the other boxes on the rail page.
+           */}
           <div
-            className="flex gap-2 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1"
+            className="flex gap-2 overflow-x-auto snap-x snap-mandatory pb-1"
             style={{ scrollbarWidth: "none" }}
           >
             {journeys.map((j) => (

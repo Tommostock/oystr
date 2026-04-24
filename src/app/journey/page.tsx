@@ -386,8 +386,14 @@ export default function JourneyPage() {
           <div className="font-mono text-[10px] tracking-wider text-amber-faint uppercase px-1">
             SAVED JOURNEYS
           </div>
+          {/*
+           * Strip scrolls within the parent's p-4 padding — no edge-
+           * bleed. That keeps the first chip's left edge aligned with
+           * the other boxes on the page, rather than visually butting
+           * up against the screen edge.
+           */}
           <div
-            className="flex gap-2 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1"
+            className="flex gap-2 overflow-x-auto snap-x snap-mandatory pb-1"
             style={{ scrollbarWidth: "none" }}
           >
             {savedJourneys.slice(0, 5).map((j) => (
@@ -450,7 +456,7 @@ export default function JourneyPage() {
             </span>
           </div>
           <div
-            className="flex gap-2 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1"
+            className="flex gap-2 overflow-x-auto snap-x snap-mandatory pb-1"
             style={{ scrollbarWidth: "none" }}
           >
             {recents.slice(0, 5).map((r, i) => (
