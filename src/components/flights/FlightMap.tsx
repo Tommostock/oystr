@@ -147,9 +147,17 @@ function createAirportIcon(iata: string): L.DivIcon {
 }
 
 /**
- * Aircraft icon — SVG plane pointing "up" by default, rotated to
- * match `trueTrack` (compass bearing in degrees; 0 = north).
- * A pulsing amber glow makes it stand out at any zoom level.
+ * Aircraft icon — recognisable plane silhouette (nose up = north at
+ * 0deg, which matches aviation's trueTrack convention). Rotated to
+ * match the current heading so at a glance the user can tell which
+ * direction the plane is flying.
+ *
+ * The amber drop-shadow + thin dark stroke outlines the shape even
+ * against bright tile pixels so the plane never blends into the map.
+ *
+ * We use a Material-style FlightIcon SVG path rather than the Lucide
+ * Plane (which points upper-right, forcing a -45deg fudge factor).
+ * This one is perfectly north-aligned.
  */
 function createAircraftIcon(heading: number | null): L.DivIcon {
   const rotation = typeof heading === "number" ? heading : 0;
@@ -157,21 +165,21 @@ function createAircraftIcon(heading: number | null): L.DivIcon {
     className: "flight-aircraft-marker",
     html: `
       <div style="
-        width: 28px;
-        height: 28px;
+        width: 40px;
+        height: 40px;
         display: flex;
         align-items: center;
         justify-content: center;
         transform: rotate(${rotation}deg);
-        filter: drop-shadow(0 0 6px rgba(255, 149, 0, 0.9));
+        filter: drop-shadow(0 0 8px rgba(255, 149, 0, 1)) drop-shadow(0 0 2px #000);
       ">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="${AMBER}" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2 L14 10 L22 12 L14 14 L12 22 L10 14 L2 12 L10 10 Z"/>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="${AMBER}" stroke="#0a0a0a" stroke-width="0.5" xmlns="http://www.w3.org/2000/svg">
+          <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
         </svg>
       </div>
     `,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
   });
 }
 
@@ -265,7 +273,32 @@ export default function FlightMap({
   }, [origin.lat, origin.lon, destination.lat, destination.lon, liveLocation]);
 
   return (
-    <div className="w-full h-[280px] border border-board-border bg-surface overflow-hidden">
+    <div className="relative w-full h-[280px] border border-board-border bg-surface overflow-hidden">
+      {/* Overlay chip: "IN FLIGHT" when we have a live position, or a
+          short explanation otherwise so the user knows why there's
+          no plane icon. Positioned above the map with pointer-events
+          disabled so it doesn't block panning. */}
+      <div
+        className="absolute top-2 left-2 z-[500] pointer-events-none flex items-center gap-1.5 px-2 py-1 border border-amber bg-board-bg/85 font-mono text-[10px] tracking-widest text-amber uppercase"
+      >
+        {liveLocation ? (
+          <>
+            <span className="w-1.5 h-1.5 rounded-full bg-amber animate-pulse" />
+            IN FLIGHT
+            {typeof liveLocation.altitudeFeet === "number" && (
+              <span className="text-amber-faint ml-1">
+                {liveLocation.altitudeFeet.toLocaleString()} FT
+              </span>
+            )}
+          </>
+        ) : (
+          <>
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-faint" />
+            ON GROUND
+          </>
+        )}
+      </div>
+
       <MapContainer
         bounds={bounds}
         boundsOptions={{ padding: [40, 40] }}
