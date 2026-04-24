@@ -14,22 +14,65 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
 import { useRouter } from "next/navigation";
-import { Clock, Trash2, Plane } from "lucide-react";
+import { Clock, Trash2, Plane, Star } from "lucide-react";
 import PageHeader from "@/components/shared/PageHeader";
 import AirportSearch from "@/components/flights/AirportSearch";
 import FlightSearch from "@/components/flights/FlightSearch";
 import TrackedFlightCard from "@/components/flights/TrackedFlightCard";
 import FlightSeatEditor from "@/components/flights/FlightSeatEditor";
+import TodaysFlightHero from "@/components/flights/TodaysFlightHero";
+import SavedAirportLiveCard from "@/components/flights/SavedAirportLiveCard";
 import { LONDON_AIRPORTS } from "@/lib/airports";
 import { useRecentAirports } from "@/hooks/useRecentAirports";
 import { useTrackedFlights } from "@/hooks/useTrackedFlights";
+import { db } from "@/lib/db";
+
+/** Local YYYY-MM-DD — avoids the UTC shift toISOString() would cause. */
+function localDateString(d: Date = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 export default function FlightsPage() {
   const router = useRouter();
   const { recents, addRecent, removeRecent } = useRecentAirports();
   const { flights: trackedFlights, removeFlight, updateSeats } =
     useTrackedFlights();
+
+  /*
+   * Saved airports table — reactive via useLiveQuery so adding /
+   * removing a saved airport elsewhere in the app updates this
+   * section immediately without needing a manual refresh.
+   */
+  const savedAirports = useLiveQuery(
+    async () => {
+      const all = await db.savedAirports.toArray();
+      return all.sort((a, b) => b.addedAt - a.addedAt);
+    },
+    [],
+    []
+  );
+
+  /*
+   * Pick the single "today's flight" for the hero panel — the
+   * earliest departing tracked flight whose travelDate is today.
+   * If the user has multiple flights today we still only hero the
+   * earliest one; the others keep their normal TrackedFlightCard.
+   */
+  const today = localDateString();
+  const todaysFlight = trackedFlights.find((f) => f.travelDate === today) ?? null;
+
+  /*
+   * MY FLIGHTS card list — everything except the one we already
+   * hero'd, to avoid duplication at the top of the page.
+   */
+  const otherTrackedFlights = todaysFlight
+    ? trackedFlights.filter((f) => f.id !== todaysFlight.id)
+    : trackedFlights;
 
   /*
    * Which tracked flight currently has its seat editor open (null
@@ -65,8 +108,14 @@ export default function FlightsPage() {
     <div className="p-4 space-y-4">
       <PageHeader title="Flights" subtitle="LIVE DEPARTURES WORLDWIDE" />
 
-      {/* ---- Tracked flights — only rendered when the user has any ---- */}
-      {trackedFlights.length > 0 && (
+      {/* ---- TODAY'S FLIGHT hero — giant panel with live terminal,
+               gate, check-in, and countdown. Only shown when there's
+               a tracked flight departing today. ---- */}
+      {todaysFlight && <TodaysFlightHero flight={todaysFlight} />}
+
+      {/* ---- MY FLIGHTS — the remaining tracked flights (excluding
+               the one already shown in the hero) ---- */}
+      {otherTrackedFlights.length > 0 && (
         <div>
           <div className="flex items-center gap-1.5 mb-1.5 px-1">
             <Plane
@@ -79,13 +128,34 @@ export default function FlightsPage() {
             </span>
           </div>
           <div className="space-y-2">
-            {trackedFlights.map((f) => (
+            {otherTrackedFlights.map((f) => (
               <TrackedFlightCard
                 key={f.id}
                 flight={f}
                 onRemove={(id) => removeFlight(id)}
                 onEditSeats={(id) => setEditingSeatsId(id)}
               />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ---- Saved airports with live status — only when any exist ---- */}
+      {savedAirports && savedAirports.length > 0 && (
+        <div>
+          <div className="flex items-center gap-1.5 mb-1.5 px-1">
+            <Star
+              size={10}
+              strokeWidth={1.5}
+              className="text-amber-faint shrink-0"
+            />
+            <span className="font-mono text-[10px] tracking-wider text-amber-faint uppercase">
+              SAVED AIRPORTS
+            </span>
+          </div>
+          <div className="space-y-2">
+            {savedAirports.map((a) => (
+              <SavedAirportLiveCard key={a.iata} airport={a} />
             ))}
           </div>
         </div>

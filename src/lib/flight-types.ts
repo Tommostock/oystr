@@ -212,6 +212,22 @@ export interface FlightDetail {
   /** Aircraft info where known */
   aircraftModel: string | null;
   aircraftRegistration: string | null;
+  /**
+   * Aircraft photo + required attribution. Provided by AeroDataBox
+   * via the `withAircraftImage=true` query flag — images are typically
+   * sourced from Flickr/Wikimedia under CC licences, which is why we
+   * have to render the author credit alongside.
+   */
+  aircraftImage: {
+    /** Full-size image URL (PNG / JPEG) */
+    url: string;
+    /** Smaller thumbnail variant — null if the provider didn't return one */
+    thumbnailUrl: string | null;
+    /** Photographer's name / handle (required to display) */
+    author: string | null;
+    /** Link back to the source gallery (e.g. jetphotos, Flickr) */
+    webUrl: string | null;
+  } | null;
 
   /** Great-circle distance between the two airports in kilometres */
   distanceKm: number | null;

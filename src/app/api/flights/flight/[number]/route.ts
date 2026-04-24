@@ -275,6 +275,30 @@ function normaliseFlight(record: any, displayNumber: string): FlightDetail {
     record.arrival?.scheduledTime?.utc
   );
 
+  /*
+   * AeroDataBox shape for aircraft image (when withAircraftImage=true):
+   *   aircraft.image: {
+   *     url: string,
+   *     thumbnail: { url?: string, ... } | null,
+   *     webUrl: string,
+   *     author: string,
+   *     htmlAttributions: string[],
+   *   }
+   * It's only present when the provider has a known image for the
+   * aircraft's registration. Guard every access so missing fields
+   * don't break the whole response.
+   */
+  const rawImage = aircraft.image;
+  const aircraftImage =
+    rawImage && typeof rawImage.url === "string"
+      ? {
+          url: rawImage.url,
+          thumbnailUrl: rawImage.thumbnail?.url ?? null,
+          author: rawImage.author ?? null,
+          webUrl: rawImage.webUrl ?? null,
+        }
+      : null;
+
   return {
     flightNumber: record.number ?? displayNumber,
     airline: airline.name ?? "Unknown Airline",
@@ -287,6 +311,7 @@ function normaliseFlight(record: any, displayNumber: string): FlightDetail {
     arrival,
     aircraftModel: aircraft.model ?? null,
     aircraftRegistration: aircraft.reg ?? null,
+    aircraftImage,
     distanceKm,
     durationMinutes,
     liveLocation: normaliseLocation(record.location),
@@ -304,7 +329,10 @@ async function fetchUpstreamFlight(
 ): Promise<FlightDetail | null> {
   // The `{number}` path segment can contain a space — encode it.
   const urlNumber = encodeURIComponent(flightNumber);
-  const url = `https://${AERODATABOX_HOST}/flights/number/${urlNumber}?withAircraftImage=false&withLocation=true`;
+  // withAircraftImage=true so we can show a photo of the actual
+  // aircraft on the detail page. The provider includes the required
+  // attribution metadata; we render it with the image.
+  const url = `https://${AERODATABOX_HOST}/flights/number/${urlNumber}?withAircraftImage=true&withLocation=true`;
 
   const res = await fetch(url, {
     headers: {

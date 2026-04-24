@@ -544,15 +544,72 @@ export default function FlightDetailPage({ params }: PageProps) {
               </div>
             </BoardPanel>
 
-            {/* ---- Aircraft ---- */}
-            {(flight.aircraftModel || flight.aircraftRegistration) && (
+            {/* ---- Aircraft (model + reg + provider photo) ---- */}
+            {(flight.aircraftModel ||
+              flight.aircraftRegistration ||
+              flight.aircraftImage) && (
               <BoardPanel title="AIRCRAFT">
-                <div className="p-3 grid grid-cols-2 gap-3">
-                  <DetailItem label="MODEL" value={flight.aircraftModel} />
-                  <DetailItem
-                    label="REGISTRATION"
-                    value={flight.aircraftRegistration}
-                  />
+                <div className="p-3 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <DetailItem label="MODEL" value={flight.aircraftModel} />
+                    <DetailItem
+                      label="REGISTRATION"
+                      value={flight.aircraftRegistration}
+                    />
+                  </div>
+                  {flight.aircraftImage && (
+                    <figure className="border border-board-border">
+                      {/*
+                        Plain <img> not next/image — the provider URLs
+                        are from external CC-licensed sources that
+                        would each need to be added to next.config
+                        remotePatterns before next/image would accept
+                        them. A regular <img> lets us display any
+                        host. The eager loading strategy matters less
+                        here because there's only one image per page.
+                      */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={flight.aircraftImage.url}
+                        alt={
+                          flight.aircraftModel
+                            ? `${flight.aircraftModel}${
+                                flight.aircraftRegistration
+                                  ? ` — ${flight.aircraftRegistration}`
+                                  : ""
+                              }`
+                            : "Aircraft photograph"
+                        }
+                        loading="lazy"
+                        className="w-full h-auto object-cover"
+                      />
+                      {/*
+                        Attribution — required by most CC licences
+                        that the upstream provider aggregates from.
+                        Rendered as a caption so it's always
+                        associated with the photo.
+                      */}
+                      {(flight.aircraftImage.author ||
+                        flight.aircraftImage.webUrl) && (
+                        <figcaption className="px-2 py-1.5 font-mono text-[9px] tracking-wider text-amber-faint uppercase truncate">
+                          {flight.aircraftImage.webUrl ? (
+                            <a
+                              href={flight.aircraftImage.webUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:text-amber"
+                            >
+                              PHOTO{" "}
+                              {flight.aircraftImage.author &&
+                                `· ${flight.aircraftImage.author}`}
+                            </a>
+                          ) : (
+                            <>PHOTO · {flight.aircraftImage.author}</>
+                          )}
+                        </figcaption>
+                      )}
+                    </figure>
+                  )}
                 </div>
               </BoardPanel>
             )}

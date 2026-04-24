@@ -208,15 +208,14 @@ export default function FlightMap({
   destination,
   liveLocation,
 }: FlightMapProps) {
-  // Both coords are required for the map to be useful.
-  if (
-    origin.lat == null ||
-    origin.lon == null ||
-    destination.lat == null ||
-    destination.lon == null
-  ) {
-    return null;
-  }
+  // Coords are required for the map to be useful. We still need to
+  // run all hooks before any early return so the Rules of Hooks
+  // aren't violated — so check after computing, not before.
+  const hasCoords =
+    origin.lat != null &&
+    origin.lon != null &&
+    destination.lat != null &&
+    destination.lon != null;
 
   const originIcon = useMemo(() => createAirportIcon(origin.iata), [origin.iata]);
   const destIcon = useMemo(
@@ -230,18 +229,20 @@ export default function FlightMap({
 
   const pathPoints = useMemo(
     () =>
-      greatCirclePoints(
-        { lat: origin.lat as number, lon: origin.lon as number },
-        { lat: destination.lat as number, lon: destination.lon as number }
-      ),
-    [origin.lat, origin.lon, destination.lat, destination.lon]
+      hasCoords
+        ? greatCirclePoints(
+            { lat: origin.lat as number, lon: origin.lon as number },
+            { lat: destination.lat as number, lon: destination.lon as number }
+          )
+        : [],
+    [hasCoords, origin.lat, origin.lon, destination.lat, destination.lon]
   );
 
   // Split the path into "flown" and "remaining" segments when we
   // have a live position. Rough heuristic: use the closest waypoint
   // on the precomputed path. Good enough for a visual distinction.
   const { flown, remaining } = useMemo(() => {
-    if (!liveLocation) {
+    if (!liveLocation || pathPoints.length === 0) {
       return { flown: null, remaining: pathPoints };
     }
     let closestIdx = 0;
@@ -264,13 +265,18 @@ export default function FlightMap({
 
   // Bounds include both airports + aircraft when airborne.
   const bounds: L.LatLngBoundsExpression = useMemo(() => {
+    if (!hasCoords) return [[0, 0], [0, 0]];
     const pts: [number, number][] = [
       [origin.lat as number, origin.lon as number],
       [destination.lat as number, destination.lon as number],
     ];
     if (liveLocation) pts.push([liveLocation.lat, liveLocation.lon]);
     return pts;
-  }, [origin.lat, origin.lon, destination.lat, destination.lon, liveLocation]);
+  }, [hasCoords, origin.lat, origin.lon, destination.lat, destination.lon, liveLocation]);
+
+  // Hide the map entirely when we don't have enough data. All hooks
+  // above have been called unconditionally so this bail-out is safe.
+  if (!hasCoords) return null;
 
   return (
     <div className="relative w-full h-[280px] border border-board-border bg-surface overflow-hidden">
@@ -300,6 +306,17 @@ export default function FlightMap({
       </div>
 
       <MapContainer
+        /*
+         * `key` forces React to discard and recreate the map whenever
+         * the user navigates to a different flight. Without this,
+         * React-Leaflet 5 + React 19's strict-mode double-invoke
+         * throws "Map container is being reused by another instance"
+         * during dev HMR and route changes. The key uses the IATA
+         * pair since that uniquely identifies the flight corridor;
+         * the map never needs to visually transition between two
+         * different routes.
+         */
+        key={`${origin.iata}-${destination.iata}`}
         bounds={bounds}
         boundsOptions={{ padding: [40, 40] }}
         zoomControl={false}
