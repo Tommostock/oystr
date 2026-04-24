@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { FlightDeparture, FlightStatus } from "@/lib/flight-types";
 import { getAirportByIata } from "@/lib/airports";
+import { FLIGHT_SERVER_CACHE_SECONDS } from "@/lib/constants";
 
 const FLIGHTS_API_KEY_ENV = "FLIGHTS_API_KEY";
 const AERODATABOX_HOST = "aerodatabox.p.rapidapi.com";
@@ -209,8 +210,10 @@ async function fetchUpstreamDepartures(
       "x-rapidapi-host": AERODATABOX_HOST,
       "x-rapidapi-key": apiKey,
     },
-    // Cache server-side for 90 seconds to avoid hammering the free tier
-    next: { revalidate: 90 },
+    // Cache server-side for 8 minutes — keeps multiple simultaneous
+    // components (e.g. saved-airport card + airport page) sharing a
+    // single upstream call most of the time. See FLIGHT_SERVER_CACHE_SECONDS.
+    next: { revalidate: FLIGHT_SERVER_CACHE_SECONDS },
   });
 
   if (!res.ok) {

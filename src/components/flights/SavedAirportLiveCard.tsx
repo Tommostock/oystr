@@ -48,10 +48,19 @@ function summariseBoard(departures: FlightDeparture[]) {
 export default function SavedAirportLiveCard({
   airport,
 }: SavedAirportLiveCardProps) {
-  // Request 15 rows — enough to give the counts substance without
-  // triggering the clamp at 50.
+  /*
+   * Request 15 rows, once per mount — the AeroDataBox free tier is
+   * only 150 req/mo, and each saved airport card would otherwise
+   * poll every 10 min while /flights is open, multiplying with every
+   * saved airport the user pins. Fetching once gives a snapshot; the
+   * user can tap through to the full airport page for live data.
+   */
   const { departures, isLoading, error, notConfigured } =
-    useFlightDepartures({ iata: airport.iata, numRows: 15 });
+    useFlightDepartures({
+      iata: airport.iata,
+      numRows: 15,
+      pollingDisabled: true,
+    });
 
   const fullName = formatAirportFullName({
     name: airport.name,

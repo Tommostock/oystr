@@ -142,12 +142,27 @@ export const ARRIVALS_POLL_INTERVAL = 30_000; // 30 seconds
 export const LINE_STATUS_POLL_INTERVAL = 60_000; // 60 seconds
 export const RAIL_DEPARTURES_POLL_INTERVAL = 30_000; // 30 seconds
 /*
- * Flight boards poll slower than tube/rail because the free tiers of
- * aviation data providers (AeroDataBox et al.) cap monthly requests
- * very tightly. 2 minutes gives the user a lively feel without
- * burning through the quota when multiple airports are viewed.
+ * Flight boards poll *very* slowly because the AeroDataBox free
+ * tier is only 150 requests/month. At 2 min intervals (the old
+ * value), a single saved-airport card + tracked-flight hero burns
+ * ~60 calls/hour — the entire monthly budget in ~2.5h of page-open
+ * time. 10 min + viewport + cache hygiene keeps normal use well
+ * inside the quota:
+ *   - Global `revalidateOnFocus: false` (tab-switch no longer
+ *     forces a refresh).
+ *   - `refreshWhenHidden: false` (tab in background pauses polling).
+ *   - Server-side cache extended to the same interval so concurrent
+ *     components share one upstream call.
+ *   - SavedAirportLiveCard fetches ONCE (no interval at all).
+ *   - TodaysFlightHero only polls within the last 4h before
+ *     scheduled departure.
+ *
+ * Users who need faster refresh can pull-to-refresh or upgrade to
+ * AeroDataBox Basic ($10/mo = 5,000 req/mo).
  */
-export const FLIGHT_DEPARTURES_POLL_INTERVAL = 120_000; // 2 minutes
+export const FLIGHT_DEPARTURES_POLL_INTERVAL = 600_000; // 10 minutes
+/** Server-side Next.js fetch cache TTL for flight API routes. */
+export const FLIGHT_SERVER_CACHE_SECONDS = 480; // 8 minutes
 
 /* ========================================
  * NAVIGATION TABS

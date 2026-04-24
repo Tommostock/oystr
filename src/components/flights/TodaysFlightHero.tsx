@@ -111,15 +111,28 @@ function useNowTicker(intervalMs = 30_000): number {
 
 export default function TodaysFlightHero({ flight }: TodaysFlightHeroProps) {
   const router = useRouter();
+  const now = useNowTicker(30_000);
 
-  /* Poll live detail for the hero so terminal / gate / delay are
-     always current — this is the single most important piece of
-     UI on travel day. */
+  /*
+   * Only auto-refresh live data within ~4h of departure — that's the
+   * window where terminal/gate/delay changes actually matter to the
+   * user. A flight scheduled for 18:00 that you open at 08:00
+   * doesn't need 10-min polling; it just wastes AeroDataBox quota
+   * (free tier is 150 req/mo). Users can still pull-to-refresh.
+   */
+  const minutesToDeparture = (() => {
+    const dep = new Date(
+      `${flight.travelDate}T${flight.scheduledDeparture}:00`
+    );
+    if (Number.isNaN(dep.getTime())) return Number.POSITIVE_INFINITY;
+    return Math.round((dep.getTime() - now) / 60_000);
+  })();
+  const shouldPoll = minutesToDeparture <= 4 * 60 && minutesToDeparture >= -60;
+
   const { flight: live } = useFlightDetail({
     flightNumber: flight.flightNumber,
+    pollingDisabled: !shouldPoll,
   });
-
-  const now = useNowTicker(30_000);
 
   const fromFullName = formatAirportFullName({
     name: flight.departureName,

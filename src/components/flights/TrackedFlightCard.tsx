@@ -221,15 +221,28 @@ export default function TrackedFlightCard({
   const router = useRouter();
 
   /*
-   * Only fetch live data when the travel day matches — calling the
-   * flight-by-number endpoint days early burns through the free-tier
-   * quota and the provider rarely has useful data that far out.
+   * Only fetch live data when the travel day matches. Polling is
+   * further gated to the last ~4h before departure to protect the
+   * AeroDataBox free-tier quota (150 req/mo — polling a card all
+   * day would exhaust that in a few hours with multiple cards).
+   * Before the 4h window we still fetch once so the card has fresh
+   * status on mount; we just don't refresh on an interval.
    */
   const today = localDateString();
   const shouldFetchLive = flight.travelDate === today;
+  const shouldPoll = (() => {
+    if (!shouldFetchLive) return false;
+    const dep = new Date(
+      `${flight.travelDate}T${flight.scheduledDeparture}:00`
+    );
+    if (Number.isNaN(dep.getTime())) return false;
+    const mins = Math.round((dep.getTime() - Date.now()) / 60_000);
+    return mins <= 4 * 60 && mins >= -60;
+  })();
 
   const { flight: live } = useFlightDetail({
     flightNumber: shouldFetchLive ? flight.flightNumber : null,
+    pollingDisabled: !shouldPoll,
   });
 
   const isFuture = flight.travelDate > today;

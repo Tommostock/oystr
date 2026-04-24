@@ -24,6 +24,7 @@ import TrackedFlightCard from "@/components/flights/TrackedFlightCard";
 import FlightSeatEditor from "@/components/flights/FlightSeatEditor";
 import TodaysFlightHero from "@/components/flights/TodaysFlightHero";
 import SavedAirportLiveCard from "@/components/flights/SavedAirportLiveCard";
+import FlightQuotaBanner from "@/components/flights/FlightQuotaBanner";
 import { LONDON_AIRPORTS } from "@/lib/airports";
 import { useRecentAirports } from "@/hooks/useRecentAirports";
 import { useTrackedFlights } from "@/hooks/useTrackedFlights";
@@ -107,6 +108,9 @@ export default function FlightsPage() {
   return (
     <div className="p-4 space-y-4">
       <PageHeader title="Flights" subtitle="LIVE DEPARTURES WORLDWIDE" />
+
+      {/* ---- Quota banner — only visible when near / past free-tier limit ---- */}
+      <FlightQuotaBanner />
 
       {/* ---- TODAY'S FLIGHT hero — giant panel with live terminal,
                gate, check-in, and countdown. Only shown when there's

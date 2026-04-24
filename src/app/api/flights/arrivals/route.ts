@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { FlightArrival, FlightStatus } from "@/lib/flight-types";
 import { getAirportByIata } from "@/lib/airports";
+import { FLIGHT_SERVER_CACHE_SECONDS } from "@/lib/constants";
 
 const FLIGHTS_API_KEY_ENV = "FLIGHTS_API_KEY";
 const AERODATABOX_HOST = "aerodatabox.p.rapidapi.com";
@@ -173,7 +174,9 @@ async function fetchUpstreamArrivals(
       "x-rapidapi-host": AERODATABOX_HOST,
       "x-rapidapi-key": apiKey,
     },
-    next: { revalidate: 90 },
+    // See FLIGHT_SERVER_CACHE_SECONDS — 8 min server cache deliberately
+    // matches the SWR poll interval so concurrent components share a call.
+    next: { revalidate: FLIGHT_SERVER_CACHE_SECONDS },
   });
 
   if (!res.ok) {
