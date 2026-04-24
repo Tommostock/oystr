@@ -9,8 +9,15 @@
  *   - Surface:     #111111 (card/panel backgrounds)
  *   - Border:      #1a1a1a (subtle panel edges)
  *   - Amber:       #ff9500 (primary LED text colour)
- *   - Amber dim:   #cc7700 (secondary/dimmer text)
- *   - Amber faint: #664400 (placeholder/inactive text)
+ *   - Amber dim:   #e68600 (10% dimmer than primary — labels, secondary info)
+ *   - Amber faint: #e68600 (10% dimmer than primary — placeholders, icons)
+ *
+ * Note: dim + faint were originally much darker (#cc7700 / #664400)
+ * but reading them on an iPhone outdoors was near-impossible, so
+ * they've been raised to a 90% luminosity variant of the primary
+ * amber. Both settle at the same value for now — the old hierarchy
+ * was rarely used meaningfully and the unified dim is easier to
+ * reason about.
  *   - Error/red:   #ff3b30 (disruptions and severe delays)
  *   - Good/green:  #34c759 (good service status)
  */
@@ -45,8 +52,10 @@
    *   text-amber, bg-surface, border-board-border
    * ======================================== */
   --color-amber: #ff9500;
-  --color-amber-dim: #cc7700;
-  --color-amber-faint: #664400;
+  /* Both dim variants sit at 90% brightness of the primary so they
+     read on an iPhone in daylight — previously far too dark. */
+  --color-amber-dim: #e68600;
+  --color-amber-faint: #e68600;
   --color-board-bg: #0a0a0a;
   --color-surface: #111111;
   --color-board-border: #1a1a1a;
@@ -145,9 +154,9 @@ body {
   --primary: #ff9500;
   --primary-foreground: #0a0a0a;
   --secondary: #1a1a1a;
-  --secondary-foreground: #cc7700;
+  --secondary-foreground: #e68600;
   --muted: #1a1a1a;
-  --muted-foreground: #664400;
+  --muted-foreground: #e68600;
   --accent: #ff9500;
   --accent-foreground: #0a0a0a;
   --destructive: #ff3b30;
@@ -323,7 +332,7 @@ body {
 }
 
 .leaflet-popup-close-button {
-  color: #664400 !important;
+  color: #e68600 !important;
   font-size: 18px !important;
   top: 4px !important;
   right: 6px !important;
