@@ -14,6 +14,7 @@
 "use client";
 
 import { use, useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   Plane,
   Clock,
@@ -32,6 +33,22 @@ import { useFlightDetail } from "@/hooks/useFlightDetail";
 import { useTrackedFlights } from "@/hooks/useTrackedFlights";
 import { formatAirportFullName } from "@/lib/airports";
 import type { FlightDetail, FlightDetailLeg } from "@/lib/flight-types";
+
+/*
+ * FlightMap depends on Leaflet, which touches `window` at import
+ * time and breaks SSR. Loading it dynamically with ssr: false
+ * defers the import to the browser.
+ */
+const FlightMap = dynamic(
+  () => import("@/components/flights/FlightMap"),
+  { ssr: false, loading: () => (
+    <div className="w-full h-[280px] border border-board-border bg-surface flex items-center justify-center">
+      <span className="font-mono text-[10px] tracking-widest text-amber-faint uppercase">
+        MAP LOADING...
+      </span>
+    </div>
+  ) }
+);
 
 interface PageProps {
   /* Next.js 15 passes dynamic params as a Promise in client pages. */
@@ -492,6 +509,14 @@ export default function FlightDetailPage({ params }: PageProps) {
         {/* ---- Departure / Arrival — stacked on mobile, side-by-side on md ---- */}
         {flight && (
           <>
+            {/* ---- Flight map — airport markers, great-circle arc, and
+                     live aircraft position when airborne ---- */}
+            <FlightMap
+              origin={flight.departure.airport}
+              destination={flight.arrival.airport}
+              liveLocation={flight.liveLocation}
+            />
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <LegPanel
                 title="DEPARTURE"

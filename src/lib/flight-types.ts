@@ -140,6 +140,14 @@ export interface FlightDetailAirport {
   countryCode: string | null;
   /** IANA timezone (e.g. "Europe/London") — useful for showing local times */
   timeZone: string | null;
+  /**
+   * Latitude / longitude of the airport. Used to plot origin and
+   * destination on the flight map and to draw the great-circle arc
+   * between them. Nullable because AeroDataBox occasionally omits
+   * coordinates for obscure airports.
+   */
+  lat: number | null;
+  lon: number | null;
 }
 
 export interface FlightDetailLeg {

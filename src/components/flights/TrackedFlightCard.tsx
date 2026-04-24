@@ -13,11 +13,22 @@
 
 "use client";
 
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2, ArrowRight, Armchair, Pencil, Calendar } from "lucide-react";
+import {
+  Trash2,
+  ArrowRight,
+  Armchair,
+  Pencil,
+  Calendar,
+  Clock,
+  Map,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFlightDetail } from "@/hooks/useFlightDetail";
 import { formatAirportFullName } from "@/lib/airports";
+import { getTransportOptions } from "@/lib/airport-transport";
 import type { TrackedFlight } from "@/lib/db";
 import type { FlightStatus } from "@/lib/flight-types";
 
@@ -115,6 +126,93 @@ function prettyStatus(status: FlightStatus): string {
   }
 }
 
+/* ========================================
+ * COUNTDOWN
+ * Drives the urgency messaging on the card. Defaults:
+ *   gate closes ~15 min before departure
+ *   boarding starts ~45 min before departure
+ *   check-in recommended ~2 h before international, ~90 min domestic
+ *
+ * We don't know whether the flight is international from a tracked
+ * record alone, so the boarding/gate-close markers are kept as a
+ * generic heuristic that's conservative enough for most scenarios.
+ *
+ * Returns an object with a label (one short string) and an optional
+ * urgency level — the caller can colour the chip accordingly.
+ * ======================================== */
+function computeCountdown(
+  travelDate: string,
+  scheduledDeparture: string,
+  liveDepartureLocal: string | null | undefined,
+  nowMs: number
+): { label: string; urgency: "calm" | "soon" | "urgent" | "none" } {
+  // Prefer the live (estimated/actual) time if different from scheduled.
+  const hhmm = liveDepartureLocal || scheduledDeparture;
+  if (!travelDate || !hhmm) return { label: "", urgency: "none" };
+
+  const target = new Date(`${travelDate}T${hhmm}:00`);
+  if (Number.isNaN(target.getTime())) return { label: "", urgency: "none" };
+
+  const deltaMs = target.getTime() - nowMs;
+  const deltaMin = Math.round(deltaMs / 60_000);
+
+  if (deltaMin <= -60) return { label: "", urgency: "none" };
+  if (deltaMin <= 0) return { label: "DEPARTED", urgency: "none" };
+
+  // Gate closes ~15 min before departure
+  if (deltaMin <= 15) {
+    return { label: `GATE CLOSES IN ${deltaMin} MIN`, urgency: "urgent" };
+  }
+  // Boarding ~45 min before departure
+  if (deltaMin <= 45) {
+    const boardMin = deltaMin - 15;
+    return { label: `BOARDS IN ${boardMin} MIN`, urgency: "urgent" };
+  }
+  if (deltaMin <= 120) {
+    return { label: `BOARDS IN ${deltaMin - 45} MIN`, urgency: "soon" };
+  }
+
+  // Beyond 2h — friendly hours/minutes countdown.
+  if (deltaMin < 60 * 24) {
+    const h = Math.floor(deltaMin / 60);
+    const m = deltaMin % 60;
+    const label = m === 0 ? `DEPARTS IN ${h}H` : `DEPARTS IN ${h}H ${m}M`;
+    return { label, urgency: "calm" };
+  }
+
+  // Days away — show days.
+  const days = Math.ceil(deltaMin / (60 * 24));
+  return {
+    label: days === 1 ? "DEPARTS TOMORROW" : `DEPARTS IN ${days} DAYS`,
+    urgency: "calm",
+  };
+}
+
+function countdownChipClasses(
+  urgency: "calm" | "soon" | "urgent" | "none"
+): string {
+  switch (urgency) {
+    case "urgent":
+      return "border-bad text-bad bg-bad/10";
+    case "soon":
+      return "border-amber text-amber amber-glow bg-amber/10";
+    case "calm":
+      return "border-amber-faint text-amber";
+    default:
+      return "hidden";
+  }
+}
+
+/** Reactive now() that ticks every 30 s so countdown chips stay live. */
+function useNowTicker(intervalMs = 30_000): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
+
 export default function TrackedFlightCard({
   flight,
   onRemove,
@@ -176,6 +274,19 @@ export default function TrackedFlightCard({
   const statusClasses = status
     ? statusChipClasses(status)
     : "border-amber-faint text-amber-faint";
+
+  /*
+   * Gate / boarding / departure countdown. Ticks every 30s so the
+   * user doesn't need to refresh to watch the time shrink. Skipped
+   * entirely on past / far-future flights (urgency === "none").
+   */
+  const now = useNowTicker(30_000);
+  const countdown = computeCountdown(
+    flight.travelDate,
+    flight.scheduledDeparture,
+    live?.departure.estimatedTime ?? null,
+    now
+  );
 
   const seats = flight.seats ?? [];
   const hasSeats = seats.length > 0;
@@ -300,6 +411,20 @@ export default function TrackedFlightCard({
         </div>
       )}
 
+      {/* ---- Countdown chip: "DEPARTS IN 3H 15M" -> "BOARDS IN 45 MIN"
+               -> "GATE CLOSES IN 10 MIN" as the departure approaches. ---- */}
+      {countdown.urgency !== "none" && (
+        <div
+          className={cn(
+            "inline-flex items-center gap-1.5 px-2 py-1 border font-mono text-[10px] tracking-widest uppercase w-fit",
+            countdownChipClasses(countdown.urgency)
+          )}
+        >
+          <Clock size={10} strokeWidth={1.5} />
+          {countdown.label}
+        </div>
+      )}
+
       {/* ---- Seats row: always rendered so editing is one tap away ---- */}
       <div className="flex items-center gap-2 pt-1 border-t border-board-border">
         <Armchair
@@ -343,6 +468,24 @@ export default function TrackedFlightCard({
           )}
         </button>
       </div>
+
+      {/* ---- How-to-get-there link — only when we have curated
+               transport data for the departure airport (the 5 main
+               London ones for now). Links to the airport page's
+               GETTING HERE panel. ---- */}
+      {getTransportOptions(flight.departureIata) && (
+        <Link
+          href={`/flights/airport/${flight.departureIata}#getting-here`}
+          className="flex items-center justify-between gap-2 px-2 py-1.5 border border-board-border hover:border-amber-faint text-amber-faint hover:text-amber transition-colors font-mono text-[10px] tracking-widest uppercase"
+          aria-label={`How to get to ${flight.departureIata}`}
+        >
+          <span className="flex items-center gap-1.5">
+            <Map size={11} strokeWidth={1.5} />
+            HOW TO GET TO {flight.departureIata}
+          </span>
+          <ArrowRight size={10} strokeWidth={1.5} />
+        </Link>
+      )}
     </div>
   );
 }

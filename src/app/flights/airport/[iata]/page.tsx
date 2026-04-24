@@ -21,6 +21,7 @@ import PullToRefresh from "@/components/shared/PullToRefresh";
 import FlightDepartureBoard from "@/components/flights/FlightDepartureBoard";
 import FlightArrivalsBoard from "@/components/flights/FlightArrivalsBoard";
 import SaveAirportButton from "@/components/flights/SaveAirportButton";
+import AirportTransportPanel from "@/components/flights/AirportTransportPanel";
 import { getAirportByIata, formatAirportFullName } from "@/lib/airports";
 import type { FlightArrival, FlightDeparture } from "@/lib/flight-types";
 
@@ -176,6 +177,9 @@ export default function AirportPage({ params }: PageProps) {
             onFlightTap={handleFlightTap}
           />
         )}
+
+        {/* ---- Ground transport — only renders for London airports ---- */}
+        <AirportTransportPanel iata={iata} />
       </div>
     </PullToRefresh>
   );

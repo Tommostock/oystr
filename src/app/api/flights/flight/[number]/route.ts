@@ -168,6 +168,8 @@ function normaliseLeg(leg: any): FlightDetailLeg {
       city: displayCity,
       countryCode: airport.countryCode ?? null,
       timeZone: airport.timeZone ?? null,
+      lat: typeof airport.location?.lat === "number" ? airport.location.lat : null,
+      lon: typeof airport.location?.lon === "number" ? airport.location.lon : null,
     },
     scheduledTime,
     scheduledDate,
